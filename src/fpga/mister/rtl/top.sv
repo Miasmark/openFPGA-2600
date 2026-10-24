@@ -1,32 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2019-2026 Jamie Blanks
 
-module Atari7800 #(
-	// Firmware images for the Souper BupChip profile. Quartus reads the .mif
-	// when it builds; $readmemh reads the .hex in simulation. Both come from
-	// .agents/firmware/bupchip, installed into rtl/ by its `install` target.
-	//
-	// Never let a comment line begin with the word s-y-n-t-h-e-s-i-s: Quartus
-	// treats that as a directive and warns (10335) about whatever word comes
-	// next, so ordinary prose wrapping onto such a line becomes one. The
-	// earlier wording here did exactly that, twice per build. Enforced by
-	// .agents/tests/lint/comment_directives.py - and spelled out above rather
-	// than quoted, so this note cannot trip the thing it describes.
-	parameter BUPCHIP_ROM_MIF  = "bupchip.mif",
-	parameter BUPCHIP_ROM_INIT = "rtl/bupchip.hex"
-) (
-`ifdef BUPCHIP_FORCE_CMD
-	// Simulation only: see the BUPCHIP_FORCE_CMD block below.
-	input  logic        bupchip_force_valid,
-	input  logic  [7:0] bupchip_force_data,
-`endif
+// openFPGA-2600 (plan step 4): the 2600 system module. The 7800 cartridge
+// (cart.sv, with its POKEY, YM2151, SN76489, Minnie, Covox and the Souper
+// BupChip's command and audio), the 7800's RAM0/RAM1, the 7800 BIOS read
+// path and the High Score Cart are gone; MARIA's clock and decode remain.
+module Atari7800 (
 `ifdef POCKET_SRAM
-	// Pocket: the BIOS and the Flicker Blend frame live in the Pocket's SRAM
+	// Pocket: the Flicker Blend frame lives in the Pocket's SRAM
 	// (core/sram_ctrl.sv), as does the cartridge RAM (EXTERNAL_CARTRAM).
-	// mclk1 is the SRAM's slot reference; bios_sel says a cartridge-space
-	// read is the BIOS. See POCKET_CHANGES.md.
+	// mclk1 is the SRAM's slot reference. See POCKET_CHANGES.md.
 	output logic        mclk1_out,
-	output logic        bios_sel_out,
 	output logic [15:0] fb_addr,
 	output logic        fb_we,
 	output logic  [7:0] fb_wdata,
@@ -39,16 +23,6 @@ module Atari7800 #(
 	output logic        cartram_wr26_out,
 	output logic        cartram_rd26_out,
 	output logic  [7:0] cartram_wrdata26_out,
-`endif
-`ifdef POCKET_BUPCHIP
-	// Pocket: the BupChip runs outside this module (core/bupchip/, with
-	// NO_BUPCHIP defined). This exports its $8007 command and the Souper
-	// profile and takes its audio back into the mix. See POCKET_CHANGES.md.
-	output logic        bup_cmd_valid_o,
-	output logic  [7:0] bup_cmd_data_o,
-	output logic        souper_profile_o,
-	input  logic [15:0] bup_audio_l_i,
-	input  logic [15:0] bup_audio_r_i,
 `endif
 `ifdef NO_ARM_MAPPER
 `ifdef POCKET_DARIA
@@ -67,12 +41,11 @@ module Atari7800 #(
 `endif
 `endif
 `ifdef EXTERNAL_FIRMWARE
-	// Pocket: the HSC and Supercharger firmware are loaded at run time from
-	// user-supplied files instead of being built in (see POCKET_CHANGES.md).
-	input  logic        fw_hsc_load,
+	// Pocket: the Supercharger firmware is loaded at run time from a
+	// user-supplied file instead of being built in (see POCKET_CHANGES.md).
 	input  logic        fw_ar_load,
 	input  logic        fw_wr,
-	input  logic [11:0] fw_addr,
+	input  logic [10:0] fw_addr,
 	input  logic  [7:0] fw_data,
 `endif
 	input  logic        clk_sys,
@@ -89,9 +62,6 @@ module Atari7800 #(
 	output logic        ce_pix,
 	input  logic        PAL,
 	input  logic [1:0]  pal_temp,
-	input  logic        hsc_en,
-	output logic        hsc_ram_cs,
-	input  logic  [7:0] hsc_ram_dout,
 	output logic  [7:0] dout,
 	output logic        cpu_ce,
 
@@ -104,23 +74,23 @@ module Atari7800 #(
 	input logic         tia_mode,
 	input logic         cpu_driver,
 
-	input  logic [7:0]  cart_xm,
 	output logic        cart_read,
-	input  logic [7:0]  cart_out, bios_out,
+	input  logic [7:0]  cart_out,
 	output logic [15:0] AB,
 	output logic [24:0] cart_addr_out,
-	input  logic [15:0] cart_flags,
-	input  logic [7:0]  cart_mapper,
-	input  logic  [7:0] cart_save,
 	input  logic [31:0] cart_size,
 	output logic  [7:0] cart_din,
 	output logic        RW,
 	input  logic        loading,
 
+`ifndef POCKET_SRAM
+	// The cartridge RAM request (the 2600 mappers' and the ARM mapper's
+	// init); under POCKET_SRAM it leaves on cartram_*26_out instead.
 	output       [17:0] cartram_addr,
 	output              cartram_wr,
 	output              cartram_rd,
 	output       [7:0]  cartram_wrdata,
+`endif
 	input        [7:0]  cartram_data,
 	input  logic        clk_arm,
 	input  logic        arm_reset,          // power-on reset for the ARM mapper
@@ -178,8 +148,6 @@ module Atari7800 #(
 	input logic [31:0] cdfj_stack,
 	input logic [15:0] arm_audio_size_addr,
 	input logic        sc,
-	input logic [7:0]  clearval,
-	input logic [7:0]  random,
 	input logic [1:0]  tape_in,
 	input logic        fix_sc_cs,
 	output logic       tia_hsync,
@@ -193,10 +161,6 @@ module Atari7800 #(
 	output logic [9:0] comp_burst_len,
 
 	input  logic       use_stereo,
-	input [10:0]       ps2_key,
-	input              pokey_irq,
-	input              minnie_en,
-	input              minnie_alt,
 	input              decomb,
 	input [5:0]        mapper,
 	input              pal_load,
@@ -221,7 +185,9 @@ module Atari7800 #(
 	logic [3:0]     audv0, audv1;
 	logic [7:0]     tia_db_out;
 	logic           RDY;
-	logic           IRQ_n;
+	// The 6507 has no IRQ pin. On a 7800 the cartridge's POKEY or YM2151
+	// drove SALLY's (cart.sv: high without one, so for every 2600 image).
+	wire            IRQ_n = 1'b1;
 	logic [15:0]    cpu_AB;
 	logic           cpu_halt_n;
 	logic           cpu_released;
@@ -235,26 +201,16 @@ module Atari7800 #(
 	logic [7:0]     bus_stuff_data;
 	wire [7:0]      physical_write_DB = tia_en && bus_stuff_valid ?
 		(write_DB & bus_stuff_data) : write_DB;
-	logic [7:0]     tia_DB_out, riot_DB_out, maria_DB_out, ram0_DB_out, ram1_DB_out, cart_DB_out;
+	logic [7:0]     tia_DB_out, riot_DB_out, maria_DB_out, cart_DB_out;
 	// Which data lines each chip is actually driving. Everything else on the
 	// bus drives all eight or none.
 	logic [7:0]     tia_DB_oe, riot_DB_oe, maria_DB_oe, cart_DB_oe;
-	logic [7:0]     cart_7800_DB_oe, cart_2600_DB_oe;
 	logic           cpu_DB_oe, cpu_AB_oe, cpu_RW_oe;
-	logic [15:0]    pokey_audio_r, pokey_audio_l, ym_audio_r, ym_audio_l;
-	logic [15:0]    minnie_audio;
-	logic [15:0]    sn_audio;
 	logic           mclk0;
 	logic           mclk1;
 	logic           cs_ram0, cs_ram1, cs_tia, cs_riot, cs_maria;
 	logic [7:0]     open_bus;
-	wire            cart_read_flag, ext_audio_cart;
-	// Souper's player is an external source too, so it must halve the mix.
-	wire            ext_audio = ext_audio_cart || souper_profile;
-	logic [24:0]    cart_2600_addr_out, cart_7800_addr_out;
-	logic [7:0]     cart_2600_DB_out, cart_7800_DB_out;
 	logic           cpu_rwn;
-	logic [15:0]    covox_r, covox_l;
 	logic [15:0]    last_address;
 	logic           pclk1, pclk0, pclk1_m, pclk0_m, pclk1_t, pclk0_t;
 	logic           pclk1_raw, pclk0_raw;
@@ -267,10 +223,10 @@ module Atari7800 #(
 	logic           tia_clk_x2;
 	logic           read_2600;
 	logic [1:0]     pause_clock;
-	logic [17:0]    cartram_addr78, cartram_addr26;
-	logic           cartram_wr78, cartram_wr26;
-	logic [7:0]     cartram_wrdata78, cartram_wrdata26;
-	logic           cartram_rd78, cartram_rd26;
+	logic [17:0]    cartram_addr26;
+	logic           cartram_wr26;
+	logic [7:0]     cartram_wrdata26;
+	logic           cartram_rd26;
 	logic [7:0]     cartram_data_bram;
 	logic           arm_call_stall;
 
@@ -351,10 +307,10 @@ module Atari7800 #(
 	assign RDY = maria_RDY && tia_RDY && (~tia_en || tia_RDY_seen_high) &&
 		!arm_call_stall;
 	assign cpu_halt_n = (ctrl_writes == 2'd2) ? halt_n : 1'b1;
-	assign cart_read = tia_en ? (pause ? ~|pause_clock : read_2600) : ((pause ? pause_clock[0] : (cart_read_flag & mclk1)));
-	assign cart_addr_out = tia_en ? cart_2600_addr_out : cart_7800_addr_out;
-	assign cart_DB_out = tia_en ? cart_2600_DB_out : cart_7800_DB_out;
-	assign cart_DB_oe = tia_en ? cart_2600_DB_oe : cart_7800_DB_oe;
+	// The 2600 cartridge slot only (cart2600). The 7800 one (cart.sv) served
+	// these while tia_en was low: in the 2600 core that is while the console
+	// is held in reset, a load included, and before the first image.
+	assign cart_read = tia_en ? (pause ? ~|pause_clock : read_2600) : 1'b0;
 	assign cpu_ce = pclk1;
 	assign VBlank_orig = maria_en ? maria_vblank : tia_vblank;
 
@@ -375,9 +331,7 @@ module Atari7800 #(
 	end
 
 	wire cs_cart = ~|{cs_ram0, cs_ram1, cs_tia, cs_riot, cs_maria};
-	wire bios_sel = ~bios_en_b && AB[15];
 `ifdef POCKET_SRAM
-	assign bios_sel_out = bios_sel;
 	assign mclk1_out = mclk1;
 `endif
 
@@ -401,19 +355,16 @@ module Atari7800 #(
 
 		read_DB = open_bus;
 		if (RW) begin
-			if (cs_ram0)  read_DB = ram0_DB_out;
-			if (cs_ram1)  read_DB = ram1_DB_out;
 			if (cs_tia)   read_DB = (tia_DB_out   & tia_DB_oe)   | (open_bus & ~tia_DB_oe);
 			if (cs_riot)  read_DB = (riot_DB_out  & riot_DB_oe)  | (open_bus & ~riot_DB_oe);
 			if (cs_maria) read_DB = (maria_DB_out & maria_DB_oe) | (open_bus & ~maria_DB_oe);
 			// Last, so the cartridge - the slowest source by far - reaches the bus
 			// through the fewest mux levels. cs_cart is the complement of the other
 			// selects, so the two can never both be true and the order is free.
-			// The BIOS is a plain ROM and answers with the whole byte; the slot
-			// says which lines it drives, and an unclaimed one holds its charge.
-			if (cs_cart && (cart_present || bios_sel))
-				read_DB = bios_sel ? bios_out
-					: ((cart_DB_out & cart_DB_oe) | (open_bus & ~cart_DB_oe));
+			// The slot says which lines it drives, and an unclaimed one holds
+			// its charge.
+			if (cs_cart && cart_present)
+				read_DB = (cart_DB_out & cart_DB_oe) | (open_bus & ~cart_DB_oe);
 		end
 	end
 
@@ -434,30 +385,6 @@ module Atari7800 #(
 	);
 
 	assign dout = write_DB;
-
-	// Memory
-	logic [10:0] clear_addr;
-	always_ff @(posedge clk_sys) clear_addr <= clear_addr + loading;
-
-	spram #(.addr_width(11), .mem_name("RAM0")) ram0
-	(
-		.clock          (clk_sys),
-		.address        (loading ? clear_addr : AB[10:0]),
-		.data           (loading ? clearval : write_DB),
-		.wren           ((~RW & cs_ram0 & pclk0) || loading),
-		.q              (ram0_DB_out),
-		.cs             (~pause)
-	);
-
-	spram #(.addr_width(11), .mem_name("RAM1")) ram1
-	(
-		.clock          (clk_sys),
-		.address        (loading ? clear_addr : AB[10:0]),
-		.data           (loading ? clearval : write_DB),
-		.wren           ((~RW & cs_ram1 & pclk0) || loading),
-		.q              (ram1_DB_out),
-		.cs             (~pause)
-	);
 
 	// MARIA
 	logic maria_vblank, maria_vblank_ex, maria_vsync, maria_hblank, maria_hsync;
@@ -661,44 +588,21 @@ module Atari7800 #(
 
 	logic tape_audio;
 
-	// The mixer sums unsigned contributions around a midpoint, so the BupChip's
-	// signed PCM is offset into that convention. Halved along with every other
-	// external source when ext_audio is set, which is what keeps the sum from
-	// clipping when several sources sound at once.
-
-	// CoreTone renders with a lot of headroom: its channel scalar tops out at
-	// (127*127)>>8, so the loudest Rikki & Vikki track only reaches -7 dBFS and
-	// the quietest -24. Doubling brings it back level with TIA once ext_audio
-	// halves the sum. Saturate rather than wrap - doubling overflows exactly
-	// when the top two bits disagree, and a wrapped sample is a click.
-	wire [15:0] bup_gain_l = (bupchip_audio_l[15] ^ bupchip_audio_l[14]) ?
-		(bupchip_audio_l[15] ? 16'h8000 : 16'h7FFF) : {bupchip_audio_l[14:0], 1'b0};
-	wire [15:0] bup_gain_r = (bupchip_audio_r[15] ^ bupchip_audio_r[14]) ?
-		(bupchip_audio_r[15] ? 16'h8000 : 16'h7FFF) : {bupchip_audio_r[14:0], 1'b0};
-
-	// Signed two's complement into the mixer's unsigned-around-midpoint
-	// convention: inverting the sign bit is exactly the +$4000... offset, and
-	// costs one inverter instead of an adder.
-	wire [15:0] bupchip_mix_l = souper_profile ?
-		{~bup_gain_l[15], bup_gain_l[14:0]} : 16'd0;
-	wire [15:0] bupchip_mix_r = souper_profile ?
-		{~bup_gain_r[15], bup_gain_r[14:0]} : 16'd0;
-
 	wire [4:0] aud_index = audv0 + audv1;
 	wire [15:0] tia_r = (use_stereo ? audio_lut_single[audv0] : audio_lut[aud_index]);
 	wire [15:0] tia_l = (use_stereo ? audio_lut_single[audv1] : audio_lut[aud_index]);
 
-	// There is an assumption made here that all audio sources will not be used simultaneously at
-	// max volume. If this is the case, there will be clipping. Tia audio cannot be greater than
-	// 0x7FFF on a single channel. When external audio sources are used, the overall volume will be
-	// halved to ensure no clipping. If in the future more than two external audio devices are used
-	// at once, eg covox + ym2151 + tia, then more reduction will be needed, but for the time being
-	// that seems unlikely.
-	wire [16:0] audio_mix_r = tia_r + pokey_audio_r + ym_audio_r + covox_r + minnie_audio + sn_audio + bupchip_mix_r + {tape_audio, 12'd0};
-	wire [16:0] audio_mix_l = tia_l + pokey_audio_l + ym_audio_l + covox_l + minnie_audio + sn_audio + bupchip_mix_l + {tape_audio, 12'd0};
+	// The TIA and the Supercharger's tape. The 7800 core added its cartridge's
+	// sound chips here and halved the sum whenever one of them (or the Souper
+	// BupChip) was in use; none of them is left, so the mix is never halved,
+	// as it never was for a 2600 image (its header flags were all clear).
+	// 16 bits: the 7800 core's sum had a 17th for the halving, and without
+	// it took these 16 (a sum past $FFFF wraps here as it did there).
+	wire [15:0] audio_mix_r = tia_r + {tape_audio, 12'd0};
+	wire [15:0] audio_mix_l = tia_l + {tape_audio, 12'd0};
 
-	assign AUDIO_R = ext_audio ? audio_mix_r[16:1] : audio_mix_r[15:0];
-	assign AUDIO_L = ext_audio ? audio_mix_l[16:1] : audio_mix_l[15:0];
+	assign AUDIO_R = audio_mix_r;
+	assign AUDIO_L = audio_mix_l;
 
 	logic [7:0] ar_ram_addr;
 	M6532 riot_inst
@@ -772,30 +676,23 @@ module Atari7800 #(
 		.tia_mode     (tia_mode)
 	);
 
-`ifdef POCKET_SRAM
-	// Pocket, Fix B: the merge below, split in two under the merge's own
-	// select. The 7800 request (MARIA's slot timing) stays on cartram_*; the
-	// 2600 request goes out on its own port, which sram_ctrl registers for
-	// one clk_sys, so the 2600 mappers' decode leaves clk_sdram's cone.
-	// Needs EXTERNAL_CARTRAM: cart_ram_tdp below sees cartram_* only.
+	// The 2600 mappers' cartridge RAM request, while the 2600 owns the bus or
+	// a mapper initialises its RAM. The 7800 core merged cart.sv's request in
+	// on MARIA's slot otherwise (cartram_* under POCKET_SRAM, Fix B's split).
 	wire cartram_sel26 = mapper_init_busy | tia_en;
-	assign cartram_wr = ~cartram_sel26 & cartram_wr78 & mclk1;
-	assign cartram_rd = ~cartram_sel26 & cartram_rd78 & mclk1;
-	assign cartram_addr = cartram_addr78;
-	assign cartram_wrdata = cartram_wrdata78;
+`ifdef POCKET_SRAM
+	// Pocket, Fix B: the 2600 request goes out on its own port, which
+	// sram_ctrl registers for one clk_sys, so the 2600 mappers' decode leaves
+	// clk_sdram's cone. Needs EXTERNAL_CARTRAM.
 	assign cartram_wr26_out = cartram_sel26 & cartram_wr26;
 	assign cartram_rd26_out = cartram_sel26 & cartram_rd26;
 	assign cartram_addr26_out = cartram_addr26;
 	assign cartram_wrdata26_out = cartram_wrdata26;
 `else
-	assign cartram_wr = mapper_init_busy ? cartram_wr26 :
-		(tia_en ? cartram_wr26 : (cartram_wr78 & mclk1));
-	assign cartram_rd = mapper_init_busy ? cartram_rd26 :
-		(tia_en ? cartram_rd26 : (cartram_rd78 & mclk1));
-	assign cartram_addr = mapper_init_busy ? cartram_addr26 :
-		(tia_en ? cartram_addr26 : cartram_addr78);
-	assign cartram_wrdata = mapper_init_busy ? cartram_wrdata26 :
-		(tia_en ? cartram_wrdata26 : cartram_wrdata78);
+	assign cartram_wr = cartram_sel26 & cartram_wr26;
+	assign cartram_rd = cartram_sel26 & cartram_rd26;
+	assign cartram_addr = cartram_addr26;
+	assign cartram_wrdata = cartram_wrdata26;
 `endif
 
 	//////////////////////
@@ -849,12 +746,12 @@ module Atari7800 #(
 `ifndef NO_ARM_MAPPER
 	arm_host arm_host (
 		.clk_arm,
-		.reset_arm       (arm_reset || (souper_profile && bup_hold)),
+		.reset_arm       (arm_reset),
 		// MARIA, the RAMs and the cartridge RAM's 6507 port all stop on pause;
 		// without this the ARM ran on, moving mapper state and cartridge RAM
 		// under a frozen 6507.
 		.ce              (~pause),
-		.halt_req        (souper_profile ? 1'b0 : arm_halt_req),
+		.halt_req        (arm_halt_req),
 		.halted          (arm_halted),
 		.mem_req         (arm_mem_req),
 		.mem_ready       (arm_mem_ready),
@@ -918,21 +815,22 @@ module Atari7800 #(
 		.ch1_ack          (arm_ddr_ack),
 		.ch1_dout         (arm_ddr_dout),
 		.ch1_rvalid       (arm_ddr_rvalid),
-		.ch2_addr         (bup_ddr_addr),
-		.ch2_din          (bup_ddr_din),
-		.ch2_be           (bup_ddr_be),
-		.ch2_len          (bup_ddr_len),
-		.ch2_req          (bup_ddr_req),
-		.ch2_rnw          (bup_ddr_rnw),
-		.ch2_ack          (bup_ddr_ack),
-		.ch2_dout         (bup_ddr_dout),
-		.ch2_rvalid       (bup_ddr_rvalid),
+		// Channel 2 was the Souper BupChip player's (7800 only): idle
+		.ch2_addr         (29'b0),
+		.ch2_din          (64'b0),
+		.ch2_be           (8'b0),
+		.ch2_len          (8'd1),
+		.ch2_req          (1'b0),
+		.ch2_rnw          (1'b1),
+		.ch2_ack          (),
+		.ch2_dout         (),
+		.ch2_rvalid       (),
 		.ch1_timeout      (arm_ddr_timeout),
-		.ch2_timeout      (bup_ddr_timeout)
+		.ch2_timeout      ()
 	);
 `else
 	// Pocket port: there is no DDR3. Nothing requests it once the ARM mapper
-	// and the BupChip are left out, so both channels read back as idle.
+	// is left out, so it reads back as idle.
 	assign ddram_clk = clk_arm;
 	assign ddram_addr = 29'b0;
 	assign ddram_burstcnt = 8'd0;
@@ -944,10 +842,6 @@ module Atari7800 #(
 	assign arm_ddr_dout = 64'b0;
 	assign arm_ddr_rvalid = 1'b0;
 	assign arm_ddr_timeout = 1'b0;
-	assign bup_ddr_ack = 1'b0;
-	assign bup_ddr_dout = 64'b0;
-	assign bup_ddr_rvalid = 1'b0;
-	assign bup_ddr_timeout = 1'b0;
 `endif
 
 `ifndef EXTERNAL_CARTRAM
@@ -981,171 +875,12 @@ module Atari7800 #(
 	assign cartram_word_data_tdp = 32'b0;
 `endif
 
-	// ---- ARM profile mux ----------------------------------------------------
-	// Decision 0040: one CPU, two exclusive clients. A Souper cartridge takes
-	// the bus for the BupChip player; everything else leaves it with the 2600
-	// call mappers exactly as before. The two never drive it together.
-	logic        arm2600_mem_req, arm2600_mem_ready, arm2600_mem_abort;
-	logic [31:0] arm2600_mem_rdata;
-	logic        bup_mem_ready, bup_mem_abort;
-	logic [31:0] bup_mem_rdata;
-	logic        bup_hold, bup_load_wait;
+	// The 2600 call mappers own the ARM bus. The 7800 core shared it with the
+	// Souper cartridge's BupChip player (decision 0040), which is gone.
 	logic        cart2600_load_wait;
-	// Either consumer may stall the download; the loader honours the union.
-	assign mapper_load_wait = cart2600_load_wait || bup_load_wait;
-	logic        bup_cmd_valid;
-	logic  [7:0] bup_cmd_data;
-`ifdef BUPCHIP_FORCE_CMD
-	// Simulation only: a harness-injected command, ORed in beside the
-	// cartridge's own writes so both paths stay live.
-	wire       bup_cmd_valid_eff = bup_cmd_valid || bupchip_force_valid;
-	wire [7:0] bup_cmd_data_eff  = bup_cmd_valid ? bup_cmd_data : bupchip_force_data;
-`else
-	wire       bup_cmd_valid_eff = bup_cmd_valid;
-	wire [7:0] bup_cmd_data_eff  = bup_cmd_data;
-`endif
-	logic [15:0] bupchip_audio_l, bupchip_audio_r;
-	logic [28:0] bup_ddr_addr;
-	logic [63:0] bup_ddr_din, bup_ddr_dout;
-	logic  [7:0] bup_ddr_be, bup_ddr_len;
-	logic        bup_ddr_req, bup_ddr_rnw, bup_ddr_ack, bup_ddr_rvalid;
-	logic        bup_ddr_timeout;
+	assign mapper_load_wait = cart2600_load_wait;
 
-	// Bit 12 is the Souper mapper. tia_mode means a 2600 image, which has no
-	// A78 header and therefore no Souper flag to trust.
-	wire souper_profile = cart_flags[12] && !tia_mode;
-
-	assign arm2600_mem_req = souper_profile ? 1'b0 : arm_mem_req;
-	// An OR, not a profile mux: each adapter answers all-zero unless it is the
-	// one addressed. arm2600's bus cannot leave idle without a request, and
-	// bupchip_memory masks its answer outside S_ANSWER. The OR then folds into
-	// the adapters' own last mux level instead of adding one on the CPU's
-	// critical read path. The only cycles where this differs from the mux are
-	// ones with mem_ready low, which the core never samples.
-	assign arm_mem_ready = bup_mem_ready | arm2600_mem_ready;
-	assign arm_mem_abort = bup_mem_abort | arm2600_mem_abort;
-	assign arm_mem_rdata = bup_mem_rdata | arm2600_mem_rdata;
-
-`ifndef NO_BUPCHIP
-	bupchip_subsystem #(.ROM_MIF(BUPCHIP_ROM_MIF), .ROM_INIT(BUPCHIP_ROM_INIT)) bupchip (
-		.clk_sys, .clk_arm,
-		.reset_arm      (arm_reset),
-		.enabled        (souper_profile),
-		.load_start     (mapper_load_start),
-		.load_addr      (mapper_load_addr),
-		.load_valid     (mapper_load_valid),
-		.load_data      (mapper_load_data),
-		.load_end       (mapper_load_end),
-		.asset_start    (),
-		.cmd_valid_sys  (bup_cmd_valid_eff),
-		.cmd_data_sys   (bup_cmd_data_eff),
-		.mem_req        (souper_profile ? arm_mem_req : 1'b0),
-		.mem_addr       (arm_mem_addr),
-		.mem_write      (arm_mem_write),
-		.mem_wdata      (arm_mem_wdata),
-		.mem_wstrb      (arm_mem_wstrb),
-		.mem_size       (arm_mem_size),
-		.mem_ce         (~pause),
-		.mem_ready      (bup_mem_ready),
-		.mem_abort      (bup_mem_abort),
-		.mem_rdata      (bup_mem_rdata),
-		.arm_hold       (bup_hold),
-		.load_wait      (bup_load_wait),
-		.ddr_addr       (bup_ddr_addr),
-		.ddr_din        (bup_ddr_din),
-		.ddr_be         (bup_ddr_be),
-		.ddr_len        (bup_ddr_len),
-		.ddr_req        (bup_ddr_req),
-		.ddr_rnw        (bup_ddr_rnw),
-		.ddr_ack        (bup_ddr_ack),
-		.ddr_dout       (bup_ddr_dout),
-		.ddr_rvalid     (bup_ddr_rvalid),
-		.ddr_timeout    (bup_ddr_timeout),
-		.audio_l        (bupchip_audio_l),
-		.audio_r        (bupchip_audio_r)
-	);
-`else
-	// Pocket port: the BupChip player (an ARM program plus DDR-resident
-	// assets) is left out. The Souper mapper itself still works; its music
-	// channel is silent.
-	assign bup_mem_ready = 1'b0;
-	assign bup_mem_abort = 1'b0;
-	assign bup_mem_rdata = 32'b0;
-	assign bup_hold = 1'b0;
-	assign bup_load_wait = 1'b0;
-	assign bup_ddr_addr = 29'b0;
-	assign bup_ddr_din = 64'b0;
-	assign bup_ddr_be = 8'b0;
-	assign bup_ddr_len = 8'd1;
-	assign bup_ddr_req = 1'b0;
-	assign bup_ddr_rnw = 1'b1;
-`ifdef POCKET_BUPCHIP
-	// Pocket BupChip: the command goes out, the audio comes back.
-	assign bup_cmd_valid_o = bup_cmd_valid_eff;
-	assign bup_cmd_data_o = bup_cmd_data_eff;
-	assign souper_profile_o = souper_profile;
-	assign bupchip_audio_l = bup_audio_l_i;
-	assign bupchip_audio_r = bup_audio_r_i;
-`else
-	assign bupchip_audio_l = 16'd0;
-	assign bupchip_audio_r = 16'd0;
-`endif
-`endif
-
-	cart cart
-	(
-		.aud_cmd_valid  (bup_cmd_valid),
-		.aud_cmd_data   (bup_cmd_data),
-		.clk_sys        (clk_sys),
-		.pclk0          (pclk0),
-		.pclk1          (pclk1),
-		.IRQ_n          (IRQ_n),
-		.halt_n         (cpu_halt_n),
-		.reset          (effective_reset),
-		.address_in     (AB[15:0]),
-		.din            (write_DB),
-		.rom_din        (cart_out),
-		.cart_flags     (cart_flags),
-		.cart_mapper    (cart_mapper),
-		.cart_size      (cart_size),
-		.cart_save      (cart_save),
-		.cart_cs        (cs_cart),
-		.cart_xm        (cart_xm),
-		.cart_read      (cart_read_flag),
-		.cartram_addr   (cartram_addr78),
-		.cartram_wr     (cartram_wr78),
-		.cartram_rd     (cartram_rd78),
-		.cartram_wrdata (cartram_wrdata78),
-		.cartram_data   (cartram_data_bram),
-		.hsc_en         (hsc_en),
-`ifdef EXTERNAL_FIRMWARE
-		.fw_load        (fw_hsc_load),
-		.fw_wr          (fw_wr),
-		.fw_addr        (fw_addr),
-		.fw_data        (fw_data),
-`endif
-		.hsc_ram_cs     (hsc_ram_cs),
-		.hsc_ram_din    (hsc_ram_dout),
-		.rw             (RW),
-		.dout           (cart_7800_DB_out),
-		.dout_oe        (cart_7800_DB_oe),
-		.pokey_audio_r  (pokey_audio_r),
-		.pokey_audio_l  (pokey_audio_l),
-		.minnie_audio   (minnie_audio),
-		.ym_audio_r     (ym_audio_r),
-		.ym_audio_l     (ym_audio_l),
-		.rom_address    (cart_7800_addr_out),
-		.covox_r        (covox_r),
-		.covox_l        (covox_l),
-		.sn_audio       (sn_audio),
-		.external_audio (ext_audio_cart),
-		.ps2_key        (ps2_key),
-		.pokey_irq_en   (pokey_irq),
-		.minnie_en      (minnie_en),
-		.minnie_alt     (minnie_alt)
-	);
-
-	assign cart_2600_addr_out[24:19] = '0;
+	assign cart_addr_out[24:19] = '0;
 	// What the 2600 slot sees on the data lines: the resolved bus on a read,
 	// the CPU's own byte on a write. RW, not the CPU's pin, so a released R/W
 	// reads as a read here too.
@@ -1169,12 +904,12 @@ module Atari7800 #(
 `ifdef EXTERNAL_FIRMWARE
 		.fw_load        (fw_ar_load),
 		.fw_wr          (fw_wr),
-		.fw_addr        (fw_addr[10:0]),
+		.fw_addr        (fw_addr),
 		.fw_data        (fw_data),
 `endif
 		.pal            (PAL),
 		.ddr_timeout    (arm_ddr_timeout),
-		.d_out          (cart_2600_DB_out),
+		.d_out          (cart_DB_out),
 		.d_in           (cart_din),
 		// The slot's A12 is gated by INPTCTRL's cart-enable bit, so the BIOS
 		// RAM test at $1800-$1FFF is never seen as $1xxx by a 2600 cart.
@@ -1199,7 +934,7 @@ module Atari7800 #(
 		.arm_audio_size_addr,
 		.rom_do         (cart_out),
 		.rom_size       (cart_size),
-		.rom_a          (cart_2600_addr_out[18:0]),
+		.rom_a          (cart_addr_out[18:0]),
 		.rom_read       (read_2600),
 		.cartram_addr   (cartram_addr26),
 		.cartram_wr     (cartram_wr26),
@@ -1238,13 +973,13 @@ module Atari7800 #(
 		// Paired with arm_host's own ce: stopping only the CPU leaves the
 		// memory system retiring answers nobody is there to take.
 		.mem_ce         (~pause),
-		.mem_req        (arm2600_mem_req),
-		.mem_ready      (arm2600_mem_ready),
-		.mem_abort      (arm2600_mem_abort),
+		.mem_req        (arm_mem_req),
+		.mem_ready      (arm_mem_ready),
+		.mem_abort      (arm_mem_abort),
 		.mem_addr       (arm_mem_addr),
 		.mem_write      (arm_mem_write),
 		.mem_wdata      (arm_mem_wdata),
-		.mem_rdata      (arm2600_mem_rdata),
+		.mem_rdata      (arm_mem_rdata),
 		.mem_size       (arm_mem_size),
 		.mem_wstrb      (arm_mem_wstrb),
 		.mem_fetch      (arm_mem_fetch),
@@ -1266,7 +1001,7 @@ module Atari7800 #(
 		.fa2_nvram_dirty,
 		.bus_stuff_valid,
 		.bus_stuff_data,
-		.oe             (cart_2600_DB_oe),
+		.oe             (cart_DB_oe),
 		.tape_in        (tape_in),
 		.tape_audio     (tape_audio),
 `ifdef POCKET_SUPERCHARGER

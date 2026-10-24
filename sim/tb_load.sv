@@ -93,17 +93,12 @@ module tb_load;
 		void'($value$plusargs("skipbios=%d", skip_bios));
 		nocart = $test$plusargs("nocart");
 	end
-	logic pokey_irq_on = 1'b0;
 	logic overscan_on = 1'b0;
-	logic clear_rnd = 1'b0; logic [4:0] bs_ovr = 5'd0;   // +clearrnd, +bs=N
-	initial begin
-		clear_rnd = $test$plusargs("clearrnd");
-		void'($value$plusargs("bs=%d", bs_ovr));
-	end
+	logic [4:0] bs_ovr = 5'd0;                            // +bs=N
+	initial void'($value$plusargs("bs=%d", bs_ovr));
 	initial overscan_on = $test$plusargs("overscan");
 	logic blend_on = 1'b0;                                // +blend: 2600 Flicker Blend
 	initial blend_on = $test$plusargs("blend");
-	initial pokey_irq_on = $test$plusargs("pokeyirq");
 	logic [15:0] joy0 = 16'd0, joy1 = 16'd0, joy2 = 16'd0, joy3 = 16'd0;
 	logic [15:0] ana0 = 16'h8080;
 	logic [2:0] port1_in = 3'd0, port2_in = 3'd0;   // +port1=N, +port2=N
@@ -186,8 +181,8 @@ module tb_load;
 		.ioctl_wr(ioctl_wr_r & (cart_download | arfw_download)), .ioctl_addr(ioctl_addr_r), .ioctl_dout(ioctl_dout_r),
 		.region_setting(region_tb), .palette_temp(2'd0), .show_overscan(overscan_on),
 		.hide_border(1'b0), .stereo_tia(1'b0), .swap_joysticks(1'b0), .diff_left_b(1'b1),
-		.diff_right_b(1'b1), .bw_setting(1'b0), .flicker_blend(blend_on), .pokey_irq(pokey_irq_on), .pause_core(1'b0),
-		.clear_random(clear_rnd), .decomb(1'b0), .bs_override(bs_ovr),
+		.diff_right_b(1'b1), .bw_setting(1'b0), .flicker_blend(blend_on), .pause_core(1'b0),
+		.decomb(1'b0), .bs_override(bs_ovr),
 		.joy0(joy0), .joy1(joy1), .joy2(joy2), .joy3(joy3),
 		.analog0(ana0), .analog1(16'h8080), .analog2(16'h8080), .analog3(16'h8080),
 		.port1_input(port1_in), .port2_input(port2_in),
@@ -1026,8 +1021,10 @@ module tb_load;
 	// sim/check/run_sim_check.py judge it (2.2.2's read fix, READ_WHOLE_CYCLE
 	// in Pokey/pokey_adapter.sv: without it every read is $FF).
 	int pr_ms = 0;
-	function automatic logic [7:0] pr_ram(int a);   // RAM0, $2000-$27FF
-		return dut.main.ram0.u_ram.mem_q[a - 'h2000];
+	// RAM0 ($2000-$27FF) is 7800 hardware, gone from the 2600 core (plan
+	// step 4): the report reads 0 (the section's A78 is refused anyway).
+	function automatic logic [7:0] pr_ram(int a);
+		return 8'h00;
 	endfunction
 	task automatic pokeyrd_report();
 		string s = "";
@@ -1050,10 +1047,12 @@ module tb_load;
 	// BIOS switch as the core got it (use_bios, and top.sv's bypass_bios,
 	// tia_mode and cart_present). Then the 6502's reset vector, read at
 	// $FFFC/$FFFD, and its first opcode fetch, each with where the bytes came
-	// from: the BIOS ROM (top.sv's bios_sel) or the cartridge slot. Then, 50
+	// from: the BIOS ROM (top.sv's bios_sel in the 7800 core; the 2600 core
+	// has no BIOS read path, so never) or the cartridge slot. Then, 50
 	// ms after the release (or at the next reset), the CPU's reads from the
 	// BIOS ROM so far, and tia_en. run_sim.sh's BIOS tests check these lines.
 	`define BOOT_CPU dut.main.cpu_inst.cpu
+	wire boot_bios_sel = 1'b0;
 	int boot_n = 0;
 	logic boot_rst_d = 1'b1, boot_on = 1'b0, boot_fetched = 1'b0;
 	logic [1:0] boot_vec_seen = 2'b00, boot_vec_bios = 2'b00;
@@ -1078,11 +1077,11 @@ module tb_load;
 		end
 		// A read cycle of the CPU's own, at the edge where it takes the byte
 		if (boot_on && `BOOT_CPU.core_phi2_en && `BOOT_CPU.rw_n) begin
-			if (dut.main.bios_sel) boot_bios_rd++;
+			if (boot_bios_sel) boot_bios_rd++;
 			for (int k = 0; k < 2; k++)
 				if (`BOOT_CPU.addr_out == 16'hFFFC + 16'(k) && !boot_vec_seen[k]) begin
 					boot_vec_seen[k] = 1'b1;
-					boot_vec_bios[k] = dut.main.bios_sel;
+					boot_vec_bios[k] = boot_bios_sel;
 					if (k == 0) boot_vec[7:0] = `BOOT_CPU.data_in; else boot_vec[15:8] = `BOOT_CPU.data_in;
 				end
 			// The first SYNC after the vector: the reset sequence raises SYNC
@@ -1090,7 +1089,7 @@ module tb_load;
 			if (`BOOT_CPU.sync && boot_vec_seen == 2'b11 && !boot_fetched) begin
 				boot_fetched = 1'b1;
 				$display("BOOT %0d vector: $%04x from %0s, first opcode fetch at $%04x from %0s", boot_n, boot_vec,
-					boot_src(boot_vec_bios), `BOOT_CPU.addr_out, boot_src({2{dut.main.bios_sel}}));
+					boot_src(boot_vec_bios), `BOOT_CPU.addr_out, boot_src({2{boot_bios_sel}}));
 			end
 		end
 	end
@@ -1171,9 +1170,12 @@ module tb_load;
 	// edges on port 2 and bytes the SaveKey EEPROM writes.
 	longint hsc_ram_wr = 0, hsc_ram_rd = 0, hsc_rom_rd = 0, scl_edges = 0, sk_bytes = 0;
 	logic [15:0] old_a = 0; logic old_scl = 1'b1, old_skwr = 1'b0;
+	// The 2600 core has no High Score Cart (plan step 3/4): its enable, as
+	// the 7800 core's wrapper had it, is always 0 here
+	wire tb_hsc_en = 1'b0;
 	always @(posedge clk_sys) begin
 		old_a <= dut.bios_addr;
-		if (dut.hsc_en && dut.bios_addr != old_a) begin
+		if (tb_hsc_en && dut.bios_addr != old_a) begin
 			if (dut.bios_addr[15:11] == 5'd2) begin
 				if (!dut.RW) hsc_ram_wr <= hsc_ram_wr + 1; else hsc_ram_rd <= hsc_ram_rd + 1;
 			end
@@ -1394,8 +1396,8 @@ module tb_load;
 			if (bup_ofd != 0) $fwrite(bup_ofd, "%c%c%c%c", dut.bupchip.frame_arm[7:0], dut.bupchip.frame_arm[15:8],
 				dut.bupchip.frame_arm[23:16], dut.bupchip.frame_arm[31:24]);
 		end
-		// What reaches top.sv's mixer (0 is $8000 there)
-		if (dut.main.bupchip_mix_l != 16'h8000 && dut.main.bupchip_mix_l != 16'h0000) bup_mix_nz++;
+		// What reached top.sv's mixer: the Souper mix is gone (plan step 4),
+		// so bup_mix_nz stays 0
 	end
 	initial if ($value$plusargs("bupout=%s", bup_out)) begin
 		bup_fd = $fopen({bup_out, ".pcm"}, "wb");
@@ -1406,8 +1408,7 @@ module tb_load;
 	// pushed so far, in ms since reset.
 	bit bup_cmdlog = 0;
 	initial bup_cmdlog = $test$plusargs("bupcmdlog");
-	always @(posedge clk_sys) if (bup_cmdlog && dut.bup_cmd_valid)
-		$display("BUPCMD sent  $%02x at %0.1f ms", dut.bup_cmd_data, real'($time - t_run) / 1.0e6);
+	// No command reaches the BupChip in the 2600 core (cart.sv sent them)
 	always @(posedge clk_arm) if (bup_cmdlog && dut.bupchip.per.cmd_pop)
 		$display("BUPCMD taken $%02x at %0.1f ms, pushed %0d", dut.bupchip.per.reg_rdata[7:0],
 			real'($time - t_run) / 1.0e6, bup_pushes);
@@ -1459,10 +1460,10 @@ module tb_load;
 			dut.main.cart2600.is_bad_game);
 `ifdef POCKET_DARIA
 		$display("REFUSE devices: use_sk %0d, fa2_on %0d, hsc_en %0d, gun_en %0d, port types %0d %0d, daria_profile %0d",
-			dut.use_sk, dut.fa2_on, dut.hsc_en, dut.gun_en, dut.porta_type, dut.portb_type, dut.daria_profile);
+			dut.use_sk, dut.fa2_on, tb_hsc_en, dut.gun_en, dut.porta_type, dut.portb_type, dut.daria_profile);
 `else
 		$display("REFUSE devices: use_sk %0d, fa2_on %0d, hsc_en %0d, gun_en %0d, port types %0d %0d, daria_profile 0",
-			dut.use_sk, dut.fa2_on, dut.hsc_en, dut.gun_en, dut.porta_type, dut.portb_type);
+			dut.use_sk, dut.fa2_on, tb_hsc_en, dut.gun_en, dut.porta_type, dut.portb_type);
 `endif
 		$display("REFUSE region: is_pal_o %0d, changed %0d times since power-up; header byte 57 %0d",
 			is_pal, rf_pal_changes, image[57]);
@@ -1524,7 +1525,7 @@ module tb_load;
 			bios_download = 1'b0;
 			repeat (100) @(posedge clk_sys);
 			$display("BIOS slot: %0d byte file, bios_loaded %0d, address mask %04x, skip_bios %0d",
-				n, dut.bios_loaded, dut.bios_mask, skip_bios);
+				n, dut.bios_loaded, 16'h0000, skip_bios);
 		end
 	endtask
 
@@ -1681,7 +1682,8 @@ module tb_load;
 				repeat (100) @(posedge clk_sys);
 				mismatches = 0;
 				for (int i = 0; i < (slot == 0 ? 4096 : 2048); i++)
-					if ((slot == 0 ? dut.main.cart.hsc_rom.u_ram.mem_q[i]
+					// slot 0, the HSC ROM, was cart.sv's (7800, gone)
+					if ((slot == 0 ? 8'h00
 					               : dut.main.cart2600.mapper_AR.ar_rom.u_ram.mem_q[i[10:0]])
 					    !== fw_expect(slot, i)) mismatches++;
 				$display("FIRMWARE %0s: %0d byte file, %0d ROM bytes differ from it, hscfw_loaded=%0d",
@@ -1719,13 +1721,9 @@ module tb_load;
 			load_bios();
 		end
 
-		$display("HSC_EN %0d (setting %0d, firmware loaded %0d)", dut.hsc_en, hsc_setting, dut.hscfw_loaded);
-		begin
-			automatic int nz = 0;
-			for (int i = 0; i < 2048; i++) if (dut.main.ram0.u_ram.mem_q[i] != 8'h00) nz++;
-			$display("OPTIONS RAM0 bytes non-zero after load: %0d of 2048; 2600 mapper %0d (override %0d)",
-				nz, dut.main.cart2600.mapper, bs_ovr);
-		end
+		$display("HSC_EN %0d (setting %0d, firmware loaded %0d)", tb_hsc_en, hsc_setting, dut.hscfw_loaded);
+		// No RAM0 to count (7800 hardware, gone from the 2600 core)
+		$display("OPTIONS 2600 mapper %0d (override %0d)", dut.main.cart2600.mapper, bs_ovr);
 		// The image must sit at SDRAM 0 as it is: openFPGA-2600 stores a
 		// refused A78 whole too (the 7800 core stored an A78's payload, the
 		// image minus its 128 byte header).
@@ -1978,7 +1976,7 @@ module tb_load;
 			$display("PROBE NMIs %0d, main-loop writes to $41 %0d, POKEY AUDF1 writes %0d",
 				nmis, main_writes, audf_writes);
 			$display("DEVICES hsc_en %0d use_sk %0d; HSC RAM writes %0d reads %0d, HSC ROM reads %0d; SaveKey SCL edges %0d, EEPROM bytes written %0d",
-				dut.hsc_en, dut.use_sk, hsc_ram_wr, hsc_ram_rd, hsc_rom_rd, scl_edges, sk_bytes);
+				tb_hsc_en, dut.use_sk, hsc_ram_wr, hsc_ram_rd, hsc_rom_rd, scl_edges, sk_bytes);
 			$finish;
 		end
 		repeat (14318181 / 10) @(posedge clk_sys);

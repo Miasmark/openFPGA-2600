@@ -56,8 +56,6 @@ module atari2600_pocket
 	input  wire        diff_right_b,
 	input  wire        bw_setting,      // Colour/B&W menu item: 1 = B&W (see bw_mode)
 	input  wire        flicker_blend,   // 2600 only
-	input  wire        pokey_irq,
-	input  wire        clear_random,    // fill RAM with random values at reset (MiSTer "Clear Memory")
 	input  wire        decomb,          // 2600 de-comb
 	input  wire  [4:0] bs_override,     // 2600 bankswitching: 0 auto, else MiSTer's mapper number
 	input  wire        pause_core,      // Pocket menu open
@@ -211,7 +209,7 @@ end
 ////////////////////////////  CART HEADER  ////////////////////////////////
 
 reg  [39:0] cart_header;
-reg   [7:0] cart_region, cart_save;
+reg   [7:0] cart_region;
 reg   [7:0] joy0_type, joy1_type;
 reg         cart_is_7800;
 reg         tia_mode;
@@ -222,7 +220,6 @@ wire [31:0] cart_size;
 initial begin
 	cart_header = "ATARI";
 	cart_region = 0;
-	cart_save = 0;
 	joy0_type = 8'd1;
 	joy1_type = 8'd1;
 	tia_mode = 0;
@@ -234,8 +231,6 @@ end
 // BIOS boots, there is no High Score Cart, and the BupChip's Souper profile
 // never runs (souper_profile, below).
 wire        use_bios = 1'b0;
-wire [14:0] bios_mask = 15'd0;
-wire        hsc_en = 1'b0;
 // tb_load still prints these two; plan step 6 ports the benches
 /* verilator lint_off UNUSEDSIGNAL */
 wire        bios_loaded = 1'b0;
@@ -251,13 +246,13 @@ wire        hscfw_loaded = 1'b0;
 // reaches the console or the region: tia_mode is set at the end of every
 // load, the header fields are cleared then, and the region logic treats it
 // as a 2600 image (region_pll_hold), so header byte 57 never retunes the PLL.
-// cart_is_7800 decides a78_refused and nothing else. Bytes 55-58 are still
+// cart_is_7800 decides a78_refused and nothing else. Bytes 55-57 are still
 // taken during a download, as in the 7800 core, and cleared at its end:
 // until the system module loses MARIA (plan step 4), cart_region (MARIA's
-// PAL input), cart_save (cart.sv) and the port types reach the console,
-// held in reset, while a download runs, and the frame fingerprints of 2600
-// images stay those of 2.2.4's 2600 mode. The rest of the header (the
-// version, cart type, XM and mapper bytes) is no longer read.
+// PAL input) and the port types reach the console, held in reset, while a
+// download runs, and the frame fingerprints of 2600 images stay those of
+// 2.2.4's 2600 mode. The rest of the header (the version, cart type, save
+// byte 58, XM and mapper bytes) is no longer read.
 always @(posedge clk_sys) begin
 	cart_is_7800 <= (cart_header == "ATARI");
 
@@ -274,7 +269,6 @@ always @(posedge clk_sys) begin
 			'd55: joy0_type <= ioctl_dout;   // 0=none, 1=joystick, 2=lightgun
 			'd56: joy1_type <= ioctl_dout;
 			'd57: cart_region <= ioctl_dout; // 0=ntsc, 1=pal
-			'd58: cart_save <= ioctl_dout;   // bit 0 = high score cart, bit 1 = savekey
 			default: ;
 		endcase
 	end else if (old_cart_download) begin
@@ -285,7 +279,6 @@ always @(posedge clk_sys) begin
 		joy0_type <= 8'd1;
 		joy1_type <= 8'd1;
 		cart_region <= 0;
-		cart_save <= 0;
 	end
 end
 
@@ -410,9 +403,12 @@ wire  [7:0] cart_data_sd;
 wire  [7:0] cart_data_rom;
 wire        cart_busy;
 wire  [7:0] cart_din;
+// top.sv's AB (the 7800 core's BIOS address too) and R/W: the DARIA front
+// end's and the benches' (a build without DARIA reads neither)
+/* verilator lint_off UNUSEDSIGNAL */
 wire [15:0] bios_addr;
-wire  [7:0] bios_data;
 wire        RW;
+/* verilator lint_on UNUSEDSIGNAL */
 /* verilator lint_off UNUSEDSIGNAL */
 wire  [7:0] din;                    // the CPU's write byte: DARIA's d_in (the 7800 core's HSC RAM took it too)
 /* verilator lint_on UNUSEDSIGNAL */
@@ -447,13 +443,6 @@ spram #(
 	.cs      (1'b1),
 	.q       (cart_data_rom)
 );
-`endif
-
-// No 7800 BIOS (its slot is gone): POCKET_SRAM builds still read the SRAM
-// for top.sv's BIOS strobe (sram_ctrl, below), which a 2600 image never
-// raises; the system module's BIOS read path leaves in plan step 4.
-`ifndef POCKET_SRAM
-assign bios_data = 8'h00;
 `endif
 
 sdram sdram
@@ -1125,8 +1114,6 @@ assign AUDIO_L = |mix_l[17:16] ? 16'hFFFF : mix_l[15:0];
 assign AUDIO_R = |mix_r[17:16] ? 16'hFFFF : mix_r[15:0];
 `endif
 
-reg [15:0] rnd = 16'h5A5A;
-always @(posedge clk_sys) rnd <= {rnd[14:0], rnd[15] ^ rnd[13] ^ rnd[12] ^ rnd[10]};
 
 wire VBlank_orig;
 wire [7:0] core_r, core_g, core_b;
@@ -1138,9 +1125,7 @@ wire [7:0] core_r, core_g, core_b;
 // step 4).
 
 // SRAM side of the system module (POCKET_SRAM)
-wire [17:0] cartram_addr;
-wire        cartram_wr, cartram_rd;
-wire  [7:0] cartram_wrdata, sram_c_rdata;
+wire  [7:0] sram_c_rdata;
 `ifdef POCKET_SRAM
 /* verilator lint_off UNUSEDSIGNAL */
 wire [17:0] cartram_addr26;                // the 2600 request (Fix B); [17] unused
@@ -1148,28 +1133,18 @@ wire [17:0] cartram_addr26;                // the 2600 request (Fix B); [17] unu
 wire        cartram_wr26, cartram_rd26;
 wire  [7:0] cartram_wrdata26;
 `endif
-wire        mclk1, bios_sel;
+wire        mclk1;
 wire [15:0] fb_addr;
 wire        fb_we, fb_active;
 wire  [7:0] fb_wdata, fb_q;
 
-`ifdef POCKET_BUPCHIP
-// The BupChip's side of the system module (POCKET_BUPCHIP; see BUPCHIP below).
-// top.sv's souper_profile (an A78 header flag) is left open: the profile is
-// tied off at the BupChip.
-wire        bup_cmd_valid;
-wire  [7:0] bup_cmd_data;
-wire [15:0] bup_audio_l, bup_audio_r;
-`endif
-
 Atari7800 main
 (
 	// Supercharger BIOS: built without it (EXTERNAL_FIRMWARE), loaded from
-	// the user's file instead, its first 2 KiB. No HSC firmware.
-	.fw_hsc_load  (1'b0),
+	// the user's file instead, its first 2 KiB.
 	.fw_ar_load   (arfw_download),
 	.fw_wr        (ioctl_wr & (ioctl_addr[24:11] == 0)),
-	.fw_addr      (ioctl_addr[11:0]),
+	.fw_addr      (ioctl_addr[10:0]),
 	.fw_data      (ioctl_dout),
 	.clk_sys      (clk_sys),
 	.reset        (reset),
@@ -1208,14 +1183,6 @@ Atari7800 main
 	.tia_mode     (tia_mode && ~use_bios),
 	.bypass_bios  (~use_bios),
 	.cart_present (~(use_bios & ~cart_loaded)), // 1: no BIOS boots an empty slot
-	.pokey_irq    (pokey_irq),
-	.minnie_en    (1'b1),
-	.minnie_alt   (1'b0),
-	.hsc_en       (hsc_en),
-	.hsc_ram_dout (8'h00),
-	/* verilator lint_off PINCONNECTEMPTY */
-	.hsc_ram_cs   (),
-	/* verilator lint_on PINCONNECTEMPTY */
 `ifdef POCKET_DARIA
 	.cpu_ce       (daria_pclk1),
 `else
@@ -1236,28 +1203,17 @@ Atari7800 main
 	.cart_read    (cart_read),
 	.cart_size    (cart_size),
 	.cart_addr_out(cart_addr),
-	// No A78 header reaches the console (cart_save: see CART HEADER)
-	.cart_flags   (16'd0),
-	.cart_mapper  (8'd0),
-	.cart_save    (cart_save),
 	.cart_din     (cart_din),
-	.cart_xm      (8'h0),
-	.ps2_key      (11'd0),
 
 `ifdef POCKET_SRAM
-	// Cartridge RAM lives in the SRAM (EXTERNAL_CARTRAM): the 7800 request
-	// on cartram_*, the 2600 request on cartram_*26_out (Fix B)
-	.cartram_addr   (cartram_addr),
-	.cartram_wr     (cartram_wr),
-	.cartram_rd     (cartram_rd),
-	.cartram_wrdata (cartram_wrdata),
+	// Cartridge RAM lives in the SRAM (EXTERNAL_CARTRAM): the 2600
+	// request on cartram_*26_out (Fix B)
 	.cartram_data   (sram_c_rdata),
 	.cartram_addr26_out   (cartram_addr26),
 	.cartram_wr26_out     (cartram_wr26),
 	.cartram_rd26_out     (cartram_rd26),
 	.cartram_wrdata26_out (cartram_wrdata26),
 	.mclk1_out      (mclk1),
-	.bios_sel_out   (bios_sel),
 	.fb_addr        (fb_addr),
 	.fb_we          (fb_we),
 	.fb_wdata       (fb_wdata),
@@ -1272,16 +1228,6 @@ Atari7800 main
 	.cartram_data   (8'hFF),
 `endif
 
-`ifdef POCKET_BUPCHIP
-	// The Pocket's BupChip (below) in place of upstream's
-	.bup_cmd_valid_o  (bup_cmd_valid),
-	.bup_cmd_data_o   (bup_cmd_data),
-	/* verilator lint_off PINCONNECTEMPTY */
-	.souper_profile_o (),
-	/* verilator lint_on PINCONNECTEMPTY */
-	.bup_audio_l_i    (bup_audio_l),
-	.bup_audio_r_i    (bup_audio_r),
-`endif
 `ifdef NO_ARM_MAPPER
 `ifdef POCKET_DARIA
 	// The DARIA front end (u_fe, below) in place of the ARM mapper
@@ -1324,8 +1270,7 @@ Atari7800 main
 	.ddram_be         (),
 	.ddram_we         (),
 
-	// BIOS
-	.bios_out     (bios_data),
+	// The bus
 	.AB           (bios_addr),
 	.RW           (RW),
 	.dout         (din),
@@ -1361,8 +1306,6 @@ Atari7800 main
 	.cdfj_stack,
 	.arm_audio_size_addr,
 	.sc           (sc & ~a78_refused),
-	.clearval     (clear_random ? rnd[7:0] : 8'h00),
-	.random       (rnd[7:0]),
 	.decomb       (decomb),
 	.mapper       (6'd0),
 	.tape_in      (2'b00),
@@ -1381,11 +1324,6 @@ Atari7800 main
 );
 
 `ifdef POCKET_SRAM
-// The BIOS answers MARIA's bus strobe like the cartridge RAM does: the SRAM
-// serves it in the slot that starts there, and the bus takes the byte two
-// clk_sys later, as it does from SDRAM.
-wire bios_rd = mclk1 & bios_sel & RW;
-
 // sram_ctrl's download port wrote the 7800 BIOS into the SRAM; there is no
 // BIOS slot, so it never writes. tb_cartram's +inject forces this wire to
 // place another client's SRAM access in the 6507's cycle (the s19 sweep,
@@ -1401,11 +1339,14 @@ sram_ctrl sram
 	.tia_mode     (tia_en),
 	.mclk1        (mclk1),
 
-	.c_rd         (cartram_rd | bios_rd),
-	.c_wr         (cartram_wr),
-	.c_bios       (bios_rd),
-	.c_addr       (bios_rd ? {3'd0, bios_addr[13:0] & bios_mask[13:0]} : cartram_addr[16:0]),
-	.c_wdata      (cartram_wrdata),
+	// The c port carried the 7800 cartridge's RAM request and the 7800
+	// BIOS reads (top.sv's 7800 cartridge and BIOS path, both gone): idle.
+	// sram_ctrl itself is unchanged (plan 2.1).
+	.c_rd         (1'b0),
+	.c_wr         (1'b0),
+	.c_bios       (1'b0),
+	.c_addr       (17'd0),
+	.c_wdata      (8'd0),
 	.t_rd         (cartram_rd26),
 	.t_wr         (cartram_wr26),
 	.t_addr       (cartram_addr26[16:0]),
@@ -1443,7 +1384,6 @@ sram_ctrl sram
 	.sram_ub_n    (SRAM_UB_N),
 	.sram_lb_n    (SRAM_LB_N)
 );
-assign bios_data = sram_c_rdata;
 `else
 assign SRAM_A    = 17'd0;
 assign SRAM_DQ   = 16'hZZZZ;
@@ -1496,10 +1436,13 @@ bupchip_pocket #(.CAP_A78(1'b0)) bupchip
 	.load_end      (old_cart_download && ~cart_download),
 	.fw_download   (1'b0),
 
-	.cmd_valid     (bup_cmd_valid),
-	.cmd_data      (bup_cmd_data),
-	.audio_l       (bup_audio_l),
-	.audio_r       (bup_audio_r),
+	// The Souper profile's command and audio (7800 only): none
+	.cmd_valid     (1'b0),
+	.cmd_data      (8'd0),
+	/* verilator lint_off PINCONNECTEMPTY */
+	.audio_l       (),
+	.audio_r       (),
+	/* verilator lint_on PINCONNECTEMPTY */
 
 	.psram_bank_sel        (psr_bank),
 	.psram_addr            (psr_addr),

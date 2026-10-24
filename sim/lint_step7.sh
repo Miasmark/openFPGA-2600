@@ -62,6 +62,7 @@ lint() {
 	# Verilator 5.040 rejects initialised unpacked wires and paddles.sv's
 	# always-driven output; patched copies, as run_sim.sh simulates them
 	for f in Maria/control.sv banks2600.sv video_mux.sv RIOT/M6532.sv; do
+		[ -f "$RTL/$f" ] || continue   # control.sv: trees before openFPGA-2600 step 4
 		mkdir -p "$P/$(dirname "$f")"
 		sed -E 's/^(\s*)wire(\s+\[[^]]+\]\s+\w+\s*\[[0-9]+\]\s*=)/\1logic\2/' "$RTL/$f" > "$P/$f"
 	done
@@ -78,6 +79,16 @@ lint() {
 		"$RTL/ps2_to_pokey.v" "$RTL/souper.v" "$RTL/TIA.sv" "$RTL/cart.sv"
 		"$RTL/cart2600.sv" "$P/banks2600.sv" "$P/video_mux.sv"
 		"$RTL/detect2600.sv" "$RTL/a78_cart_extent.sv" "$P/RIOT/M6532.sv" "$RTL/top.sv")
+	# openFPGA-2600 step 4 removed the 7800 cartridge (cart.sv and its sound
+	# chips) and MARIA's video and DMA: a tree past it lints without them
+	# (POKEY's files stay for its own benches until step 6, unused by top.sv)
+	local C=() g
+	for g in "${CORE[@]}"; do
+		[ -e "$g" ] || continue
+		[ -f "$RTL/cart.sv" ] || case "$g" in "$RTL"/Pokey/*) continue ;; esac
+		C+=("$g")
+	done
+	CORE=("${C[@]}")
 	local DARIA=("$B/daria_mem.sv" "$B/daria_call.sv" "$B/daria_mmio.sv")
 	local f
 	for f in daria_smp bup_dbg_snap; do [ -f "$B/$f.sv" ] && DARIA+=("$B/$f.sv"); done

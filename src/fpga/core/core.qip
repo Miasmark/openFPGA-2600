@@ -30,14 +30,9 @@ set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) .
 # MiSTer Atari7800 core
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/sdram.sv]
 set_global_assignment -name QIP_FILE [file join $::quartus(qip_path) ../mister/rtl/6502/mos6502.qip]
-# POKEY: upstream's rtl/Pokey (since 2.0.21), with the Pocket's adapter fix
-# and output level (see mister/POCKET_CHANGES.md). Mark Watson's VHDL POKEY,
-# used up to 2.0.20, stays in mister/rtl/PokeyWatson for simulation.
-set_global_assignment -name QIP_FILE [file join $::quartus(qip_path) ../mister/rtl/Pokey/Pokey.qip]
-set_global_assignment -name QIP_FILE [file join $::quartus(qip_path) ../mister/rtl/Minnie/Minnie.qip]
-set_global_assignment -name QIP_FILE [file join $::quartus(qip_path) ../mister/rtl/SN76489/SN76489.qip]
+# The 7800 cartridge's sound chips (POKEY, Minnie, SN76489, YM2151) left
+# with cart.sv (plan step 4).
 set_global_assignment -name QIP_FILE [file join $::quartus(qip_path) ../mister/rtl/Maria/maria.qip]
-set_global_assignment -name QIP_FILE [file join $::quartus(qip_path) ../mister/rtl/jt51/jt51.qip]
 set_global_assignment -name VHDL_FILE [file join $::quartus(qip_path) ../mister/rtl/dpram.vhd]
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/cache_ram.v]
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/bram.v]
@@ -58,10 +53,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) .
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/mapper_bus.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/mapper_fa2.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/fa2_nvram_bridge.sv]
-set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/ps2_to_pokey.v]
-set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/souper.v]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/TIA.sv]
-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/cart.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/cart2600.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/banks2600.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/video_mux.sv]

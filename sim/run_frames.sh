@@ -74,7 +74,7 @@ fi
 # difference (2.2.4's campaign, a WORK that shared obj_frames without rtl/).
 # rtl/mem0.hex is not one of them (above).
 TABLES=(palettes/NWARM.hex palettes/NCOOL.hex palettes/NHOT.hex palettes/PWARM.hex palettes/PCOOL.hex
-	palettes/PHOT.hex Minnie/minnie_wave.hex ooo.hex ar_stub.hex vox_irom.hex vox_drom.hex)
+	palettes/PHOT.hex ooo.hex ar_stub.hex vox_irom.hex vox_drom.hex)
 for f in "${TABLES[@]}"; do
 	[ -f "$WORK/rtl/$f" ] && continue
 	echo "run_frames.sh: $WORK/rtl/$f is missing (no rtl/ link, or a dangling one); tb_load reads its palette and ROM tables from WORK/rtl, so the run would be black. Build into this WORK (run_sim.sh links rtl/), or link WORK/rtl to the build's rtl/" >&2
