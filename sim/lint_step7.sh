@@ -7,15 +7,17 @@
 # Sets (ap_core.qsf's VERILOG_MACROs, read from the tree's qsf):
 #   daria    the qsf's macros plus POCKET_DARIA, top atari2600_pocket
 #   nodaria  the qsf's macros without POCKET_DARIA, top atari2600_pocket
-#   wrapper  run_daria.sh's SHADOW=1 WRAPPER=1 set (POCKET_DARIA without
-#            NO_ARM_MAPPER, upstream's ARM as the oracle), top tb_daria
+#   (the 7800 core's third set, run_daria.sh's WRAPPER set with top
+#   tb_daria, upstream's ARM as the oracle, is gone: openFPGA-2600 keeps no
+#   oracle RTL, and R1 runs from the openFPGA-7800 checkout, plan O2)
 #   debug    with --debug only: the daria set plus BUP_DEBUG (a hardware
 #            test build's, Q5's), top atari2600_pocket, for a change seen
 #            only under BUP_DEBUG (plan 7.6), such as the status overlay
 #   debug_nodaria  with --debug only: the nodaria set plus BUP_DEBUG (a
 #            BupChip-only hardware test build), top atari2600_pocket: the
 #            status overlay's DARIA ports are there too, tied to 0
-# The base (default aeee6d2, the step's base) is taken with git archive into
+# The base (default 73fd755, openFPGA-2600's system module once cut, plan
+# step 4; give a step's own base with --base) is taken with git archive into
 # the output directory, so neither tree is written. Warnings are compared
 # with the tree's path and the line and column numbers removed. A base from
 # before the wrapper's rename to atari2600_pocket (openFPGA-2600 step 2) is
@@ -29,8 +31,8 @@ export LC_ALL=C
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 OUT="$HERE/work/step7/lint"
-BASE=aeee6d2
-SETS="daria nodaria wrapper"
+BASE=73fd755
+SETS="daria nodaria"
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--out) OUT="$2"; shift 2 ;;
@@ -70,8 +72,8 @@ lint() {
 	local CORE=("$T/sim/sim_stubs.sv" "$RTL/arm7tdmi/arm7tdmi_pkg.sv" "$RTL/6502/mos6502_pkg.sv"
 		$(ls "$RTL"/6502/*.sv | grep -v pkg)
 		$(ls "$RTL"/Maria/*.sv | grep -v control.sv) "$P/Maria/control.sv"
-		$(ls "$RTL"/Pokey/*.sv)
-		$(sed -n 's/.*qip_path) \(.*\.sv\) *\].*/\1/p' "$RTL/Minnie/Minnie.qip" | sed "s#^#$RTL/Minnie/#")
+		$(ls "$RTL"/Pokey/*.sv 2> /dev/null)
+		$(sed -n 's/.*qip_path) \(.*\.sv\) *\].*/\1/p' "$RTL/Minnie/Minnie.qip" 2> /dev/null | sed "s#^#$RTL/Minnie/#")
 		"$RTL/SN76489/sn76489.sv" "$RTL"/jt51/*.v "$RTL/cache_ram.v" "$RTL/bram.v"
 		"$RTL/composite_out.sv" "$RTL/cart_ram_tdp.sv" "$RTL/cdf_fastjump_table.sv"
 		"$RTL"/arm_mapper_{memory,controller,subsystem,tables,ram_init,writeback,audio}.sv
@@ -81,7 +83,7 @@ lint() {
 		"$RTL/detect2600.sv" "$RTL/a78_cart_extent.sv" "$P/RIOT/M6532.sv" "$RTL/top.sv")
 	# openFPGA-2600 step 4 removed the 7800 cartridge (cart.sv and its sound
 	# chips) and MARIA's video and DMA: a tree past it lints without them
-	# (POKEY's files stay for its own benches until step 6, unused by top.sv)
+	# (POKEY's files stayed for its own benches until step 6 removed both)
 	local C=() g
 	for g in "${CORE[@]}"; do
 		[ -e "$g" ] || continue
@@ -113,16 +115,6 @@ lint() {
 			done
 			[ "$SET" = daria ] || [ "$SET" = debug ] && SRCS+=("${DARIA[@]}" "${FE[@]}")
 			TOP="$(basename "$W" .sv)" ;;
-		wrapper)
-			local H="$T/sim/bupchip/daria"
-			DEFS=(-DNO_BUPCHIP -DEXTERNAL_FIRMWARE -DEEPROM_NACK_ENDS_READ -DDARIA_SHADOW -DDARIA_WIN_KB=128
-				-DDARIA_WRAPPER -DPOCKET_DARIA "-I$H")
-			SRCS=("${CORE[@]}" "$RTL/arm7tdmi/arm7tdmi_core.sv" "$RTL/arm_host.sv" "$RTL/ddram.sv"
-				"$RTL/EEPROM_24LC256.sv" "$RTL/lightgun.sv" "$B/bup_cpu.sv" "${DARIA[@]}"
-				"$RTL/bupchip_peripheral.sv" "$B/bup_tick48k.sv" "$B/bup_capture.sv" "$B/bup_asset_wr.sv"
-				"$B/bup_asset_cache.sv" "$B/bupchip_pocket.sv" "$FPGA/pocket_utils/psram.sv"
-				"$T/sim/bupchip/s4/psram_model.sv" "$H/tb_daria.sv")
-			TOP=tb_daria ;;
 	esac
 	(cd "$D" && nice -n 10 "$V" --lint-only -Wall --timing -Wno-fatal "${DEFS[@]}" --top-module "$TOP" \
 		-Mdir "$D/mdir_$SET" "${SRCS[@]}") > "$D/$SET.raw" 2>&1

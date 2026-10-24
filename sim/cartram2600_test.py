@@ -19,23 +19,20 @@ row 6 and 3.6.
       very next cycle. AUDF0 (tb_load +arprobe logs it) is 1 at start,
       16 + (iteration & 7) after each passing iteration, 2 + 5 * area +
       phase on a failure.
-  cartram2600_test.py ram7800 > image.a78
-      a 7800 RAM cartridge (A78 type 0x0004, RAM at $4000): writes and reads
-      back 256 bytes, runs a routine from $4100, then AUDF0 = 7 (pass) or 31
-      (fail); tb_load's TONE line tells them apart.
   cartram2600_test.py check LOG --image NAME [--blend 0|1] [--profile P]
                              [--ref REF_LOG]
   cartram2600_test.py check-reset LOG --run RUN [--profile P] [--ref REF_LOG]
       one reset run's verdict (RUN: a name from the reset list below)
-      one run's verdict (NAME: a mapper, arfull, artape, armulti, armimg or
-      ram7800; --ref: the reference build's log of the same case, for
-      artape's colours).
+      one run's verdict (NAME: a mapper, arfull, artape, armulti or armimg;
+      --ref: the reference build's log of the same case, for artape's
+      colours). (openFPGA-2600: the 7800 core's 7800 RAM cartridge case,
+      ram7800, is gone with the 7800 cartridge; an A78 is refused.)
   cartram2600_test.py matrix [--work DIR] [--build] [--rtl-tree DIR]
                              [--profile P] [--only NAME,...] [--arfw FILE]
                              [--ref-logs DIR] [--fp]
       every mapper image with Flicker Blend off and on (60 ms each), the
       Supercharger's full load (blend off and on, with the RAM dump check)
-      and multiload, the 7800 RAM cartridge, and a synthetic DPC+ image
+      and multiload, and a synthetic DPC+ image
       (fe_dir/mkimg.py) that must make no cart-RAM access at all; with
       --arfw FILE (the Supercharger BIOS) also the full load from tape
       (artape, 22 simulated seconds, about an hour); then the verdicts.
@@ -126,7 +123,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 AUDC0, AUDF0, AUDV0 = 0x15, 0x17, 0x19
@@ -290,35 +286,6 @@ def image(name):
     return bytes(b)
 
 
-def ram7800_rom(audf=7):
-    """16 KB at $C000: write $4000-$40FF, read it back, copy a routine to
-    $4100 and run it (its STA writes its own next opcode), AUDF0 = audf or 31."""
-    prog, lab = asm(0xC000, [
-        0x78, 0xD8, 0xA9, 0x07, 0x85, 0x01, 0xA2, 0xFF, 0x9A,
-        0xA9, 0x04, 0x85, 0x15, 0xA9, 0x0F, 0x85, 0x19,
-        0xA2, 0x00, ("label", "w"), 0x8A, 0x49, 0x5A, 0x9D, A(0x4000), 0xE8, 0xD0, ("rel", "w"),
-        0xA2, 0x00, ("label", "r"), 0x8A, 0x49, 0x5A, 0xDD, A(0x4000), 0xD0, ("rel", "fail"), 0xE8, 0xD0, ("rel", "r"),
-        0xA2, 0x00, ("label", "c"), 0xBD, A("rt"), 0x9D, A(0x4100), 0xE8, 0xE0, 7, 0xD0, ("rel", "c"),
-        0xA2, 0x00, 0x20, A(0x4100), 0xE0, 0x01, 0xD0, ("rel", "fail"),
-        0xA9, audf, 0x85, 0x17, ("label", "idle"), 0x4C, A("idle"),
-        ("label", "fail"), 0xA9, 31, 0x85, 0x17, 0x4C, A("idle"),
-        ("label", "rt"), 0xA9, 0xE8, 0x8D, 0x05, 0x41, 0xEA, 0x60,
-        ("label", "rti"), 0x40])
-    img = bytearray([0xFF] * 0x4000)
-    img[0:len(prog)] = prog
-    for vec, a in ((0x3FFA, lab["rti"]), (0x3FFC, 0xC000), (0x3FFE, lab["rti"])):
-        img[vec], img[vec + 1] = a & 0xFF, a >> 8
-    return bytes(img)
-
-
-def write_ram7800(path):
-    binp = path + ".bin"
-    open(binp, "wb").write(ram7800_rom())
-    a78 = subprocess.run([sys.executable, os.path.join(HERE, "make_a78.py"), "--bin", binp, "--type", "0x0004"],
-                         capture_output=True, check=True).stdout
-    open(path, "wb").write(a78)
-
-
 # ------------------------------------------------------------------ checks
 def parse(log):
     t = open(log, "rb").read().decode("utf-8", "replace")
@@ -404,13 +371,6 @@ def check(log, name, blend, profile="auto", expect_counts=True, ref=None):
         bad.append("simulator: " + r["fatal"][0][:120])
     if profile_of(r, profile) == "fixb" and not r["p2"]:
         bad.append("fixb profile, but the P2 assertion is not armed (no 'P2 armed' line: SIM_FIXB not defined)")
-    if name == "ram7800":
-        if not r["tone"]:
-            bad.append("no TONE line")
-        elif not (0.99 <= r["tone"][1] <= 1.01):
-            bad.append(f"TONE ratio {r['tone'][1]} (31 = the program's fail code)")
-        summ = f"tone ratio {r['tone'][1] if r['tone'] else '-'}"
-        return not bad, bad, summ
     prof = profile_of(r, profile)
     if prof is None:
         bad.append("no CARTRAM sram_ctrl line (not tb_cartram, or no +cartram)")
@@ -438,7 +398,7 @@ def check(log, name, blend, profile="auto", expect_counts=True, ref=None):
         er, ew, es = EXPECT[name]
         if (n, strobes, sh_n) != (er, ew, es):
             bad.append(f"counts reads/writes/shadow {n}/{strobes}/{sh_n}, expected {er}/{ew}/{es}")
-    if r["ports"] and r["ports"][3] and name != "ram7800":
+    if r["ports"] and r["ports"][3]:
         bad.append(f"the 7800/BIOS port issued {r['ports'][3]} writes of cartridge RAM in a 2600 run")
     if prof in ("base", "fixb"):
         normal, rep = BUCKETS[(prof, blend)]
@@ -547,7 +507,6 @@ def images(a):
     for mode in ("full", "multi"):
         out = subprocess.run([sys.executable, os.path.join(HERE, "ar_test.py"), mode], capture_output=True, check=True).stdout
         open(os.path.join(d, f"ar{mode}.bin"), "wb").write(out)
-    write_ram7800(os.path.join(d, "ram7800.a78"))
     # a synthetic DPC+ image (fe_dir/mkimg.py): an ARM scheme never reaches
     # the SRAM's cart RAM (Fix A, decision 4)
     subprocess.run([sys.executable, os.path.join(HERE, "bupchip", "daria", "fe_dir", "mkimg.py"),
@@ -557,14 +516,12 @@ def images(a):
 
 
 def cases_matrix(only, tape=False):
-    c = [(m, b) for m in MAPPERS for b in (0, 1)] + [("arfull", 0), ("arfull", 1), ("armulti", 0), ("ram7800", 0),
+    c = [(m, b) for m in MAPPERS for b in (0, 1)] + [("arfull", 0), ("arfull", 1), ("armulti", 0),
                                                        ("armimg", 0)] + ([("artape", 0)] if tape else [])
     return [x for x in c if not only or x[0] in only]
 
 
 def case_args(img, name, blend, extra=()):
-    if name == "ram7800":
-        return [f"+image={img}/ram7800.a78", "+audf=7"]
     args = [f"+image={img}/{'arfull' if name == 'artape' else name}.bin", "+arprobe", "+cartram", f"+wav={RUN_MS[name]}"]
     if name in BS and BS[name]:
         args.append(f"+bs={BS[name]}")
@@ -870,11 +827,6 @@ def main():
     if len(sys.argv) == 2 and (sys.argv[1] in MAPPERS or (sys.argv[1].startswith("hi_") and sys.argv[1][3:] in MAPPERS)):
         sys.stdout.buffer.write(image(sys.argv[1]))
         print(BS[sys.argv[1].replace("hi_", "")], file=sys.stderr)
-        return 0
-    if len(sys.argv) == 2 and sys.argv[1] == "ram7800":
-        with tempfile.TemporaryDirectory() as d:
-            write_ram7800(os.path.join(d, "ram7800.a78"))
-            sys.stdout.buffer.write(open(os.path.join(d, "ram7800.a78"), "rb").read())
         return 0
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = p.add_subparsers(dest="cmd", required=True)

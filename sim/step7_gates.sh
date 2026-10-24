@@ -2,58 +2,34 @@
 # Every game-free gate of DARIA step 7 in one run (docs/daria_step7/plan.md
 # 3.6, 7.7: the fresh-clone run), each with its own log and one verdict; an
 # optional directory of game images for the gates that need one.
+# openFPGA-2600 (plan step 6) re-anchored it: hygiene runs from the root
+# commit b241dab; pp_equiv compares the modules shared with openFPGA-7800
+# with that repository at 3c7041c, the commit the import names
+# (sim/tools/pp_shared.py); pp_guards is gone (its chain ran from commits of
+# the 7800 core's history, F' and before, which this repository does not
+# hold); run_sim, extra_tests, cartram and selftest run the 2600 cases
+# (the 7800 core's BIOS, BupChip end to end, POKEY and MARIA cases are gone
+# with that hardware). Not yet ported, as the plan's later steps say:
+# wire (wire.py's BIOS and Souper scenarios are still in it, so without
+# BIOS and BUPFW it is PARTIAL: plan 7.B drops them), s4_check (the BupChip
+# firmware and game jobs, PARTIAL without them, as in the 7800 core), the
+# frame gate's R1 references (made from the openFPGA-7800 checkout, plan
+# O2), and the fit gates (plan step 7).
 #   sim/step7_gates.sh [--out DIR] [--only G,G...] [--skip G,G...] [--list]
 # --only and --skip take names from the list below; an unknown name is
 # refused (exit 2) before any gate runs.
 # Gates (in this order):
 #   hygiene      sim/check/hygiene.sh over BASE..HEAD (HYGIENE_NAMES, the
 #                name list kept outside the repository; HYGIENE_BASE)
-#   pp_equiv     sim/tools/pp_equiv.py: the non-DARIA stream (the qsf's
-#                macros without POCKET_DARIA, the new DARIA files excluded,
-#                which pp_equiv refuses when one holds a directive that
-#                would reach the files after it) has 0 'daria' tokens, and
-#                its hash is PP_EXPECT (F's, on aeee6d2 fc52edb6...6f52;
-#                for the release, F′'s: see pp_guards);
-#                and top.sv with cart2600.sv preprocess to PP_ORACLE_BASE's
-#                (default aeee6d2) with tb_daria's two macro sets, plain and
-#                WRAPPER (plan 2.8: upstream's oracle untouched)
-#   pp_guards    sim/tools/pp_guards.py PP_GUARD_FROM..HEAD (--qsf daria when
-#                the qsf has POCKET_DARIA, --qsf release when PP_GUARD_FROM's
-#                qsf has it too, else --qsf comments). The release's chain
-#                (docs/daria_step10/plan.md 3.1, re-based 2026-10-22) runs
-#                from F′, the last commit that changes the build without
-#                DARIA: the merge of 2.2.2 (origin/main d38fd13: the POKEY
-#                read fix and the AtariVox escape fix) into the ÷18 tree,
-#                PP_GUARD_FROM=a080f6f6c8cc8d40cd17d0271e132df7b8bee6f9.
-#                It was found as the first-parent commit that brought
-#                READ_WHOLE_CYCLE in
-#                (git log -1 --format=%h --first-parent -S READ_WHOLE_CYCLE -- src/fpga/mister/rtl/Pokey/pokey_bus.sv,
-#                run on rev1/merge-222, the branch the merge is on); pass the
-#                full hash, not the expression. The expression names F′ only
-#                on a branch that has the merge on its first-parent line:
-#                without --first-parent it finds 9aa125a, 2.2.2's own POKEY
-#                commit, whose ÷19 tree cannot start the chain; after a
-#                --no-ff merge of the release into DARIA-dev it finds that
-#                later merge (use the merge's ^2, or take the branch into
-#                DARIA-dev by fast-forward); and on main, after the PR's
-#                merge, it finds d38fd13, 2.2.2's ÷19 tree, where
-#                --qsf release fails. Never evaluate it on main. F′ has
-#                PP_EXPECT
-#                b1b706d3b6a2e3af4668de257b284aa652f19a1e67448521270e2466ce9e877c,
-#                F′'s non-DARIA stream (the stream below with pokey.sv,
-#                pokey_bus.sv, pokey_adapter.sv and avox_rx.sv from 2.2.2).
-#                pp_guards then takes --qsf release: from F′ only
-#                ap_core.qsf's SEED line and comments may change. Before it
-#                the chain ran from the commit that added fa2_on to the
-#                wrapper (-S fa2_on -- src/fpga/core/atari2600_pocket.sv,
-#                35bf88f) with 2fe5aed7...4f4b (MR, virtual_axis5 without
-#                virtual_axis.sv, the FA2 slot in 2600 mode, the L1W+L3 CPU,
-#                the sram_ctrl key copy); before that from the FA2 slot's
-#                first commit (-S fa2_nvram_bridge, 4738c65) with
-#                8a7e8a3d...3b7b, until the Stage 2 review found that an A78
-#                could write the slot; before that, from the MR commit
-#                (git log -1 --format=%h -S MUX_RESTRUCTURE --
-#                src/fpga/ap_core.qsf) with 34b3f60a...bd21
+#   pp_equiv     sim/tools/pp_shared.py: every Verilog file the Quartus build
+#                shares with openFPGA-7800 (the same path under src/fpga in
+#                both qsf's file lists) preprocessed alone (pp_equiv.py
+#                --files, the qsf's macros; comments and spacing do not
+#                count) equal to openFPGA-7800's at PP_7800_REV (default
+#                3c7041c) in PP_7800_REPO (that repository's checkout),
+#                but the files the 2600 core changed on purpose
+#                (pp_shared.py's DIVERGED, each with its step), which must
+#                differ; plan 9's "shared files drift between repos"
 #   divider      sim/check/div_check.py: every bench's and gate's default
 #                clk_arm divider (tb_load's and tb_system's arm_div, wire.py's
 #                ARM_DIV, run_sim.sh's and this script's guard expectations
@@ -81,12 +57,14 @@
 #                WORK/fp) equal to this run's (frame_gate.py --strict).
 #                FP_REF must hold fingerprints in tb_load's current format
 #                (frame,len_sys,riot,video,audio,cpu,t_sys,rst_n,rst_sys:
-#                made by these benches since 56ff012, e.g. run_sim.sh
-#                with FP=1 and RTL_TREE set to an aeee6d2 checkout, then
-#                extra_tests.sh with FP=1 on its WORK); an older set has
-#                fewer columns, and --strict fails it ("the columns differ")
+#                made by these benches since 56ff012, e.g. an earlier run's
+#                rs/fp, or openFPGA-7800's for the cases both cores run);
+#                an older set has fewer columns, and --strict fails it
+#                ("the columns differ")
 #   extra_tests  extra_tests.sh with FP=1 on run_sim's WORK, checked against
-#                EXTRA_REF (the reference build's extra_tests.sh log); AR_TAPE=1
+#                EXTRA_REF (a reference build's extra_tests.sh log, for the
+#                Supercharger tape loads' colours: openFPGA-7800 2.2.4's
+#                serves, its Supercharger section being this core's); AR_TAPE=1
 #                passes through (the tape path, and the tape load with
 #                +cartram, which the checker then requires); with FP_REF=DIR
 #                its extra_<case>.csv there too (the two tape loads'
@@ -148,12 +126,14 @@
 #                src/fpga/mister/rtl/bupchip.hex): without them the jobs
 #                that can run must pass and the gate reports PARTIAL, which
 #                is not a pass
-#   lint         sim/lint_step7.sh --debug: Verilator -Wall over the three
-#                macro sets of plan 3.3 item 1 (the shipped set, the shipped
-#                set without POCKET_DARIA, run_daria.sh's WRAPPER set) and the
+#   lint         sim/lint_step7.sh --debug: Verilator -Wall over the two
+#                macro sets of plan 3.3 item 1 kept here (the shipped set, the
+#                shipped set without POCKET_DARIA; run_daria.sh's WRAPPER set
+#                went with the oracle RTL, plan O2) and the
 #                shipped set with BUP_DEBUG (the hardware test builds' set,
 #                which holds the DARIA status overlay), no warning added
-#                against aeee6d2 (about 20 s)
+#                against lint_step7.sh's base (73fd755 by default: the 2600
+#                system module once cut; about 20 s)
 #   wire         lane I1's whole-core checks of the DARIA wiring (plan 7.3,
 #                1.2 row 1; sim/bupchip/daria/wire/wire.py): tb_wire built in
 #                both builds, every scenario (DIRECTED=1: the whole-core
@@ -215,14 +195,18 @@
 # pass. --list prints the gates and whether each is available.
 # Environment: VERILATOR (default /opt/verilator-5.040/bin/verilator when it
 # exists), VL_JOBS (default 2), SIM_LOCK=FILE (each simulation gate runs
-# under flock FILE, niced: the machine's simulation slot), BIOS=FILE and
-# BUPFW=FILE (run_sim.sh's BIOS and BupChip sections; without them those
-# sections are skipped, which fails run_sim), GAMES=DIR (game images by path;
+# under flock FILE, niced: the machine's simulation slot; SIM_SLOT=CMD
+# instead runs each under that command prefix, e.g. ~/daria_work/bin/simslot
+# on the owner's VM, whose queue a flock on its slot files would bypass),
+# BIOS=FILE and
+# BUPFW=FILE (wire.py's 7800 scenarios only), GAMES=DIR (game images by path;
 # they are never copied into the tree), R1_DIR=DIR (the reference runs),
 # S4_GAME=FILE and REFDIR (s4/check.sh's game jobs), S4_JOBS, RUN_SIM_REF=LOG,
-# FP_REF=DIR, PP_ORACLE_BASE=REV, CARTRAM_ONLY=LIST, FRAMES_LIST,
+# FP_REF=DIR, CARTRAM_ONLY=LIST, FRAMES_LIST,
 # FRAMES_GUARD, FRAMES_RULE, WIRE_ONLY, WIRE_MUT, EXTRA_JOBS, EXTRA_SLOT,
-# EXTRA_BOTH (above).
+# EXTRA_BOTH, PP_7800_REPO, PP_7800_REV, HYGIENE_BASE (default b241dab),
+# HYGIENE_ALLOW (paths, space-separated, for hygiene.sh --allow: binary
+# assets the tree ships, e.g. dist/Cores/Miasmark.2600/icon.bin) (above).
 # Every log starts with the tree's HEAD and status and the Verilator path
 # and version (plan P23); the run scripts add the md5 of each binary they
 # build. Output in --out DIR (default sim/work/step7/gates): <gate>.log and
@@ -252,7 +236,7 @@ OUT="$(cd "$OUT" && pwd)"
 QSF="$REPO/src/fpga/ap_core.qsf"
 QSF_DARIA=0
 grep -q '^set_global_assignment -name VERILOG_MACRO "POCKET_DARIA=1"' "$QSF" && QSF_DARIA=1
-GATES=(hygiene pp_equiv pp_guards divider cartram run_sim extra_tests selftest fit_selftest s4_check lint wire daria_smp dbg_snap frames dbg_overlay)
+GATES=(hygiene pp_equiv divider cartram run_sim extra_tests selftest fit_selftest s4_check lint wire daria_smp dbg_snap frames dbg_overlay)
 # opt-in gates: run only when --only names them
 OPTIN=" dbg_overlay "
 # --only and --skip name gates of GATES only: a misspelt name would select nothing
@@ -273,16 +257,16 @@ header() {   # the P23 header of every gate log
 	echo "VERILATOR $VERILATOR ($("$VERILATOR" --version 2>/dev/null))"
 	echo "date $(date -u +%FT%TZ)"
 }
-slot() {     # slot CMD...: under the simulation slot when SIM_LOCK is set
-	if [ -n "${SIM_LOCK:-}" ]; then flock "$SIM_LOCK" nice -n 10 "$@"; else nice -n 10 "$@"; fi
+slot() {     # slot CMD...: under the simulation slot when SIM_SLOT or SIM_LOCK is set
+	if [ -n "${SIM_SLOT:-}" ]; then $SIM_SLOT nice -n 10 "$@"
+	elif [ -n "${SIM_LOCK:-}" ]; then flock "$SIM_LOCK" nice -n 10 "$@"; else nice -n 10 "$@"; fi
 }
 
 # avail GATE: prints why a gate cannot run, or nothing
 avail() {
 	case "$1" in
 		hygiene) [ -n "${HYGIENE_NAMES:-}" ] || echo "HYGIENE_NAMES (the name list, outside the repository) not given" ;;
-		pp_equiv) [ -n "${PP_EXPECT:-}" ] || echo "PP_EXPECT (the expected non-DARIA stream hash) not given" ;;
-		pp_guards) [ -n "${PP_GUARD_FROM:-}" ] || echo "PP_GUARD_FROM (commit F) not given" ;;
+		pp_equiv) [ -n "${PP_7800_REPO:-}" ] && [ -d "${PP_7800_REPO:-}" ] || echo "PP_7800_REPO (an openFPGA-7800 checkout holding ${PP_7800_REV:-3c7041c}) not given" ;;
 		divider) [ -f "$HERE/bupchip/quartus_probe/step7/step7_prep.py" ] || echo "step7_prep.py (--tree-div) does not exist" ;;
 		fit_selftest) [ -f "$HERE/bupchip/quartus_probe/step7/selftest.sh" ] || echo "sim/bupchip/quartus_probe/step7/selftest.sh does not exist" ;;
 		extra_tests) [ -n "${EXTRA_REF:-}" ] && [ -f "${EXTRA_REF:-}" ] || echo "EXTRA_REF (the reference build's extra_tests.sh log) not given" ;;
@@ -320,11 +304,12 @@ if [ "$LIST" = 1 ]; then
 	exit 0
 fi
 
-# fp_compare GLOB: every FP_REF/GLOB fingerprint equal to this run's (rs/fp);
-# GLOB '*.csv' means run_sim.sh's (not extra_ or cartram_)
+# fp_compare GLOB [DIR]: every FP_REF/GLOB fingerprint equal to this run's
+# (DIR, default rs/fp); GLOB '*.csv' means run_sim.sh's (not extra_ or
+# cartram_)
 fp_compare() {
 	[ -n "${FP_REF:-}" ] || return 0
-	fp_cross "$FP_REF" "$OUT/rs/fp" "$1" FP_REF
+	fp_cross "$FP_REF" "${2:-$OUT/rs/fp}" "$1" FP_REF
 }
 # fp_cross REF_DIR DIR GLOB WHAT: every REF_DIR/GLOB fingerprint has its twin
 # in DIR, equal on every column and frame (frame_gate.py --strict); with
@@ -338,7 +323,7 @@ fp_cross() {
 		case "$3:$d" in "*.csv:extra_"*|"*.csv:cartram_"*) continue ;; esac
 		case "$d" in cartram_armimg_*) continue ;; esac
 		# the tape loads' fingerprints exist only in an AR_TAPE=1 run
-		case "$d" in extra_ar_tape_full.csv|extra_ar_tape_multi.csv)
+		case "$d" in extra_ar_tape_full.csv|extra_ar_tape_multi.csv|cartram_artape_b0.csv)
 			[ "${AR_TAPE:-0}" = 1 ] || { echo "-- fingerprints $d: not compared (AR_TAPE=1 runs the tape load that writes it)"; continue; } ;;
 		esac
 		n=$((n + 1))
@@ -351,46 +336,19 @@ fp_cross() {
 }
 
 # gate functions: run, write the log, return 0 (pass) or 1 (fail)
-g_hygiene() { bash "$HERE/check/hygiene.sh" --base "${HYGIENE_BASE:-aeee6d2}" --names "$HYGIENE_NAMES"; }
-g_pp_equiv() {
-	local rc=0 base="${PP_ORACLE_BASE:-aeee6d2}" d="$OUT/pp_oracle" set h0 h1 defs
-	python3 "$REPO/sim/tools/pp_equiv.py" "$REPO/src/fpga" "$OUT/pp_nodaria" -U POCKET_DARIA \
-		--exclude 'daria_|bup_dbg_snap' --max-token 0 --expect "$PP_EXPECT" || rc=1
-	# upstream's oracle (tb_daria, plain and WRAPPER) builds top.sv and
-	# cart2600.sv with run_daria.sh's macros: their text must be base's
-	echo "== top.sv and cart2600.sv against $base's, with tb_daria's macro sets (plan 2.8)"
-	mkdir -p "$d/base"
-	for f in top.sv cart2600.sv; do
-		git -C "$REPO" show "$base:src/fpga/mister/rtl/$f" > "$d/base/$f" || { echo "  FAIL: no $f at $base"; return 1; }
-	done
-	for set in plain wrapper; do
-		defs=(-D NO_BUPCHIP -D EXTERNAL_FIRMWARE -D EEPROM_NACK_ENDS_READ)
-		[ $set = wrapper ] && defs+=(-D DARIA_SHADOW -D DARIA_WIN_KB=128 -D DARIA_WRAPPER -D POCKET_DARIA)
-		h0="$(python3 "$REPO/sim/tools/pp_equiv.py" --files "$d/out_base_$set" "$d/base/top.sv" "$d/base/cart2600.sv" "${defs[@]}" \
-			| sed -n '1s/ .*//p')"
-		h1="$(python3 "$REPO/sim/tools/pp_equiv.py" --files "$d/out_head_$set" "$REPO/src/fpga/mister/rtl/top.sv" \
-			"$REPO/src/fpga/mister/rtl/cart2600.sv" "${defs[@]}" | sed -n '1s/ .*//p')"
-		if [ -n "$h0" ] && [ "$h0" = "$h1" ]; then echo "  $set set: $h1, equal to $base's"
-		else echo "  FAIL: $set set: HEAD ${h1:-error}, $base ${h0:-error}"; rc=1; fi
-	done
-	return $rc
+g_hygiene() {
+	local a=() p
+	for p in ${HYGIENE_ALLOW:-}; do a+=(--allow "$p"); done
+	bash "$HERE/check/hygiene.sh" --base "${HYGIENE_BASE:-b241dab}" --names "$HYGIENE_NAMES" "${a[@]}"
 }
-g_pp_guards() {
-	local q=comments
-	if [ "$QSF_DARIA" = 1 ]; then
-		q=daria
-		git -C "$REPO" show "$PP_GUARD_FROM:src/fpga/ap_core.qsf" 2> /dev/null \
-			| grep -q '^set_global_assignment -name VERILOG_MACRO "POCKET_DARIA=1"' && q=release
-	fi
-	python3 "$REPO/sim/tools/pp_guards.py" --repo "$REPO" --from "$PP_GUARD_FROM" --to HEAD --qsf "$q"
-}
+g_pp_equiv() { python3 "$REPO/sim/tools/pp_shared.py" --ref-repo "$PP_7800_REPO" --ref-rev "${PP_7800_REV:-3c7041c}" --repo "$REPO" --out "$OUT/pp_shared"; }
 g_divider() { python3 "$HERE/check/div_check.py" --repo "$REPO"; }
 g_cartram() {
 	local w="$OUT/cartram_work" p="$OUT/cartram_plain" rc=0 fp=() only=()
 	[ "$QSF_DARIA" = 1 ] && fp=(--fp)
 	[ -n "${CARTRAM_ONLY:-}" ] && only=(--only "$CARTRAM_ONLY")
 	mkdir -p "$w"
-	WORK="$w" BUILD_TOP=tb_cartram bash "$HERE/run_sim.sh" || return 1
+	WORK="$w" BUILD_TOP=tb_cartram slot bash "$HERE/run_sim.sh" || return 1
 	slot python3 "$HERE/cartram2600_test.py" matrix --work "$w" "${fp[@]}" "${only[@]}" || rc=1
 	slot python3 "$HERE/cartram2600_test.py" s19 --work "$w" "${fp[@]}" || rc=1
 	if grep -qE '\bt_new\b' "$REPO/src/fpga/core/sram_ctrl.sv"; then
@@ -406,11 +364,19 @@ g_cartram() {
 	if [ "$QSF_DARIA" = 1 ]; then
 		echo "== the plain build (DARIA=0): the same runs, and their fingerprints equal (plan 7.5 row 5)"
 		mkdir -p "$p"
-		DARIA=0 WORK="$p" BUILD_TOP=tb_cartram bash "$HERE/run_sim.sh" || return 1
+		DARIA=0 WORK="$p" BUILD_TOP=tb_cartram slot bash "$HERE/run_sim.sh" || return 1
 		slot python3 "$HERE/cartram2600_test.py" matrix --work "$p" --fp "${only[@]}" || rc=1
 		slot python3 "$HERE/cartram2600_test.py" s19 --work "$p" --fp || rc=1
 		fp_cross "$p/fp" "$w/fp" 'cartram_*.csv' "the plain build" || rc=1
 	fi
+	# with FP_REF, its matrix and s19 fingerprints too (the tape load's,
+	# cartram_artape, is the extra_tests gate's, with AR_TAPE=1)
+	[ -z "${FP_REF:-}" ] || [ -n "${CARTRAM_ONLY:-}" ] || {
+		local r="$OUT/cartram_fpref" f
+		rm -rf "$r"; mkdir -p "$r"
+		for f in "$FP_REF"/cartram_*.csv; do [ -f "$f" ] && [ "$(basename "$f")" != cartram_artape_b0.csv ] && ln -s "$f" "$r/"; done
+		FP_REF="$r" fp_compare 'cartram_*.csv' "$w/fp" || rc=1
+	}
 	[ -z "${CARTRAM_ONLY:-}" ] || { echo "CARTRAM_ONLY=$CARTRAM_ONLY: a subset, not the gate"; [ $rc = 0 ] && rc=3; }
 	return $rc
 }
@@ -450,7 +416,7 @@ g_selftest() {
 	if [ -f "$OUT/rs/cartram/logs/artape_b0.log" ]; then args+=(--artape "$OUT/rs/cartram/logs/artape_b0.log")
 	else miss+=("--artape ($OUT/rs/cartram/logs/artape_b0.log: the extra_tests gate with AR_TAPE=1)"); fi
 	if [ -f "$OUT/extra_tests.out" ] && [ -n "${EXTRA_REF:-}" ]; then
-		args+=(--extra "$OUT/extra_tests.out" --extra-ref "$EXTRA_REF" --extra-dir "$OUT/rs/extra")
+		args+=(--extra "$OUT/extra_tests.out" --extra-ref "$EXTRA_REF")
 	else miss+=("--extra ($OUT/extra_tests.out and EXTRA_REF: the extra_tests gate)"); fi
 	python3 "$HERE/check/selftest.py" "${args[@]}" || return 1
 	if [ ${#miss[@]} -gt 0 ]; then
@@ -489,6 +455,7 @@ g_extra_tests() {
 	[ "${AR_TAPE:-0}" = 1 ] && tape=(--ar-tape)
 	python3 "$HERE/check/extra_tests_check.py" "$OUT/extra_tests.out" --ref "$EXTRA_REF" "${tape[@]}" || rc=1
 	fp_compare 'extra_*.csv' || rc=1
+	fp_compare 'cartram_*.csv' || rc=1
 	if [ "$QSF_DARIA" = 1 ]; then
 		echo "== the plain build (DARIA=0): extra_tests.sh on run_sim's plain WORK, and the fingerprints equal (plan 7.5 row 5)"
 		[ -x "$OUT/rs_plain/obj_load/vtb" ] || { echo "  FAIL: no plain run_sim build in $OUT/rs_plain (the run_sim gate makes it)"; return 1; }

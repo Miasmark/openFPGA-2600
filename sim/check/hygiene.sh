@@ -1,6 +1,7 @@
 #!/bin/bash
 # Repository hygiene before a merge (DARIA step 7, docs/daria_step7/plan.md
-# 7.7), over the changes from BASE (default aeee6d2) to HEAD:
+# 7.7), over the changes from BASE (default b241dab, openFPGA-2600's root commit,
+# so the whole tree) to HEAD:
 #   - no file with a cartridge-image extension (.a26, .a78, .bin, .rom), no
 #     image or frame dump (.png, .ppm, .bmp, .gif, .jpg), nothing under
 #     sim/work, and no binary file or file over LIMIT bytes (default 262144)
@@ -41,7 +42,7 @@
 set -e -o pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
-BASE=aeee6d2
+BASE=b241dab
 NAMES="${HYGIENE_NAMES:-}"
 LIMIT=262144
 ALLOW=()
