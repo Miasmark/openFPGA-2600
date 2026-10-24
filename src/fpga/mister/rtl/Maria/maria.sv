@@ -31,9 +31,11 @@
 // registers and 7800 memory map are gone, and so is everything they fed:
 // MEN (maria_en) was never set in the 2600 core, so the constants below are
 // the values those inputs always had there: every access is a slow one
-// (control.sv's sel_slow_clock with MEN low), WSYNC is never written (no
-// MARIA registers in the 2600 map) and the line RAM's lrc never comes
-// (video_sync was held in reset while MEN was low).
+// (control.sv's sel_slow_clock with MEN low) and WSYNC is never written (no
+// MARIA registers in the 2600 map). lrc is the exception: video_sync was held
+// in reset while MEN was low, and its lrc is high in reset, so it was
+// constantly 1, not 0. Tying it 0 changes nothing: with wsync 0, lrc only
+// ever sets ready_int, which the reset already sets and nothing clears.
 module maria(
 	// Busses
 	input  logic [15:0] AB_in,
@@ -59,7 +61,7 @@ module maria(
 	wire              maria_en = 1'b0;
 	wire              sel_slow_clock = 1'b1;
 	wire              wsync = 1'b0;
-	wire              lrc = 1'b0;
+	wire              lrc = 1'b0;      // was 1 (see above); same effect
 	/* verilator lint_off UNUSEDSIGNAL */
 	wire [15:0]       AB = AB_in;     // the decode reads A15-A5
 

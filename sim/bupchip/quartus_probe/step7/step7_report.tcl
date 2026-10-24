@@ -120,14 +120,15 @@ proc regs {label pattern {nodup 0}} {
 # pattern, present in Build B (daria), present in Q5 (DARIA + BUP_DEBUG).
 # f3_crossings.txt holds the same presence per kind (selftest.sh compares
 # the two). cap_err_a is absent from Q5 too: it feeds only the status
-# word's bit 11, which bup_status_osd.sv does not show (plan 2.7).
+# word's bit 11, which bup_status_osd.sv does not show (plan 2.7). cmd_s is
+# absent in the 2600 core: the wrapper ties cmd_valid 0 (no Souper profile).
 set ff_table {
 	{*|bupchip_pocket:bupchip|hold_a[0]} 1 1
 	{*|bupchip_pocket:bupchip|pause_a[0]} 0 0
 	{*|bupchip_pocket:bupchip|prof_a[0]} 1 1
 	{*|bupchip_pocket:bupchip|ram32_a[0]} 1 1
 	{*|bupchip_pocket:bupchip|mres_a[0]} 1 1
-	{*|bupchip_pocket:bupchip|cmd_s[0]} 1 1
+	{*|bupchip_pocket:bupchip|cmd_s[0]} 0 0
 	{*|daria_call:call|tog_s[0]} 1 1
 	{*|daria_mmio:mmio|sn_a[0]} 1 1
 	{*|bup_asset_wr:writer|t1} 1 1

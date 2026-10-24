@@ -427,8 +427,8 @@ checker "FAIL: h.retime" builda "Build A (Fix B, no DARIA) whose fit report has 
 grep -q "^  (h.retime) FAIL .*no Fitter Netlist Optimizations table" "$T/c/$case_n.out" \
 	&& ok "     (h.retime) names the missing table" || bad "     (h.retime) does not name the missing table: $T/c/$case_n.out"
 echo "   (k'): the first flops' fan-in"
-checker PASS daria "hold_a[0] behind a NOT (an inverted register: 1 level), cmd_s[0] from a fitter duplicate through a routing cell" \
-	"hold_a[0]=levels:1" "cmd_s[0]=levels:1" "cmd_s[0]=dup"
+checker PASS daria "hold_a[0] behind a NOT (an inverted register: 1 level), mres_a[0] from a fitter duplicate through a routing cell" \
+	"hold_a[0]=levels:1" "mres_a[0]=levels:1" "mres_a[0]=dup"
 echo "     $(kline)"
 checker PASS daria "the reset class: en_s[0] with its clock's reset register (one more register)" "en_s[0]=own:1"
 checker "FAIL: k'" daria "a two-register cone into prof_a[0]" "prof_a[0]=two_cross"

@@ -46,7 +46,12 @@ set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|bupchip_
 set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|bupchip_pocket:*|prof_a\[0\]"
 set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|bupchip_pocket:*|ram32_a\[0\]"
 set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|bupchip_pocket:*|mres_a\[0\]"
-# bupchip/bupchip_pocket.sv: the $8007 command toggle (cmd_byte held)
+# bupchip/bupchip_pocket.sv: the $8007 command toggle (cmd_byte held). No chain
+# in the 2600 core: the wrapper ties cmd_valid 0 (no Souper profile), so the
+# fitter will list this mark as ignored, and f3_crossings.txt and
+# step7_report.tcl's ff_table expect cmd_s[0] absent. Kept because
+# smoke/run_smoke.sh (smoke.sv still has the chain) counts 13 marks; drop it
+# together with the smoke test's chain and count.
 set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|bupchip_pocket:*|cmd_s\[0\]"
 # bupchip/daria_call.sv: call_tog
 set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|daria_call:*|tog_s\[0\]"

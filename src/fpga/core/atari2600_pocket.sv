@@ -245,12 +245,13 @@ wire        hscfw_loaded = 1'b0;
 // load, the header fields are cleared then, and the region logic treats it
 // as a 2600 image (region_pll_hold), so header byte 57 never retunes the PLL.
 // cart_is_7800 decides a78_refused and nothing else. Bytes 55-57 are still
-// taken during a download, as in the 7800 core, and cleared at its end:
-// until the system module loses MARIA (plan step 4), cart_region (MARIA's
-// PAL input) and the port types reach the console, held in reset, while a
-// download runs, and the frame fingerprints of 2600 images stay those of
-// 2.2.4's 2600 mode. The rest of the header (the version, cart type, save
-// byte 58, XM and mapper bytes) is no longer read.
+// taken during a download, as in the 7800 core, and cleared at its end.
+// MARIA is gone (plan step 4), so while a download runs, with the console
+// held in reset, cart_region reaches only region_select (its Auto term while
+// tia_en is low) and the port types only the controllers; the frame
+// fingerprints of 2600 images stay those of 2.2.4's 2600 mode. The rest of
+// the header (the version, cart type, save byte 58, XM and mapper bytes) is
+// no longer read.
 always @(posedge clk_sys) begin
 	cart_is_7800 <= (cart_header == "ATARI");
 

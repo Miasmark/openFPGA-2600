@@ -762,11 +762,13 @@ module Atari7800 (
 		.ch2_len          (8'd1),
 		.ch2_req          (1'b0),
 		.ch2_rnw          (1'b1),
+		/* verilator lint_off PINCONNECTEMPTY */
 		.ch2_ack          (),
 		.ch2_dout         (),
 		.ch2_rvalid       (),
 		.ch1_timeout      (arm_ddr_timeout),
 		.ch2_timeout      ()
+		/* verilator lint_on PINCONNECTEMPTY */
 	);
 `else
 	// Pocket port: there is no DDR3. Nothing requests it once the ARM mapper

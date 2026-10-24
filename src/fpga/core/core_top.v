@@ -940,8 +940,9 @@ assign dram_dqm = {dram_dqmh, dram_dqml};
 ////////////////////////////////////////////////////////////////////////////////
 // Video
 //
-// The core produces a pixel on each ce_pix of clk_sys: every other cycle for
-// MARIA (7.16 MHz, 320 wide), every fourth for the TIA (3.58 MHz, 160 wide).
+// The core produces a pixel on each ce_pix of clk_sys: every fourth cycle,
+// for the TIA (3.58 MHz, 160 wide). (MARIA's every other cycle, 7.16 MHz and
+// 320 wide, went with its picture in plan step 4.)
 // The Pocket samples every clk_sys cycle and drops those marked skip.
 //
 // The scaler slot index is sent in rgb[23:13] on the first cycle after
