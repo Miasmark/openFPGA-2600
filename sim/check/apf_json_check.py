@@ -5,15 +5,24 @@
 
 Checks (each prints a line; the last line is APF_JSON pass or APF_JSON FAIL):
 - every JSON file in dist/ parses; the core files carry "APF_VER_1";
-- core.json: names, version, url, the bitstream name that tools/package.sh writes;
+- every field of every file is one Analogue's APF pages document, within the
+  documented limits (LIMITS: lengths, counts, ranges, allowed values);
+- core.json: names, version, url, description <= 63 characters, the
+  bitstream name that tools/package.sh writes;
 - Platforms/2600.json and _images/2600.bin are the files of Spiritualized's
   2600 core 1.0.0 (byte for byte: the platform is shared with that core);
 - no 7800 package file is left;
 - interact.json: the Pocket's menu limits (16 entries, 20 with the reloadable
   data slots, 16 options a list, 23 characters a name), every address decoded
   by core_top.v, option values inside the item's mask, defaults among the
-  options, the Mapper lists (each forcible bss_type once, names matching
-  detect2600.sv's enum, BUS left out, not persisted), SaveKey Off/On;
+  options, writeonly on every setting and persist on all but the Mapper
+  lists (each forcible bss_type once, names matching detect2600.sv's enum,
+  BUS left out, not persisted), SaveKey Off/On;
+- the menu options against the RTL that acts on them: Port Input (the
+  wrapper's menu_port_type and header_port_type, and the code that uses each
+  port type), with a planted Paddles/Driving swap that must be caught;
+  Palette (video_mux), Turbo, AtariVox Voice, Region (wrapper), Audio and
+  2600 Video (core_top's split and stmix arms), Mapper (bss_type as is);
 - data.json: the slot order and files, ids and bridge addresses as core_top.v
   decodes them, and the save sizes core_top.v writes into the data table, by
   slot index;
@@ -50,8 +59,8 @@ MAPPER_NAMES = {
     "Multicart 2K": "BANKMC2K", "Multicart 4K": "BANKMC4K", "Multicart 8K": "BANKMC8K",
     "32-in-1": "BANK32",
 }
-# Port Input names and the wrapper's port_input values (atari2600_pocket.sv,
-# menu_port_type: 0 is the header's type, which is a joystick for every image)
+# Port Input names and their menu values. What each value does is read from
+# atari2600_pocket.sv (check_options_rtl), not taken from this table.
 PORT_NAMES = {"Joystick": 0, "Paddles": 2, "Driving": 3, "Light Gun": 4,
               "Dual Stick": 5, "Booster Grip": 6}
 
@@ -61,7 +70,222 @@ PORTS = ["bs_override", "diff_left_b", "diff_right_b", "bw_setting", "savekey_se
          "turbo", "atarivox_setting", "stereo_tia", "stmix", "decomb", "flicker_blend",
          "menu_reset"]
 
+# Analogue's documented fields and limits, from the APF developer pages
+# https://www.analogue.co/developer/docs/core-definition-files/<file>-json
+# (core, data, input, interact, video, audio, variants) and
+# https://www.analogue.co/developer/docs/platform-metadata, read 2026-10-24.
+# Every field present in a file must have a row (an undocumented field
+# fails), and every rule of its row must hold. Paths are dotted keys, []
+# meaning each element of an array. Rules:
+#   ("len", n)    string of at most n characters
+#   ("count", n)  array of at most n elements
+#   "u16", "u32"  integer or "0x" hex string, unsigned 16 / 32 bit
+#   "s32"         integer or hex string, signed 32 bit
+#   "int", "bool", "str", "obj", "arr"   the JSON type
+#   ("eq", v), ("in", values), ("re", pattern)
+PLATFORM_ID = ("re", r"[a-z0-9][a-z0-9_]{0,14}")   # platform-metadata: a-z 0-9 _, 15, no leading _
+INPUT_KEYS = ("pad_btn_a", "pad_btn_b", "pad_btn_x", "pad_btn_y", "pad_trig_l", "pad_trig_r",
+              "pad_btn_start", "pad_btn_select")
+DISPLAY_MODES = ("0x10", "0x20", "0x21", "0x22", "0x23", "0x30", "0x31", "0x32", "0x40", "0x41", "0x42",
+                 "0x51", "0x52", "0x61", "0x62", "0x63", "0x71", "0x72", "0x81", "0x82", "0xE0", "0xE1")
+SETTING = ("persist", "writeonly", "defaultval", "value", "value_off", "mask", "group")
+LIMITS = {
+    "core.json": {
+        "core": ["obj"], "core.magic": [("eq", "APF_VER_1")], "core.metadata": ["obj"],
+        "core.metadata.platform_ids": ["arr", ("count", 4)],
+        "core.metadata.platform_ids[]": ["str", PLATFORM_ID],
+        "core.metadata.shortname": ["str", ("len", 31)],
+        "core.metadata.description": ["str", ("len", 63)],
+        "core.metadata.author": ["str", ("len", 31)],
+        "core.metadata.url": ["str", ("len", 63)],
+        "core.metadata.version": ["str", ("len", 31)],
+        "core.metadata.date_release": ["str", ("len", 10), ("re", r"\d{4}-\d{2}-\d{2}")],
+        "core.framework": ["obj"],
+        "core.framework.target_product": [("eq", "Analogue Pocket")],
+        "core.framework.version_required": ["str", ("re", r"\d+\.\d+")],
+        "core.framework.sleep_supported": ["bool"],
+        "core.framework.chip32_vm": ["str", ("len", 15)],
+        "core.framework.dock": ["obj"],
+        "core.framework.dock.supported": [("eq", True)],          # "Must be true"
+        "core.framework.dock.analog_output": ["bool"],
+        "core.framework.hardware": ["obj"],
+        "core.framework.hardware.link_port": ["bool"],
+        "core.framework.hardware.cartridge_adapter": ["s32"],
+        "core.cores": ["arr", ("count", 8)], "core.cores[]": ["obj"],
+        "core.cores[].name": ["str", ("len", 15)],
+        "core.cores[].id": ["u32"],
+        "core.cores[].filename": ["str", ("len", 15)],
+    },
+    "data.json": {
+        "data": ["obj"], "data.magic": [("eq", "APF_VER_1")],
+        "data.data_slots": ["arr", ("count", 32)], "data.data_slots[]": ["obj"],
+        "data.data_slots[].name": ["str", ("len", 15)],
+        "data.data_slots[].id": ["u16"],
+        "data.data_slots[].required": ["bool"],
+        "data.data_slots[].parameters": ["u32"],
+        "data.data_slots[].nonvolatile": ["bool"],
+        "data.data_slots[].deferload": ["bool"],
+        "data.data_slots[].secondary": ["bool"],
+        "data.data_slots[].filename": ["str", ("len", 31)],
+        "data.data_slots[].extensions": ["arr", ("count", 4)],
+        "data.data_slots[].extensions[]": ["str", ("len", 7)],
+        "data.data_slots[].size_exact": ["u32"],
+        "data.data_slots[].size_maximum": ["u32"],
+        "data.data_slots[].address": ["u32"],
+    },
+    "input.json": {
+        "input": ["obj"], "input.magic": [("eq", "APF_VER_1")],
+        "input.controllers": ["arr", ("count", 4)], "input.controllers[]": ["obj"],
+        "input.controllers[].type": [("eq", "default")],
+        "input.controllers[].mappings": ["arr", ("count", 8)], "input.controllers[].mappings[]": ["obj"],
+        "input.controllers[].mappings[].id": ["u16"],
+        "input.controllers[].mappings[].name": ["str", ("len", 19)],
+        "input.controllers[].mappings[].key": [("in", INPUT_KEYS)],
+    },
+    "interact.json": {
+        "interact": ["obj"], "interact.magic": [("eq", "APF_VER_1")],
+        "interact.variables": ["arr", ("count", 16)], "interact.variables[]": ["obj"],
+        "interact.variables[].name": ["str", ("len", 23)],
+        "interact.variables[].id": ["u16"],
+        "interact.variables[].type": [("in", ("radio", "check", "slider_u32", "list", "number_u32", "action"))],
+        "interact.variables[].enabled": ["bool"],
+        "interact.variables[].address": ["u32"],
+        "interact.variables[].group": ["u32"],
+        "interact.variables[].persist": ["bool"],
+        "interact.variables[].writeonly": ["bool"],
+        "interact.variables[].defaultval": ["s32"],
+        "interact.variables[].value": ["s32"],
+        "interact.variables[].value_off": ["s32"],
+        "interact.variables[].mask": ["u32"],
+        "interact.variables[].graphical": ["obj"],
+        "interact.variables[].graphical.signed": ["bool"],
+        "interact.variables[].graphical.min": ["s32"],
+        "interact.variables[].graphical.max": ["s32"],
+        "interact.variables[].graphical.adjust_small": ["s32"],
+        "interact.variables[].graphical.adjust_large": ["s32"],
+        "interact.variables[].options": ["arr", ("count", 16)], "interact.variables[].options[]": ["obj"],
+        "interact.variables[].options[].value": ["s32"],
+        "interact.variables[].options[].name": ["str", ("len", 23)],
+        # Not on the interact.json page; the 7800 core has shipped it empty
+        "interact.messages": [("eq", [])],
+    },
+    "video.json": {
+        "video": ["obj"], "video.magic": [("eq", "APF_VER_1")],
+        "video.scaler_modes": ["arr", ("count", 8)], "video.scaler_modes[]": ["obj"],
+        "video.scaler_modes[].width": ["int"], "video.scaler_modes[].height": ["int"],
+        "video.scaler_modes[].aspect_w": ["int"], "video.scaler_modes[].aspect_h": ["int"],
+        "video.scaler_modes[].dock_aspect_w": ["int"], "video.scaler_modes[].dock_aspect_h": ["int"],
+        "video.scaler_modes[].rotation": [("in", (0, 90, 180, 270))],
+        "video.scaler_modes[].mirror": [("in", (0, 1, 2, 3))],
+        "video.display_modes": ["arr", ("count", 16)], "video.display_modes[]": ["obj"],
+        "video.display_modes[].id": [("in", DISPLAY_MODES)],
+        "video.defaults": ["obj"], "video.defaults.sharpness": [("in", (0, 1, 2, 3))],
+    },
+    "audio.json": {"audio": ["obj"], "audio.magic": [("eq", "APF_VER_1")]},
+    "variants.json": {
+        "variants": ["obj"], "variants.magic": [("eq", "APF_VER_1")],
+        "variants.variant_list": ["arr", ("count", 8)], "variants.variant_list[]": ["obj"],
+        "variants.variant_list[].name": ["str", ("len", 15)],
+        "variants.variant_list[].id": ["u16"],
+        "variants.variant_list[].core_select": ["obj"],
+        "variants.variant_list[].core_select.core_id": ["u32"],
+        "variants.variant_list[].data_override": ["arr", ("count", 8)],
+        "variants.variant_list[].data_override[]": ["obj"],
+        "variants.variant_list[].data_override[].data_id_to": ["u16"],
+        "variants.variant_list[].data_override[].data_id_from": ["u16"],
+        "variants.variant_list[].memory_writes": ["arr", ("count", 16)],
+        "variants.variant_list[].memory_writes[]": ["obj"],
+        "variants.variant_list[].memory_writes[].address": ["u32"],
+        "variants.variant_list[].memory_writes[].data": ["u32"],
+    },
+    "platform": {
+        "platform": ["obj"],
+        "platform.category": ["str", ("len", 31)],
+        "platform.name": ["str", ("len", 31)],
+        "platform.manufacturer": ["str", ("len", 31)],
+        "platform.year": ["int"],
+    },
+}
+
 fails = []
+
+
+def num(v):
+    """An "integer / hex string" field's value, or None."""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, int):
+        return v
+    if isinstance(v, str) and re.fullmatch(r"0[xX][0-9A-Fa-f]+", v):
+        return int(v, 16)
+    return None
+
+
+def rule_ok(rule, v):
+    if rule == "obj":
+        return isinstance(v, dict)
+    if rule == "arr":
+        return isinstance(v, list)
+    if rule == "str":
+        return isinstance(v, str)
+    if rule == "bool":
+        return isinstance(v, bool)
+    if rule == "int":
+        return isinstance(v, int) and not isinstance(v, bool)
+    if rule in ("u16", "u32", "s32"):
+        n = num(v)
+        lo, hi = {"u16": (0, 0xFFFF), "u32": (0, 0xFFFFFFFF), "s32": (-2**31, 2**31 - 1)}[rule]
+        if rule == "s32" and isinstance(v, str) and n is not None and n <= 0xFFFFFFFF:
+            return True     # a hex string is the 32-bit pattern
+        return n is not None and lo <= n <= hi
+    kind, arg = rule
+    if kind == "len":
+        return isinstance(v, str) and len(v) <= arg
+    if kind == "count":
+        return isinstance(v, list) and len(v) <= arg
+    if kind == "eq":
+        return v == arg and type(v) is type(arg)
+    if kind == "in":
+        return any(v == x and type(v) is type(x) for x in arg)
+    if kind == "re":
+        return isinstance(v, str) and re.fullmatch(arg, v) is not None
+    raise ValueError(rule)
+
+
+def check_limits(fname, obj, table):
+    """Every field of obj against table; one check line per (field, rule)
+    that has values, so a long array still prints one line."""
+    seen = {}
+
+    def walk(v, path, where):
+        if path:
+            seen.setdefault(path, []).append((where, v))
+        if isinstance(v, dict):
+            for k, x in v.items():
+                walk(x, f"{path}.{k}" if path else k, f"{where}.{k}" if where else k)
+        elif isinstance(v, list):
+            for i, x in enumerate(v):
+                walk(x, path + "[]", f"{where}[{i}]")
+    walk(obj, "", "")
+    n_ok = n_vals = 0
+    for path, vals in seen.items():
+        rules = table.get(path)
+        if rules is None:
+            check(False, f"{fname}: {path} is not a documented field")
+            continue
+        for r in rules:
+            for w, v in vals:
+                n_vals += 1
+                if rule_ok(r, v):
+                    n_ok += 1
+                else:
+                    what = r if isinstance(r, str) else f"{r[0]} {r[1]!r}"
+                    check(False, f"{fname}: {w} = {v!r} breaks the documented limit {what}")
+    lens = sorted({f"{p.rsplit('.', 1)[-1]} {r[1]}" for p in seen for r in table.get(p, []) if r[0] == "len"})
+    check(n_ok == n_vals and all(p in table for p in seen),
+          f"{fname}: {sum(p in table for p in seen)}/{len(seen)} fields documented, "
+          f"{n_ok}/{n_vals} rule checks within limits"
+          + (f" (lengths: {', '.join(lens)})" if lens else ""))
 
 
 def check(ok, what):
@@ -91,6 +315,8 @@ def main():
     dist = os.path.join(root, "dist")
     core_dir = os.path.join(dist, "Cores", "Miasmark.2600")
     core_top = open(os.path.join(root, "src/fpga/core/core_top.v")).read()
+    wrap = open(os.path.join(root, "src/fpga/core/atari2600_pocket.sv")).read()
+    vmux = open(os.path.join(root, "src/fpga/mister/rtl/video_mux.sv")).read()
     detect = open(os.path.join(root, "src/fpga/mister/rtl/detect2600.sv")).read()
     package = open(os.path.join(root, "tools/package.sh")).read()
 
@@ -109,6 +335,13 @@ def main():
         obj = js.get(rel, (None,))[0]
         check(obj is not None and obj.get(n, {}).get("magic") == "APF_VER_1", f"{rel}: {n}.magic APF_VER_1")
 
+    print("-- Analogue's documented fields and limits (LIMITS)")
+    for rel, (obj, _) in sorted(js.items()):
+        base = os.path.basename(rel)
+        table = LIMITS["platform"] if rel.startswith("Platforms/") else LIMITS.get(base)
+        if check(table is not None, f"{rel}: a file the APF pages document"):
+            check_limits(rel, obj, table)
+
     print("-- core.json")
     core = js["Cores/Miasmark.2600/core.json"][0]["core"]
     md = core["metadata"]
@@ -118,8 +351,7 @@ def main():
     check(md["version"] == "1.0.1", "version 1.0.1")
     check(md["url"] == "https://github.com/Miasmark/openFPGA-2600", "url")
     check(bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", md["date_release"])), "date_release is a date")
-    check("Kitrinx" in md["description"] and "openFPGA-7800" in md["description"],
-          "description credits the MiSTer core (Kitrinx) and openFPGA-7800")
+    check(len(md["description"]) <= 63, f"description {len(md['description'])} characters (limit 63)")
     check(core["framework"]["sleep_supported"] is False, "sleep_supported false")
     check(core["framework"]["dock"]["supported"] is True, "dock supported")
     rbf = core["cores"][0]["filename"]
@@ -146,7 +378,7 @@ def main():
     print("-- data.json")
     slots = js["Cores/Miasmark.2600/data.json"][0]["data"]["data_slots"]
     names = [s["name"] for s in slots]
-    check(names == ["Cartridge", "Supercharger BIOS", "SaveKey", "FA2 flash"], f"slot order {names}")
+    check(names == ["Cartridge", "Supercharger", "SaveKey", "FA2 flash"], f"slot order {names}")
     ids = [int(s["id"], 16) for s in slots]
     check(len(set(ids)) == len(ids), "slot ids unique")
     cart, arfw, sk, fa2 = slots
@@ -154,7 +386,7 @@ def main():
     check(int(cart["parameters"], 16) & 1 == 1, "cartridge slot user-reloadable")
     check(arfw.get("filename") == "supercharger.bin" and arfw.get("required") is False
           and int(arfw["parameters"], 16) & 2 == 0,
-          "Supercharger BIOS: supercharger.bin, optional, not core-specific (/Assets/2600/common/)")
+          "Supercharger: supercharger.bin, optional, not core-specific (/Assets/2600/common/)")
     for s, fn, size in ((sk, "savekey.sav", 0x8000), (fa2, "fa2.sav", 0x100)):
         check(s.get("filename") == fn and s.get("nonvolatile") is True and int(s["size_maximum"], 16) == size
               and s.get("required") is False and int(s["parameters"], 16) & 2 == 0,
@@ -189,12 +421,19 @@ def main():
         by_addr[v["name"]] = v
         check(addr >> 24 == 0x10 and (addr & 0xFFF) in decoded and (addr & 0x00FFF000) == 0,
               f"{v['name']}: {v['address']} decoded by core_top")
-        check(len(v["name"]) <= 23, f"{v['name']}: name <= 23 characters")
+        if v["type"] != "action":
+            # core_top's 0x10 settings are write-only registers: the host must
+            # not read them back, and a setting keeps its value across runs
+            # (the Mapper items aside, checked below)
+            check(v.get("writeonly") is True, f"{v['name']}: writeonly true")
+            if v["name"] not in ("Mapper", "Mapper (more)"):
+                check(v.get("persist") is True, f"{v['name']}: persist true")
+        else:
+            check(all(k not in v for k in ("writeonly", "persist", "defaultval")),
+                  f"{v['name']}: action, no setting fields")
         if v["type"] == "list":
             opts = v["options"]
             mask = int(v["mask"], 16)
-            check(len(opts) <= 16, f"{v['name']}: {len(opts)} options (limit 16)")
-            check(all(len(o["name"]) <= 23 for o in opts), f"{v['name']}: option names <= 23 characters")
             check(all(o["value"] & mask == 0 for o in opts), f"{v['name']}: option values inside mask {v['mask']}")
             check(len({o["value"] for o in opts}) == len(opts), f"{v['name']}: option values unique")
             check(v["defaultval"] in [o["value"] for o in opts], f"{v['name']}: default among the options")
@@ -219,12 +458,15 @@ def main():
     for nm in ("Port 1 Input", "Port 2 Input"):
         v = by_addr[nm]
         check(all(PORT_NAMES.get(o["name"]) == o["value"] for o in v["options"]) and v["options"][0]["name"] == "Joystick"
-              and v["defaultval"] == 0, f"{nm}: Joystick (0, default) and the wrapper's port types by name")
+              and v["defaultval"] == 0, f"{nm}: Joystick (0, default) and the other names by PORT_NAMES")
     for nm in ("Left Difficulty", "Right Difficulty"):
         check([(o["value"], o["name"]) for o in by_addr[nm]["options"]] == [(0, "A"), (1, "B")], f"{nm}: A = 0, B = 1 (diff_*_b)")
     check([(o["value"], o["name"]) for o in by_addr["TV Type"]["options"]] == [(0, "Colour"), (1, "B&W")], "TV Type: Colour 0, B&W 1")
     check([(o["value"], o["name"]) for o in by_addr["Region"]["options"]] == [(0, "Auto"), (1, "NTSC"), (2, "PAL")],
           "Region: Auto 0, NTSC 1, PAL 2")
+
+    print("-- menu options against the RTL (what each option makes the core do)")
+    check_options_rtl(by_addr, wrap, core_top, vmux)
 
     print("-- video.json")
     vj = js["Cores/Miasmark.2600/video.json"][0]["video"]
@@ -249,6 +491,8 @@ def main():
     info = open(os.path.join(core_dir, "info.txt")).read()
     check(all(w in info for w in ("savekey.sav", "fa2.sav", "supercharger.bin", "/Assets/2600/common/", "openFPGA-2600")),
           "info.txt names the files, the asset folder and the source")
+    check("Kitrinx" in info and "openFPGA-7800" in info,
+          "info.txt credits the MiSTer core (Kitrinx) and the openFPGA-7800 port")
 
     if a.vectors:
         write_vectors(a.vectors, var, by_addr)
@@ -265,6 +509,165 @@ def main():
 
     print("APF_JSON " + ("pass" if not fails else f"FAIL ({len(fails)})"))
     return 0 if not fails else 1
+
+
+def rtl_find(pattern, text, what, flags=0):
+    m = re.search(pattern, text, flags)
+    if not m:
+        raise LookupError(what)
+    return m
+
+
+def port_types(wrap):
+    """The Port Input menu value -> MiSTer port type, as atari2600_pocket.sv
+    computes it once a cartridge has loaded: menu_port_type's case arms, and
+    for its default (auto_type) header_port_type of the joy0/1_type that the
+    end of every load leaves."""
+    def fn(name):
+        body = rtl_find(rf"function \[7:0\] {name}\(.*?\);(.*?)endfunction", wrap, name, re.S).group(1)
+        arms = {int(k): int(t) for k, t in re.findall(rf"\d+'d(\d+):\s*{name}\s*=\s*8'd(\d+);", body)}
+        dflt = rtl_find(rf"default:\s*{name}\s*=\s*([\w']+);", body, f"{name} default").group(1)
+        return arms, dflt
+    menu, menu_dflt = fn("menu_port_type")
+    hdr, hdr_dflt = fn("header_port_type")
+    end_blk = rtl_find(r"else if \(old_cart_download\) begin(.*?)\n\s*end\b", wrap, "end-of-load block", re.S).group(1)
+    jt = [int(rtl_find(rf"joy{i}_type <= 8'd(\d+);", end_blk, f"joy{i}_type at the end of a load").group(1)) for i in (0, 1)]
+    if menu_dflt != "auto_type":
+        raise LookupError("menu_port_type's default is not auto_type")
+    if not re.search(r"porta_type = menu_port_type\(port1_input, header_port_type\(joy0_type\)\)", wrap) or \
+       not re.search(r"portb_type = menu_port_type\(port2_input, header_port_type\(joy1_type\)\)", wrap):
+        raise LookupError("porta_type / portb_type from menu_port_type(portN_input, header_port_type(joyN_type))")
+    hd = int(rtl_find(r"8'd(\d+)", hdr_dflt, "header_port_type default").group(1))
+    auto = [hdr.get(t, hd) for t in jt]
+    return [lambda v, a=a: menu.get(v, a) for a in auto], menu
+
+
+def port_meanings(wrap):
+    """MiSTer port type -> what the wrapper does with it, per port, read from
+    the code that uses porta_type / portb_type (not from a comment)."""
+    out = []
+    for side, half, j, drv in (("a", "7:4", "a", "drive_a"), ("b", "3:0", "b", "drive_b")):
+        q = re.escape(half)
+        m = {}
+        m["none"] = rtl_find(rf"8'd(\d+): begin pa_in_r\[{q}\] = 4'b1111; ilatch\[\d\] = 1'b1;", wrap, f"port {side} off")
+        m["Paddles"] = rtl_find(rf"\(port{side}_type == 8'd(\d+)\) \? 2'b11 : 2'b00", wrap, f"port {side} paddle_en")
+        m["Driving"] = rtl_find(rf"8'd(\d+): begin pa_in_r\[{q}\] = [^\n]*\b{drv}\b", wrap, f"port {side} driving")
+        m["Booster Grip"] = rtl_find(rf"8'd(\d+): idump\[\d:\d\] = \{{joy{j}\[10\], joy{j}\[11\]\}};", wrap, f"port {side} Booster Grip")
+        if side == "a":
+            m["Light Gun"] = rtl_find(r"gun_en\s*=\s*\(porta_type == 8'd(\d+)\)", wrap, "port a light gun")
+        else:
+            m["Light Gun"] = rtl_find(r"gun_port\s*=\s*\(portb_type == 8'd(\d+)\)", wrap, "port b light gun")
+        m["Dual Stick"] = rtl_find(rf"dual_stick = [^\n]*\(port{side}_type == 8'd(\d+)\)", wrap, f"port {side} dual stick")
+        types = {}
+        for k, mt in m.items():
+            t = int(mt.group(1))
+            if t in types:
+                raise LookupError(f"port {side}: type {t} is both {types[t]} and {k}")
+            types[t] = k
+        out.append(types)
+    return out
+
+
+def port_check(by_addr, wrap, quiet=False):
+    """Mismatches between each Port Input option's name and what the wrapper
+    makes of its value. A type with none of the special uses is a plain
+    joystick (the joystick lines, fire on INPT4/5)."""
+    evals, _ = port_types(wrap)
+    means = port_meanings(wrap)
+    bad = []
+    for i, nm in enumerate(("Port 1 Input", "Port 2 Input")):
+        for o in by_addr[nm]["options"]:
+            t = evals[i](o["value"])
+            got = means[i].get(t, "Joystick")
+            ok = got == o["name"]
+            if not ok:
+                bad.append(f"{nm} {o['name']} ({o['value']}) gives type {t}: {got}")
+            if not quiet:
+                check(ok, f"{nm}: {o['name']} = {o['value']} -> menu_port_type {t} -> {got}")
+    return bad
+
+
+def check_options_rtl(by_addr, wrap, core_top, vmux):
+    """The option -> behaviour tables, read from the RTL that implements them."""
+    try:
+        port_check(by_addr, wrap)
+        # Planted fault: swap the paddle and driving arms of menu_port_type;
+        # the check above must then fail.
+        means = port_meanings(wrap)[0]
+        pt = {k: t for t, k in means.items()}
+        body = rtl_find(r"function \[7:0\] menu_port_type\(.*?endfunction", wrap, "menu_port_type", re.S).group(0)
+        a = rtl_find(rf"(\d+'d\d+:\s*menu_port_type\s*=\s*)8'd{pt['Paddles']};", body, "paddle arm")
+        b = rtl_find(rf"(\d+'d\d+:\s*menu_port_type\s*=\s*)8'd{pt['Driving']};", body, "driving arm")
+        planted = body.replace(a.group(0), a.group(1) + "8'dPP;").replace(b.group(0), b.group(1) + f"8'd{pt['Paddles']};")
+        planted = planted.replace("8'dPP;", f"8'd{pt['Driving']};")
+        bad = port_check(by_addr, wrap.replace(body, planted), quiet=True)
+        check(len(bad) >= 2, f"planted fault: Paddles/Driving swapped in menu_port_type is caught ({'; '.join(bad)})")
+    except LookupError as e:
+        check(False, f"Port Input: cannot read {e} from atari2600_pocket.sv")
+
+    # Palette: video_mux's case ({is_PAL, pal_temp}), NTSC half
+    arms = dict((int(k), c) for k, c in re.findall(r"\n\s*(\d): out_color = n(\w+)_color;", vmux))
+    opts = by_addr["Palette"]["options"]
+    check(all(arms.get(o["value"]) == o["name"].lower() for o in opts) and len(arms) == len(opts),
+          f"Palette: {[(o['value'], o['name']) for o in opts]} = video_mux out_color {arms}")
+
+    # Turbo: 0 never gates fire; else fire toggles every value+1 frames
+    tv = {o["name"]: o["value"] for o in by_addr["Turbo (X/Y)"]["options"]}
+    ok = bool(re.search(r"turbo_gate = \(turbo == 2'd0\) \| turbo_on;", wrap)
+              and re.search(r"if \(turbo_cnt >= turbo\) begin\s*turbo_cnt <= 2'd0;\s*turbo_on\s*<= ~turbo_on;", wrap))
+    check(ok and tv.get("Off") == 0 and 0 < tv.get("Fast", 0) < tv.get("Medium", 0) < tv.get("Slow", 0),
+          f"Turbo: Off = 0 (turbo_gate open), Fast < Medium < Slow by the period turbo+1 frames {tv}")
+
+    # AtariVox: 0 mutes (vox_on), the gain shift grows with the value
+    av = {o["name"]: o["value"] for o in by_addr["AtariVox Voice"]["options"]}
+    off = re.search(r"vox_on = use_sk && \(atarivox_setting != 2'd0\);", wrap)
+    g = re.search(r"vox_gain = \(atarivox_setting == 2'd(\d)\) \? \(20'\(vox_sample\) <<< (\d+)\) :\s*"
+                  r"\(atarivox_setting == 2'd(\d)\) \? \(20'\(vox_sample\) <<< (\d+)\) : \(20'\(vox_sample\) <<< (\d+)\);", wrap)
+    if off and g:
+        sh = {int(g.group(1)): int(g.group(2)), int(g.group(3)): int(g.group(4))}
+        sh.update({v: int(g.group(5)) for v in (1, 2, 3) if v not in sh})
+        ok = av.get("Off") == 0 and sh[av["Quiet"]] < sh[av["Normal"]] < sh[av["Loud"]]
+    else:
+        ok, sh = False, None
+    check(ok, f"AtariVox Voice: Off = 0 (vox_on), Quiet < Normal < Loud by vox_gain's shift {sh} {av}")
+
+    # Region: 0 automatic, the value region_select compares with is PAL, the other NTSC
+    rv = {o["name"]: o["value"] for o in by_addr["Region"]["options"]}
+    r = re.search(r"region_select = \(region_setting == 2'd(\d)\) \?\s*\([^;]*\) : \(region_setting == 2'd(\d)\);", wrap)
+    check(r is not None and rv.get("Auto") == int(r.group(1)) and rv.get("PAL") == int(r.group(2))
+          and rv.get("NTSC") not in (int(r.group(1)), int(r.group(2))),
+          f"Region: Auto / PAL by region_select {r and r.groups()}, NTSC the other {rv}")
+
+    # Audio: core_top splits the value {stereo, stmix}; stmix's arms in core_top
+    split = re.search(r"12'h2B8: \{set_stereo, set_stmix\}\s*<= bridge_wr_data\[2:0\];", core_top)
+    mix = {}
+    body = re.search(r"case \(stmix\)(.*?)endcase", core_top, re.S)
+    for k, arm in re.findall(r"2'd(\d): begin(.*?)end", body.group(1) if body else "", re.S):
+        mix[int(k)] = ("none" if re.search(r"mix_l <= audio_l; mix_r <= audio_r;", arm) else
+                       "1/8" if "audio_r >> 3" in arm else "1/4" if "audio_r >> 2" in arm else "?")
+    if body and re.search(r"default: begin\s*mix_l <= \(audio_l >> 1\) \+ \(audio_r >> 1\);\s*"
+                          r"mix_r <= \(audio_l >> 1\) \+ \(audio_r >> 1\);", body.group(1)):
+        mix[3] = "mono"
+    # MiSTer's names: a 25% blend takes 1/8 of the other side, 50% a quarter
+    want = {"Mono TIA": (0, "none"), "Stereo TIA": (1, "none"), "Stereo, 25% Blend": (1, "1/8"),
+            "Stereo, 50% Blend": (1, "1/4"), "Full Mono": (None, "mono")}
+    for o in by_addr["Audio"]["options"]:
+        w = want.get(o["name"])
+        st, mx = o["value"] >> 2 & 1, mix.get(o["value"] & 3)
+        check(split is not None and w is not None and (w[0] is None or w[0] == st) and w[1] == mx,
+              f"Audio: {o['name']} = {o['value']}: stereo_tia {st}, stmix arm {o['value'] & 3} {mx}")
+
+    # 2600 Video: {decomb, blend}, to the wrapper's decomb / flicker_blend
+    split = re.search(r"12'h2BC: \{set_decomb, set_blend\}\s*<= bridge_wr_data\[1:0\];", core_top)
+    ports = re.search(r"\.decomb\s*\(decomb\)", wrap) and re.search(r"\.blend\s*\(flicker_blend\)", wrap)
+    for o in by_addr["2600 Video"]["options"]:
+        n = o["name"]
+        check(bool(split and ports) and bool(o["value"] & 1) == ("Blend" in n) and bool(o["value"] & 2) == ("De-comb" in n),
+              f"2600 Video: {n} = {o['value']}: blend bit 0, de-comb bit 1")
+
+    # Mapper: a non-zero value is the bss_type itself
+    check(re.search(r"\(\|bs_override \? \{1'b0, bs_override\} : force_bs\)", wrap) is not None,
+          "Mapper: the wrapper runs bss_type = bs_override when it is not 0 (values are detect2600's enum)")
 
 
 def write_vectors(path, var, by_addr):

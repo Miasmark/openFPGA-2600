@@ -4,7 +4,7 @@
     "metadata": {
       "platform_ids": ["2600"],
       "shortname": "2600",
-      "description": "Atari 2600 (VCS). Its TIA, RIOT and mappers come from the MiSTer Atari7800 core by Jamie Blanks (Kitrinx), through the openFPGA-7800 port.",
+      "description": "Atari 2600 (VCS), from the MiSTer Atari7800 core by Kitrinx",
       "author": "Miasmark",
       "url": "https://github.com/Miasmark/openFPGA-2600",
       "version": "1.0.1",
