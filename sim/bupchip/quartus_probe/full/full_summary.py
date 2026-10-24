@@ -20,7 +20,7 @@ with open(os.path.join(out, "ap_core.fit.summary")) as f:
 
 # The entity table: the BupChip, its CPU and the memories DARIA adds; DARIA's
 # blocks (step 7) by entity, whatever their instance names; Fix B's sram_ctrl.
-want = ["|atari7800_pocket:atari|", "|bupchip_pocket:bupchip|", "|bup_cpu:cpu|", "|altsyncram:window|",
+want = ["|atari2600_pocket:atari|", "|bupchip_pocket:bupchip|", "|bup_cpu:cpu|", "|altsyncram:window|",
         "|bup_asset_cache:cache|", "|bupchip_peripheral:per|", "|bup_capture:capture|", "|bup_asset_wr:writer|",
         "|psram:bup_psram|", "|sram_ctrl:sram|"]
 daria_ent = re.compile(r"\|(daria_mem|daria_fe|daria_call|daria_mmio|daria_smp|bup_dbg_snap):[^|]+\|")

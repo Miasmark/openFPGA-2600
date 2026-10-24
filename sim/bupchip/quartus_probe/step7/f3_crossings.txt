@@ -27,15 +27,15 @@
 #
 # Names are as the RTL declares them (bupchip_pocket.sv, daria_call.sv,
 # daria_mmio.sv, bup_asset_wr.sv, daria_fe_call.sv, daria_fe_audio.sv,
-# daria_fe_guard.sv; daria_smp.sv and the atari7800_pocket.sv registers of P21
+# daria_fe_guard.sv; daria_smp.sv and the atari2600_pocket.sv registers of P21
 # as lane I1 names them; bup_dbg_snap.sv).
 
 # ---- clk_sys -> clk_arm: first flops --------------------------------------------------------------------
 s2a daria,q5 first *|bupchip_pocket:bupchip|hold_a[0]              *|bupchip_pocket:bupchip|hold_sys
 s2a -        first *|bupchip_pocket:bupchip|pause_a[0]             -
-s2a daria,q5 first *|bupchip_pocket:bupchip|prof_a[0]              *|atari7800_pocket:atari|daria_profile
-s2a daria,q5 first *|bupchip_pocket:bupchip|ram32_a[0]             *|atari7800_pocket:atari|daria_ram32_r
-s2a daria,q5 first *|bupchip_pocket:bupchip|mres_a[0]              *|atari7800_pocket:atari|daria_mres_r
+s2a daria,q5 first *|bupchip_pocket:bupchip|prof_a[0]              *|atari2600_pocket:atari|daria_profile
+s2a daria,q5 first *|bupchip_pocket:bupchip|ram32_a[0]             *|atari2600_pocket:atari|daria_ram32_r
+s2a daria,q5 first *|bupchip_pocket:bupchip|mres_a[0]              *|atari2600_pocket:atari|daria_mres_r
 s2a daria,q5 first *|bupchip_pocket:bupchip|cmd_s[0]               *|bupchip_pocket:bupchip|cmd_tog
 s2a daria,q5 first *|daria_call:call|tog_s[0]                      *|daria_fe_call:u_call|tog_q
 s2a daria,q5 reset *|daria_mmio:mmio|sn_a[0]                       *|daria_mmio:mmio|sn_tog

@@ -503,7 +503,7 @@ def scenarios(img):
             j.ge(s, "calls_rt", 1)
             if at == "svc":
                 # not vacuous: the service ran on into pll_busy_s[1], and
-                # atari7800_pocket.sv's daria_we_ok dropped its writes
+                # atari2600_pocket.sv's daria_we_ok dropped its writes
                 j.ge(s, "wr_drop", 1)
             return j, s
         S[name] = (f, "7.3, P20: a PAL/NTSC retune (+retune) mid-game in a busy ARM image: no daria_fe RAM write "
@@ -689,7 +689,7 @@ def scenarios(img):
     # a PAL 2600 image the cartridge region is cleared to 0 while the PLL is PAL. During a PAL A78's download, once
     # its header makes it a 7800 cartridge, Auto asks for NTSC (cart_region 0) before byte 57 sets the region to
     # PAL. In 2.2.1's DARIA build region_pll took NTSC, the retune became pending, and the freeze while one is
-    # pending (atari7800_pocket.sv's daria_rt_pend) kept region_pll there; pll_region then retuned to NTSC at the
+    # pending (atari2600_pocket.sv's daria_rt_pend) kept region_pll there; pll_region then retuned to NTSC at the
     # load's end and back to PAL after it, two retunes more than the plain build, which makes none. With the fix
     # region_pll follows region_select in an A78's header even with a retune pending (daria_a78_hdr), so it is
     # PAL again before the load ends. The final region is PAL in both. This scenario pins the counts after the
@@ -841,7 +841,7 @@ def scenarios(img):
 
 
 # ---------------------------------------------------------------- mutants
-# atari7800_pocket.sv's fixes of the D review's findings 3 and 5, each mutant
+# atari2600_pocket.sv's fixes of the D review's findings 3 and 5, each mutant
 # undoing one of their parts: (the text, its replacement)
 MUTANTS = {
     # cart_reset not masked while a retune is pending: a console reset then
@@ -950,14 +950,14 @@ def mutant(name, names):
         dst = os.path.join(tree, f)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(os.path.join(RTL_TREE, f), dst)
-    p = os.path.join(tree, "src/fpga/core/atari7800_pocket.sv")
+    p = os.path.join(tree, "src/fpga/core/atari2600_pocket.sv")
     t = open(p).read()
     old, new = MUTANTS[name]
     if t.count(old) != 1:
         print("MUTANT %s: ERROR (its text is not in %s once)" % (name, p), flush=True)
         return 2
     open(p, "w").write(t.replace(old, new))
-    print("-- mutant %s: atari7800_pocket.sv mutated in %s (from %s)" % (name, tree, RTL_TREE), flush=True)
+    print("-- mutant %s: atari2600_pocket.sv mutated in %s (from %s)" % (name, tree, RTL_TREE), flush=True)
     env = dict(os.environ, WORK=d, RTL_TREE=tree)
     me = os.path.abspath(__file__)
     r = subprocess.run([sys.executable, me, "build", "daria"], env=env, capture_output=True, text=True)

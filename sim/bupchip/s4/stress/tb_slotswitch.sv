@@ -148,7 +148,7 @@ module tb_slotswitch;
 		bupfw_download <= dl_s[2] & bupfw_s[2];
 	end
 
-	// atari7800_pocket, and bupchip_pocket's strobes
+	// atari2600_pocket, and bupchip_pocket's strobes
 	wire ioctl_wr_g = ioctl_wr_r & (cart_download | bios_download | hscfw_download | arfw_download | bupfw_download);
 	logic old_cart_download = 0;
 	always @(posedge clk_sys) old_cart_download <= cart_download;

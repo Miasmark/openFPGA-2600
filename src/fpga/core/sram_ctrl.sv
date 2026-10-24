@@ -79,7 +79,7 @@
 //   strobe (the reset register rose at E1 of a cycle the mapper decodes as
 //   cart RAM, so the select falls at E2), the 6507 reads at A15 = 1 and mclk1
 //   is high from E2, the BIOS read (mclk1 & bios_sel & RW,
-//   atari7800_pocket.sv) rises there too: m_new and t_new in the same
+//   atari2600_pocket.sv) rises there too: m_new and t_new in the same
 //   clk_sdram cycle, s9. Code at $F000-$FFFF meets this with a RAM read, a
 //   Superchip write port's dummy read or a Supercharger RAM write, all 6507
 //   reads. (A load meets it only with the bank-switch override set: otherwise

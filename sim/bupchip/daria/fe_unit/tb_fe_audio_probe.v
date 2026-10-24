@@ -2,7 +2,7 @@
 // tb_fe_audio_probe: daria_fe_audio as the core synthesises it, for the area
 // probe of design 10.3 (lane B; docs/daria_fe/lanes/B_audio.md, "Area"). The
 // bench merge hook (hk_en, hk_stb, hk_ret) is tied 0, as daria_fe's instance
-// in atari7800_pocket will tie it (design 1.2: "Tied 0 in synthesis; constant
+// in atari2600_pocket will tie it (design 1.2: "Tied 0 in synthesis; constant
 // propagation removes the hook paths"); every other port passes through. A
 // probe of daria_fe_audio alone keeps the hook (192 + 2 free inputs); this
 // one is the block's cost inside the core.

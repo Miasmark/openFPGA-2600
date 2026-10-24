@@ -144,7 +144,7 @@
 	logic clk_74a = 0;
 	always #6734 clk_74a = ~clk_74a;
 	// top.sv's mapper_ram_size == 32768 is force_bs == BANKCDF && mapper_revision
-	// == 3 (top.sv), the expression atari7800_pocket.sv's daria_ram32 uses on the
+	// == 3 (top.sv), the expression atari2600_pocket.sv's daria_ram32 uses on the
 	// same force_bs (its daria_fbs, which it gives main): the same signal
 	wire         d_ram32 = dut.mapper_ram_size == 16'd32768;
 	int          d_await = 0;		// +d_await has no effect here: the cache makes the waits
@@ -160,7 +160,7 @@
 `ifdef FE_MODE_B
 	// Mode B on the wrapper (docs/daria_step7/plan.md 3.6 I4b): daria_fe (u_fe,
 	// fe_shadow.svh) on bupchip_pocket's DARIA ports, wired as
-	// atari7800_pocket.sv wires them (plan 2.1, 2.5): call_tog and ret_tog,
+	// atari2600_pocket.sv wires them (plan 2.1, 2.5): call_tog and ret_tog,
 	// ready, state RAM and cart RAM port B, the front-end ROM's two ports (the
 	// ROM filled by the wrapper's own capture), the capture's cartridge window
 	// and the sample port (daria_smp, on the PSRAM); the profile, daria_ram32

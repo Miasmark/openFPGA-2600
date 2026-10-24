@@ -239,8 +239,8 @@ edit(wrap, [
 ])
 assert "ALTERA_RESERVED_QIS" not in w[start:start + len(block)]
 
-# ---- atari7800_pocket.sv ------------------------------------------------------------
-edit(os.path.join(core, "atari7800_pocket.sv"), [
+# ---- atari2600_pocket.sv ------------------------------------------------------------
+edit(os.path.join(core, "atari2600_pocket.sv"), [
     ("\t.pause         (pause_core),\n",
      "\t.pause         (pause_core),\n\t.prof26_sys    (tia_en),\n"),
 ])

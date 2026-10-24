@@ -45,7 +45,7 @@
 #                pp_guards then takes --qsf release: from F′ only
 #                ap_core.qsf's SEED line and comments may change. Before it
 #                the chain ran from the commit that added fa2_on to the
-#                wrapper (-S fa2_on -- src/fpga/core/atari7800_pocket.sv,
+#                wrapper (-S fa2_on -- src/fpga/core/atari2600_pocket.sv,
 #                35bf88f) with 2fe5aed7...4f4b (MR, virtual_axis5 without
 #                virtual_axis.sv, the FA2 slot in 2600 mode, the L1W+L3 CPU,
 #                the sram_ctrl key copy); before that from the FA2 slot's

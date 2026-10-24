@@ -22,7 +22,7 @@
 
 `default_nettype none
 
-module atari7800_pocket
+module atari2600_pocket
 (
 	input  wire        clk_sys,
 	input  wire        clk_sdram,

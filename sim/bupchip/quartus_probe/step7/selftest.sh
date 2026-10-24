@@ -140,7 +140,7 @@ ARM = "ic|pll|altera_pll_i|cyclonev_pll|counter[3].output_counter|divclk"
 def name(p):
     p = p.replace("[*]", "[0]")
     if p.startswith("*|"):
-        p = "core_top:ic|atari7800_pocket:atari|" + p[2:]
+        p = "core_top:ic|atari2600_pocket:atari|" + p[2:]
     return p.replace("*", "x")
 rows = []
 for line in open(f3):
@@ -280,7 +280,7 @@ if "nofit" not in changes:
       + "; ALMs needed [=A-B+C] ; 13,000 / 18,480 ( 70 % ) ;\n; Peak interconnect usage (total/H/V) ; 40% / 42% / 38% ;\n")
 W(os.path.join(out, "ap_core.fit.summary"), "Logic utilization (in ALMs) : 13,000 / 18,480 ( 70 % )\n")
 cs = "50.0" if kind in ("daria", "q5") else "28.636364"
-W(os.path.join(out, "ap_core.map.rpt"), "; Parameter Settings for User Entity Instance: core_top:ic|atari7800_pocket:atari|psram:bup_psram ;\n"
+W(os.path.join(out, "ap_core.map.rpt"), "; Parameter Settings for User Entity Instance: core_top:ic|atari2600_pocket:atari|psram:bup_psram ;\n"
   f"; CLOCK_SPEED ; {cs} ; Signed Float ;\n")
 W(os.path.join(d, "quartus.log"), "Info (332104): Reading SDC File: 'core/daria_constraints.sdc'\n" if kind in ("daria", "q5") else "")
 W(os.path.join(d, "report.log"), "")
@@ -354,8 +354,8 @@ for c in changes:
             e["rows"].append([f"core_top:ic|own_reg{k}", e["own"], 1])
         e["rows"][0][2] = 1
     elif how == "bypass":                   # parked & img_ready: the state bits and img_ready
-        e["rows"] = [[f"core_top:ic|atari7800_pocket:atari|bupchip_pocket:bupchip|bup_cpu:cpu|state[{k}]", e["rows"][0][1], 2] for k in range(3)] \
-                    + [["core_top:ic|atari7800_pocket:atari|bupchip_pocket:bupchip|img_ready", e["rows"][0][1], 2]]
+        e["rows"] = [[f"core_top:ic|atari2600_pocket:atari|bupchip_pocket:bupchip|bup_cpu:cpu|state[{k}]", e["rows"][0][1], 2] for k in range(3)] \
+                    + [["core_top:ic|atari2600_pocket:atari|bupchip_pocket:bupchip|img_ready", e["rows"][0][1], 2]]
     elif how == "nopath":
         e["rows"] = []
 for k, e in fan.items():

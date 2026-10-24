@@ -8,16 +8,16 @@
 #          the section's "overlay cells:" line.
 # MUTANT   the same on a scratch copy of the tree's tracked src/fpga with one
 #          fault planted in the RTL (run_sim.sh's RTL_TREE):
-#   nodaria    atari7800_pocket.sv: .daria(1'b0); the overlay never draws
+#   nodaria    atari2600_pocket.sv: .daria(1'b0); the overlay never draws
 #              DARIA's rows, so no cell is read back
-#   dstat_lo0  atari7800_pocket.sv: .dstat({daria_dstat[48:12], 12'd0}); the
+#   dstat_lo0  atari2600_pocket.sv: .dstat({daria_dstat[48:12], 12'd0}); the
 #              calls' low twelve bits miswired between u_dstat and the overlay
 #   xc88       bup_status_osd.sv: the DARIA rows' window ends at x 88, not
 #              96; column 11 is never drawn
-#   g_locked0  atari7800_pocket.sv: u_dstat's .g_locked(1'b0); the guard bit
+#   g_locked0  atari2600_pocket.sv: u_dstat's .g_locked(1'b0); the guard bit
 #              never set (seen in frame_cdfj_pattern, whose +ovl_guard
 #              forces the guard's nets, at VCO/19 too)
-#   g_unlock0  atari7800_pocket.sv: u_dstat's .g_unlock(1'b0); no unlock
+#   g_unlock0  atari2600_pocket.sv: u_dstat's .g_unlock(1'b0); no unlock
 #              counted (frame_cdfj_pattern's forced pulses)
 #   rows9      bup_status_osd.sv: the DARIA rows are 72 lines tall whether
 #              halted or not; rows 6-8 drawn while running
@@ -76,13 +76,13 @@ mutate() {
 	import sys
 	core, m = sys.argv[1:]
 	M = {
-	    "nodaria": ("atari7800_pocket.sv", "\t.daria   (daria_profile),", "\t.daria   (1'b0),"),
-	    "dstat_lo0": ("atari7800_pocket.sv", "\t.dstat   (daria_dstat),", "\t.dstat   ({daria_dstat[48:12], 12'd0}),"),
+	    "nodaria": ("atari2600_pocket.sv", "\t.daria   (daria_profile),", "\t.daria   (1'b0),"),
+	    "dstat_lo0": ("atari2600_pocket.sv", "\t.dstat   (daria_dstat),", "\t.dstat   ({daria_dstat[48:12], 12'd0}),"),
 	    "xc88": ("bupchip/bup_status_osd.sv",
 	             "wire       in_osd = (dar ? yc < d_lines : en && yc < 7'd104) && !hblank && !vblank && xc < 7'd96;",
 	             "wire       in_osd = (dar ? yc < d_lines && xc < 7'd88 : en && yc < 7'd104) && !hblank && !vblank && xc < 7'd96;"),
-	    "g_locked0": ("atari7800_pocket.sv", "\t.g_locked  (daria_dbg_locked),", "\t.g_locked  (1'b0),"),
-	    "g_unlock0": ("atari7800_pocket.sv", "\t.g_unlock  (daria_dbg_unlock),", "\t.g_unlock  (1'b0),"),
+	    "g_locked0": ("atari2600_pocket.sv", "\t.g_locked  (daria_dbg_locked),", "\t.g_locked  (1'b0),"),
+	    "g_unlock0": ("atari2600_pocket.sv", "\t.g_unlock  (daria_dbg_unlock),", "\t.g_unlock  (1'b0),"),
 	    "rows9": ("bupchip/bup_status_osd.sv", "wire [6:0] d_lines = st[28] ? 7'd72 : 7'd48;", "wire [6:0] d_lines = 7'd72;"),
 	}
 	f, a, b = M[m]

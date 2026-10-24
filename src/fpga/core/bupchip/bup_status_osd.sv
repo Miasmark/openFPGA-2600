@@ -256,7 +256,7 @@ endmodule
 //------------------------------------------------------------------------------
 // daria_dbg_status: DARIA's counts for the overlay above (dstat). Hardware
 // test builds of the DARIA core only (BUP_DEBUG and POCKET_DARIA);
-// atari7800_pocket.sv instantiates it as u_dstat. All clk_sys, from clk_sys
+// atari2600_pocket.sv instantiates it as u_dstat. All clk_sys, from clk_sys
 // registers and top.sv's bus; nothing else reads them.
 //
 // Calls (24 bits): flips of daria_fe's call_tog, one per call posted (plan

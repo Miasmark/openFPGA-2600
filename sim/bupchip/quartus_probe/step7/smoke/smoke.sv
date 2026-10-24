@@ -2,7 +2,7 @@
 // The step-7 report's smoke design (run_smoke.sh; docs/daria_step7/plan.md
 // 3.5, 5.4 (c), (f), (k), (k')). NOT the core: a few hundred registers whose
 // modules and instances carry the core's entity and instance names, four
-// levels deep as in the core (core_top:ic|atari7800_pocket:atari|
+// levels deep as in the core (core_top:ic|atari2600_pocket:atari|
 // bupchip_pocket:bupchip|...), so that core/daria.qip's instance assignments
 // and step7_report.tcl's patterns meet the names they meet in a real fit.
 // Each clk_sys <-> clk_arm crossing of plan 2.7 is here as a synchroniser or a
@@ -241,7 +241,7 @@ module bupchip_pocket (
 	input  wire        clk_sys,
 	input  wire        clk_arm,
 	input  wire  [7:0] a,
-	input  wire        daria_profile,      // atari7800_pocket's registers (P21)
+	input  wire        daria_profile,      // atari2600_pocket's registers (P21)
 	input  wire        daria_ram32_n,
 	input  wire        daria_mreset,
 	input  wire        daria_gate,
@@ -367,7 +367,7 @@ module bupchip_pocket (
 	assign q_arm = w_q ^ m_q_arm ^ {c_q, cmd_data_arm[7], halted, 5'd0};
 endmodule
 
-module atari7800_pocket (
+module atari2600_pocket (
 	input  wire        clk_sys,
 	input  wire        clk_arm,
 	input  wire  [7:0] a,
@@ -397,7 +397,7 @@ module core_top (
 	output wire  [7:0] q_sys,
 	output wire  [7:0] q_arm
 );
-	atari7800_pocket atari (.clk_sys, .clk_arm, .a, .q_sys, .q_arm);
+	atari2600_pocket atari (.clk_sys, .clk_arm, .a, .q_sys, .q_arm);
 endmodule
 
 module ap_core (

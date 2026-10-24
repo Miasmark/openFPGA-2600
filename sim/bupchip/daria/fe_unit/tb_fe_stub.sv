@@ -2,7 +2,7 @@
 // tb_fe_stub: the whole daria_fe tree with daria_mem, so that every file
 // elaborates together in Verilator (docs/daria_fe/design.md 12.2 step 0;
 // docs/daria_fe/interfaces.md). daria_fe sits on daria_mem's clk_sys ports
-// as atari7800_pocket will wire it (1.6), fe_phase_gen drives the bus, and
+// as atari2600_pocket will wire it (1.6), fe_phase_gen drives the bus, and
 // the bench runs +clocks (default 1,000) clk_sys. It checks only what holds
 // for the stubs and for the finished design alike: fe_oe = a_in[12] on
 // every clock, and that every bench tap of design 1.7 (and the guard's and

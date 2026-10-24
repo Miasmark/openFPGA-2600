@@ -4,7 +4,7 @@
 // Instantiated by the real top-level: apf_top.
 //
 // Port list and APF plumbing come from Analogue's core template. The system
-// itself is the MiSTer Atari7800 core, wrapped by atari7800_pocket.sv.
+// itself is the MiSTer Atari7800 core, wrapped by atari2600_pocket.sv.
 //
 
 `default_nettype none
@@ -266,7 +266,7 @@ assign port_tran_sd_dir = 1'b0;     // SD is input and not used
 // tie off the rest of the pins we are not using
 `ifndef POCKET_BUPCHIP
 // (POCKET_BUPCHIP: cram0 holds the BupChip's assets, driven by
-// atari7800_pocket's psram.sv; cram1 stays unused.)
+// atari2600_pocket's psram.sv; cram1 stays unused.)
 assign cram0_a = 'h0;
 assign cram0_dq = {16{1'bZ}};
 assign cram0_clk = 0;
@@ -293,7 +293,7 @@ assign cram1_ub_n = 1;
 assign cram1_lb_n = 1;
 
 
-// The SRAM is driven by atari7800_pocket (sram_ctrl in POCKET_SRAM builds).
+// The SRAM is driven by atari2600_pocket (sram_ctrl in POCKET_SRAM builds).
 
 assign dbg_tx = 1'bZ;
 assign user1 = 1'bZ;
@@ -439,7 +439,7 @@ end
 // instead shifted every saved word by one: the .sav files came out rotated
 // by four bytes, the HSC signature at $1002 moved, and the HSC firmware
 // asked to be personalised again after every load.
-// The latch lives in atari7800_pocket.sv (hsc_bridge_rd), where the
+// The latch lives in atari2600_pocket.sv (hsc_bridge_rd), where the
 // simulation exercises it.
     wire    [31:0]  hsc_rd_latched;
 wire hsc_sel = bridge_addr[31:24] == 8'h20;
@@ -660,7 +660,7 @@ always @(posedge clk_74a) begin
 end
 
 // Save slot sizes, constants: one shared file each for every cart. The HSC's
-// is 2 KiB, always (see hsc_active in atari7800_pocket.sv). dt_sel rotates
+// is 2 KiB, always (see hsc_active in atari2600_pocket.sv). dt_sel rotates
 // over the three save slots, one size field written per clk_74a.
     wire            hsc_active;
     reg             hsc_active_74a;
@@ -801,7 +801,7 @@ function [15:0] map_joy;
         map_joy[7] = k[14];             // select
         map_joy[8] = k[15];             // start -> reset switch
         // Raw face buttons, for the virtual paddles, driving controllers and
-        // light gun (atari7800_pocket.sv): A or B fire, X slow, Y fast.
+        // light gun (atari2600_pocket.sv): A or B fire, X slow, Y fast.
         map_joy[9]  = k[4];             // A
         map_joy[10] = k[5];             // B
         map_joy[11] = k[6];             // X
@@ -858,7 +858,7 @@ end
     wire    [15:0]  audio_l, audio_r;
     wire            dram_dqml, dram_dqmh;
 
-atari7800_pocket atari (
+atari2600_pocket atari (
     .clk_sys        ( clk_sys ),
     .clk_sdram      ( clk_sdram ),
 `ifdef POCKET_BUPCHIP
@@ -1012,7 +1012,7 @@ wire core_de = ~(core_hb | core_vb);
 // TIA's window is unchanged), NTSC only:
 //   NTSC      6 372x242  7 320x242
 // The APF takes at most 8 scaler modes, so there is no PAL overscan mode;
-// atari7800_pocket.sv ignores Show Overscan in PAL instead (274 lines already
+// atari2600_pocket.sv ignores Show Overscan in PAL instead (274 lines already
 // show the whole PAL picture). Slots 8 and above make the Pocket fall back to
 // the wrong height, which is what a 292 line PAL mode did on hardware.
 wire       hide_border = set_s2[7];

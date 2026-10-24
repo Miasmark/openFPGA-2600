@@ -476,7 +476,7 @@ check("m", "INFO" if area else "FAIL", "; ".join(area) if area else "no fit summ
 
 # ---- (n): psram's CLOCK_SPEED -------------------------------------------------------------------------------------------
 mp = rd(os.path.join(out, "ap_core.map.rpt")) or ""
-i = mp.find("Parameter Settings for User Entity Instance: core_top:ic|atari7800_pocket:atari|psram:bup_psram ;")
+i = mp.find("Parameter Settings for User Entity Instance: core_top:ic|atari2600_pocket:atari|psram:bup_psram ;")
 cs = None
 if i >= 0:
     m = re.search(r";\s*CLOCK_SPEED\s*;\s*([-0-9.]+)\s*;", mp[i:i + 4000])

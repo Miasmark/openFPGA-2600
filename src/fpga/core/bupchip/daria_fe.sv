@@ -63,7 +63,7 @@ module daria_fe (
 	output logic         fe_oe,           // comb: a_in[12]
 	output logic         arm_call_busy,   // reg: the stall terms (top.sv:306-307)
 	output logic         arm_dma_busy,    // reg
-	output logic         init_busy,       // reg: into atari7800_pocket's reset OR
+	output logic         init_busy,       // reg: into atari2600_pocket's reset OR
 	output logic  [12:0] fea_addr,        // FE ROM port A word address
 	input  wire   [31:0] fea_q,
 	output logic  [12:0] feb_addr,        // FE ROM port B: the mirror

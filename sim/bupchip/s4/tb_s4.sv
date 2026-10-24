@@ -11,7 +11,7 @@
 //            0..+bytejit ns, as a one-clock clk_sys strobe,
 //            first the firmware slot (+fw, bupchip.bin), then the cartridge
 //            (+rom); the cartridge's header byte 53 sets souper_profile, as
-//            atari7800_pocket.sv's cart_flags does
+//            atari2600_pocket.sv's cart_flags does
 //   PSRAM    agg23's psram.sv (src/fpga/pocket_utils/) at CLOCK_SPEED =
 //            28.636364 (-DPSRAM_CS sets another) on a psram_model.sv die,
 //            or, built with -DPSRAM_STANDIN, psram_standin.sv (the same port

@@ -111,7 +111,7 @@ SRCS=(
 	"$RTL/cart2600.sv" "$PATCHED/banks2600.sv" "$PATCHED/video_mux.sv"
 	"$RTL/detect2600.sv" "$RTL/a78_cart_extent.sv" "$PATCHED/RIOT/M6532.sv"
 	"$RTL/top.sv"
-	"$RTL/EEPROM_24LC256.sv" "$FPGA/core/atari7800_pocket.sv"
+	"$RTL/EEPROM_24LC256.sv" "$FPGA/core/atari2600_pocket.sv"
 	"$FPGA/core/atarivox/avox_rx.sv" "$FPGA/core/atarivox/avox_engine.sv" "$FPGA/core/atarivox/atarivox.sv"
 	"$FPGA/core/virtual_axis.sv" "$FPGA/core/virtual_axis5.sv" "$FPGA/core/stick_dirs.sv" "$FPGA/core/sram_ctrl.sv" "$PATCHED/paddles.sv" "$RTL/lightgun.sv"
 	"$FPGA/pocket_utils/data_loader.sv"
@@ -154,7 +154,7 @@ if [ "${BUPCHIP:-1}" = 1 ] && [ "${DARIA:-$QSF_DARIA}" = 1 ]; then
 	SRCS+=($(ls "$B"/daria_fe_*.sv | grep -v daria_fe_pkg.sv) "$B/daria_fe.sv")
 	# The DARIA section's taps need daria_fe in the wrapper as u_fe (plan P14):
 	# an instance "daria_fe [#(...)] u_fe (", on one line or over several
-	sed 's,//.*,,' "$FPGA/core/atari7800_pocket.sv" | tr '\n' ' ' \
+	sed 's,//.*,,' "$FPGA/core/atari2600_pocket.sv" | tr '\n' ' ' \
 		| grep -qE '(^|[^A-Za-z0-9_$.])daria_fe\s*(#[^;]*)?[^A-Za-z0-9_$]u_fe\s*\(' && BUP_DEFS="$BUP_DEFS -DSIM_DARIA_FE"
 fi
 # Fix B's P2 assertion in the benches (docs/daria_step7/plan.md P2): on when
@@ -612,7 +612,7 @@ echo "-- PAL/NTSC PLL retune sequence:"
 	|| { grep -m20 "%Error" "$WORK/obj_pllr.log"; exit 1; }
 sim ./obj_pllr/vtb | grep -E "fraction|PLL_REGION|FAIL"
 
-echo "-- the region asked of the PLL (atari7800_pocket.sv's region_pll with pll_region.v, tb_region; RTL-1, RTL-2):"
+echo "-- the region asked of the PLL (atari2600_pocket.sv's region_pll with pll_region.v, tb_region; RTL-1, RTL-2):"
 WORK="$WORK/region" bash "$HERE/run_region.sh" | grep -E "^REGION " || true
 
 echo "-- audio filter:"

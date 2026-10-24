@@ -173,7 +173,7 @@ module tb_fe_copy;
 	wire         cart_reset = (rst_wr | (hold_left > 0)) & !glitch;
 	always @(posedge clk_sys) begin
 		old_dl <= cart_download;
-		rst_wr <= cart_download | old_dl | init_busy | button;      // atari7800_pocket.sv:166-172
+		rst_wr <= cart_download | old_dl | init_busy | button;      // atari2600_pocket.sv:166-172
 		if (rst_wr) hold_left <= 1 + int'(rndq(8));                   // top.sv's reset_hold tail (>= 1: set
 		                                                              // at the edge reset is seen, top.sv:266-269)
 		else if (hold_left > 0) hold_left <= hold_left - 1;

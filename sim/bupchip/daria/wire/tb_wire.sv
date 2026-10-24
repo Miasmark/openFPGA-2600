@@ -1,13 +1,13 @@
 //------------------------------------------------------------------------------
 // tb_wire: tb_load with checks of the DARIA wiring in the whole core
 // (docs/daria_step7/plan.md 3.3 items 4 and 5, 7.2 row I1, 7.3): the real
-// loader, atari7800_pocket.sv with top.sv's and cart2600.sv's hooks, the
+// loader, atari2600_pocket.sv with top.sv's and cart2600.sv's hooks, the
 // BupChip and the PSRAM model, on the clk_arm lattice of tb_load (F5).
 // run_wire.sh builds it, runs the scenarios and judges them (wire_check.py).
 //
 // It prints, in both builds (with and without POCKET_DARIA):
 //   WIRE release N at clk_sys T (MS ms)   each release of the console reset
-//                     (atari7800_pocket.sv's reset register; T counts clk_sys
+//                     (atari2600_pocket.sv's reset register; T counts clk_sys
 //                     edges from time 0, the edge that first sees it low), so
 //                     that the two builds' release edges can be compared (P6)
 // and in the DARIA build:
@@ -44,7 +44,7 @@
 //                           from the first F6's
 //   wr_crb, wr_stb          daria_fe's cart RAM and state RAM writes that
 //                           reach the RAMs (bupchip's port B write enables,
-//                           after atari7800_pocket.sv's daria_we_ok)
+//                           after atari2600_pocket.sv's daria_we_ok)
 //   wr_busy                 of those, while pll_busy_s[1] is high (P20; the
 //                           first 40 also as WIRE write lines)
 //   wr_stop                 clk_run edges (+retune, +wire_retune: the PLL's
@@ -551,7 +551,7 @@ module tb_wire;
 	end
 
 	// ---- +wire_reset_on_pal=K: a console reset as region_pll changes ---------------------
-	// With +wire_pll: on the K-th clk_sys at which atari7800_pocket.sv's region_pll
+	// With +wire_pll: on the K-th clk_sys at which atari2600_pocket.sv's region_pll
 	// is about to change (not held, region_select differs), reset_in rises at
 	// that clock's falling edge, so the console reset rises on the edge where
 	// region_pll changes, about 2 clk_sys before pll_busy_s[1] shows the retune

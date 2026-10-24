@@ -1,5 +1,5 @@
 // tb_region: the wrapper's region logic (region_unit, cut out of
-// atari7800_pocket.sv by sim/region_unit.py) with core/pll_region.v, in the
+// atari2600_pocket.sv by sim/region_unit.py) with core/pll_region.v, in the
 // load sequences of RTL-1 and RTL-2 (docs/IMPROVEMENTS.md, "After 2.2.1").
 // sim/run_region.sh builds it for the DARIA and the plain build and for
 // planted variants, and judges the lines it prints.

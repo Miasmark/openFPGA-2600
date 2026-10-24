@@ -1,4 +1,4 @@
-// Whole-core simulation of the Pocket wrapper (atari7800_pocket) at the
+// Whole-core simulation of the Pocket wrapper (atari2600_pocket) at the
 // Pocket's clock plan: clk_sys 14.318181 MHz, clk_sdram at exactly 4x and,
 // with POCKET_BUPCHIP, clk_arm at exactly 2x (with POCKET_DARIA on the PLL's
 // VCO/18 lattice, as tb_load.sv), with a model of the PSRAM
@@ -119,7 +119,7 @@ module tb_system;
 		.cram_we_n(cram0_we_n), .cram_ub_n(cram0_ub_n), .cram_lb_n(cram0_lb_n));
 `endif
 
-	atari7800_pocket dut (
+	atari2600_pocket dut (
 `ifdef POCKET_BUPCHIP
 		.clk_arm(clk_arm), .bupfw_download(1'b0), .ioctl_wr_any(1'b0), .ioctl_hi(3'd0),
 		.cram0_a(cram0_a), .cram0_dq(cram0_dq), .cram0_wait(cram0_wait), .cram0_clk(cram0_clk),
@@ -246,7 +246,7 @@ module tb_system;
 	// console's reset) does not compare equal:
 	//   t_sys    clk_sys counted from time 0 at the edge that ends the frame
 	//   rst_n    how many times the wrapper's console reset (the register
-	//            reset in atari7800_pocket.sv, which P6's daria_hold joins)
+	//            reset in atari2600_pocket.sv, which P6's daria_hold joins)
 	//            has been released so far, counted from time 0
 	//   rst_sys  clk_sys counted from time 0 at the last of those releases:
 	//            the clock whose edge first sees reset low (plan P6: the

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""tb_region's unit under test: the region logic of atari7800_pocket.sv, cut
+"""tb_region's unit under test: the region logic of atari2600_pocket.sv, cut
 out of the wrapper as the tree has it, into a module of its own.
 
   region_unit.py WRAPPER OUT [VARIANT]
 
-WRAPPER is src/fpga/core/atari7800_pocket.sv. OUT gets module region_unit:
+WRAPPER is src/fpga/core/atari2600_pocket.sv. OUT gets module region_unit:
 the DARIA retune counter (daria_rt_cnt, the block after "wire daria_hold,
 daria_arm, daria_rt_pend;") and the whole region_pll block, from "reg
 region_pll" to the `endif after its plain-build branch, both copied as they

@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-// tb_frames: the whole Pocket core (tb_load: atari7800_pocket, the APF loader,
+// tb_frames: the whole Pocket core (tb_load: atari2600_pocket, the APF loader,
 // the SRAM, PSRAM and SDRAM models) running a 2600 image for a number of
 // frames, with tb_daria's fingerprint, input script and call log, so that its
 // files compare directly with tb_daria's (sim/check/frame_gate.py). DARIA
@@ -13,7 +13,7 @@
 //               bit (tia_inst.vsync_o), not the Pocket's video path, so Flicker
 //               Blend, the border and overscan cannot change it. Frames are
 //               counted from the last release of the wrapper's console reset
-//               (atari7800_pocket's reset, which main takes): frame 1 starts
+//               (atari2600_pocket's reset, which main takes): frame 1 starts
 //               at the first VSYNC rise after it. With +frames=N the run stops
 //               at the N-th rise, so fp.csv holds frames 1..N-1 under its
 //               header, as tb_daria's does with +frames=N. A later release

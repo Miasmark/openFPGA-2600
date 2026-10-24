@@ -4,7 +4,7 @@
 // for the BupChip and for DARIA, turned into one ordered message stream for
 // bup_asset_wr on clk_arm.
 //
-// Cartridge slot. Bytes 1-5 are compared with "ATARI", as atari7800_pocket.sv
+// Cartridge slot. Bytes 1-5 are compared with "ATARI", as atari2600_pocket.sv
 // does for cart_is_7800, and pick one of two modes:
 //
 //   A78 (ARSC mode). The ARSC block starts at 128 + the ROM size the A78
@@ -32,7 +32,7 @@
 // Which bytes are the BupChip's. Every byte carries its own bridge address,
 // and the slots' addresses differ in bits 27:25 (data.json): the cartridge
 // 0x00000000 is 0, bupchip.bin 0x0A000000 is 5. load_valid and fw_valid are
-// the bytes carrying those (atari7800_pocket.sv), whatever slot flag is up,
+// the bytes carrying those (atari2600_pocket.sv), whatever slot flag is up,
 // and each download takes them while its window is open: from load_start,
 // or fw_download rising, until DRAIN clocks after load_end, or the flag
 // falling. The flags change when the host's requestwrite or allcomplete
@@ -106,7 +106,7 @@
 module bup_capture (
 	input  wire        clk,             // clk_sys
 
-	// Cartridge download (atari7800_pocket.sv's mapper_load_* expressions).
+	// Cartridge download (atari2600_pocket.sv's mapper_load_* expressions).
 	input  wire        load_start,      // one clock as the download starts
 	input  wire [24:0] load_addr,       // file offset, header included
 	input  wire        load_valid,      // one clock per byte at the cartridge slot's address
@@ -170,7 +170,7 @@ module bup_capture (
 			f_drain <= f_drain - 7'd1;
 	end
 
-	// ---- the A78 gate (atari7800_pocket.sv's cart_header) -----------------------------
+	// ---- the A78 gate (atari2600_pocket.sv's cart_header) -----------------------------
 	// h_match: bytes 1 up to the last one seen match "ATAR" so far. At byte 5
 	// the mode is known (g_known), and g_a78 picks ARSC mode.
 	logic        h_match = 1'b0, g_known = 1'b0, g_a78 = 1'b0;

@@ -1,6 +1,6 @@
 // Load path test: an A78 image goes through the APF data loader, exactly as
 // core_top.v wires it (clk_sdram, 10 cycle spacing, 4 cycle strobe), into
-// atari7800_pocket, then the core runs it. The image's program starts a TIA
+// atari2600_pocket, then the core runs it. The image's program starts a TIA
 // tone, so hearing the right tone proves the header was parsed, the 128 byte
 // header was stripped, the payload landed at the right place and the cart
 // mapping is right. The built-in cartridge image plays nothing, so a wrong
@@ -171,7 +171,7 @@ module tb_load;
 		.cram_we_n(cram0_we_n), .cram_ub_n(cram0_ub_n), .cram_lb_n(cram0_lb_n));
 `endif
 
-	atari7800_pocket dut (
+	atari2600_pocket dut (
 `ifdef POCKET_BUPCHIP
 		.clk_arm(clk_arm), .bupfw_download(bupfw_download), .ioctl_wr_any(ioctl_wr_r), .ioctl_hi(ioctl_hi_r),
 		.cram0_a(cram0_a), .cram0_dq(cram0_dq), .cram0_wait(cram0_wait), .cram0_clk(cram0_clk),
@@ -322,7 +322,7 @@ module tb_load;
 	// console's reset) does not compare equal:
 	//   t_sys    clk_sys counted from time 0 at the edge that ends the frame
 	//   rst_n    how many times the wrapper's console reset (the register
-	//            reset in atari7800_pocket.sv, which P6's daria_hold joins)
+	//            reset in atari2600_pocket.sv, which P6's daria_hold joins)
 	//            has been released so far, counted from time 0
 	//   rst_sys  clk_sys counted from time 0 at the last of those releases:
 	//            the clock whose edge first sees reset low (plan P6: the
@@ -409,7 +409,7 @@ module tb_load;
 	// returns it saw (ret_tog flips), the PSRAM model's violations, the
 	// BupChip CPU's halt, and the guard's lock and unlocks (P22's ports).
 	// The taps need daria_fe in the wrapper as dut.u_fe: run_sim.sh defines
-	// SIM_DARIA_FE when atari7800_pocket.sv instantiates it.
+	// SIM_DARIA_FE when atari2600_pocket.sv instantiates it.
 	int     daria_ms = 0;
 	longint dr_calls = 0, dr_rets = 0, dr_unlocks = 0;
 `ifdef SIM_DARIA_FE
@@ -780,7 +780,7 @@ module tb_load;
 `ifdef SIM_DARIA_FE
 			dut.u_fe.dbg_locked ? "locked" : "unlocked",
 `else
-			"absent (atari7800_pocket.sv has no daria_fe u_fe)",
+			"absent (atari2600_pocket.sv has no daria_fe u_fe)",
 `endif
 			dr_unlocks);
 `ifdef BUP_DEBUG
@@ -1282,7 +1282,7 @@ module tb_load;
 	// The cart's tone is counted on the console's own mix, before the
 	// AtariVox voice. With POCKET_ATARIVOX the voice runs whenever the SaveKey
 	// does and the AtariVox Voice setting is not Off (tb default Normal), and
-	// AUDIO_L then carries it on a +32,768 bias (atari7800_pocket.sv, vox_add),
+	// AUDIO_L then carries it on a +32,768 bias (atari2600_pocket.sv, vox_add),
 	// so it never returns to 0 and the SaveKey runs' tone read 0 Hz. With the
 	// voice off, vox_add is 0 and core_audio_l is AUDIO_L.
 `ifdef POCKET_ATARIVOX
@@ -1301,7 +1301,7 @@ module tb_load;
 
 	// ---------------- joystick script (+joyscript=FILE) ----------------
 	// Drives joy0 from reset on. Each line "MS HEX" sets joy0 to HEX from MS
-	// ms after reset (atari7800_pocket.sv's bits: 0 right, 1 left, 2 down,
+	// ms after reset (atari2600_pocket.sv's bits: 0 right, 1 left, 2 down,
 	// 3 up, 9 A, 10 B); "MS dump" writes the next whole frame as
 	// frame_NNN.ppm (numbered from 0 in script order). # starts a comment.
 	longint t_run = 0;

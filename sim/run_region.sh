@@ -1,5 +1,5 @@
 #!/bin/bash
-# tb_region: the wrapper's region logic (atari7800_pocket.sv's region_pll
+# tb_region: the wrapper's region logic (atari2600_pocket.sv's region_pll
 # block and DARIA retune counter, cut out by sim/region_unit.py) with
 # core/pll_region.v in RTL-1's and RTL-2's load sequences (tb_region.sv's
 # scenarios A, B and C), on the DARIA and the plain build, and four planted
@@ -34,7 +34,7 @@ ok=1
 run() {   # run <name> <variant or -> <defines...>: build and run one; its lines in WORK/<name>.log
 	local name="$1" var="$2"; shift 2
 	[ "$var" = - ] && var=""
-	python3 -I "$HERE/region_unit.py" "$FPGA/core/atari7800_pocket.sv" "$WORK/region_unit_$name.sv" $var \
+	python3 -I "$HERE/region_unit.py" "$FPGA/core/atari2600_pocket.sv" "$WORK/region_unit_$name.sv" $var \
 		|| { echo "REGION $name: region_unit.py failed"; return 1; }
 	"$V" --binary --timing -O2 -Wno-fatal -Wno-lint --top-module tb_region "$@" -Mdir "$WORK/obj_$name" -o vtb \
 		"$FPGA/core/pll_region.v" "$WORK/region_unit_$name.sv" "$HERE/tb_region.sv" > "$WORK/obj_$name.log" 2>&1 \

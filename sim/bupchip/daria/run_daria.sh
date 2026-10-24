@@ -45,7 +45,7 @@
 # sets SHADOW=1 and FE=1 itself, and refuses FE_STAGE0=1:
 # obj_shadow<WIN_KB>_fe_modeB, runs/shadow<WIN_KB>_fe_modeB/ (with FE_POISON=1
 # _fe_modeB_poison). MODE_B=1 WRAPPER=1 runs daria_fe on the whole wrapper's
-# ports (bupchip_pocket.sv), wired as atari7800_pocket.sv wires them (plan
+# ports (bupchip_pocket.sv), wired as atari2600_pocket.sv wires them (plan
 # 3.6 I4b; daria_shadow.svh): obj_wrap<WIN_KB>_fe_modeB,
 # runs/wrap<WIN_KB>_fe_modeB/; pass WIN_KB=64, the shipped window (the default
 # is 128). Every other build is as before.

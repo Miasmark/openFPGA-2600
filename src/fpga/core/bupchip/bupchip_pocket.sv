@@ -60,7 +60,7 @@
 // PSRAM: the wrapper drives psram.sv's user ports (agg23, MIT, vendored in
 // pocket_utils/psram.sv, instantiated by the parent on clk_arm with bank 0
 // of cram0, CLOCK_SPEED = 28.636364, or 50.0 with POCKET_DARIA:
-// atari7800_pocket.sv).
+// atari2600_pocket.sv).
 //
 // BUP_DEBUG adds dbg_status / dbg_halt_pc (clk_arm), dbg_load, shadow FIFO
 // counters and the throttle (BUP_THROTTLE of every 16 clocks may start an
@@ -158,7 +158,7 @@ module bupchip_pocket #(
 	// cartridge slot's bytes (0x00000000) have 0 there, bupchip.bin's
 	// (0x0A000000) 5, whatever slot flag is up (bup_capture.sv, "Which bytes
 	// are the BupChip's"). The cartridge's start and end
-	// (atari7800_pocket.sv's mapper_load_*), and the firmware slot's flag.
+	// (atari2600_pocket.sv's mapper_load_*), and the firmware slot's flag.
 	input  wire        byte_valid,
 	input  wire  [2:0] byte_hi,
 	input  wire [24:0] load_addr,

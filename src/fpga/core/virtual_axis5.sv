@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-// The five virtual axes of atari7800_pocket.sv as one time-shared engine
+// The five virtual axes of atari2600_pocket.sv as one time-shared engine
 //
 // Five axes as virtual_axis.sv makes them (same parameters, same position
 // and phase), with one difference: axis k makes its 1 kHz update k clocks
