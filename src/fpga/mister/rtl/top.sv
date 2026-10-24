@@ -30,9 +30,9 @@ module Atari7800 (
 	// and CDF cartridges outside this module, in place of the left-out ARM
 	// mapper. This exports what it watches on the cartridge bus and takes its
 	// data byte and its busys back into cart2600. See POCKET_CHANGES.md.
-	output logic [12:0] daria_a_in_o,      // {AB[12] & bios_en_b, AB[11:0]}, as cart2600's a_in
+	output logic [12:0] daria_a_in_o,      // {AB[12] & tia_en, AB[11:0]}, as cart2600's a_in
 	output logic        daria_pclk0_o,     // pclk0
-	output logic        daria_access_o,    // mapper_phi2 && lock_ctrl && tia_en, as cart2600's arm_access
+	output logic        daria_access_o,    // mapper_phi2 && tia_en, as cart2600's arm_access
 	output logic        daria_reset_o,     // effective_reset
 	input  logic  [7:0] daria_fe_do_i,
 	input  logic        daria_fe_oe_i,
@@ -191,10 +191,7 @@ module Atari7800 (
 	logic [15:0]    cpu_AB;
 	logic           cpu_halt_n;
 	logic           cpu_released;
-	logic           maria_en;
-	logic           lock_ctrl;
-	logic           bios_en_b;
-	logic [1:0]     ctrl_writes;
+	wire            maria_en = 1'b0;   // MARIA's MEN: never set in the 2600 core
 	logic [7:0]     read_DB;
 	logic [7:0]     write_DB;
 	logic           bus_stuff_valid;
@@ -235,8 +232,7 @@ module Atari7800 (
 	// SALLY must receive real clock enables to recognize reset. MARIA remains
 	// the source throughout the shared held reset; the optional TIA source is a
 	// phase-safe handoff after every chip has left reset together.
-	wire phase_source_request_tia = cpu_driver && !effective_reset &&
-		ctrl_writes == 2'd2 && tia_en;
+	wire phase_source_request_tia = cpu_driver && !effective_reset && tia_en;
 	wire first_phase_is_phi1 = bypass_bios && tia_mode &&
 		!tia_clock_after_reset;
 
@@ -306,7 +302,7 @@ module Atari7800 (
 	wire mapper_phi2 = pclk0 && (!arm_call_stall || !stall_cycle_taken);
 	assign RDY = maria_RDY && tia_RDY && (~tia_en || tia_RDY_seen_high) &&
 		!arm_call_stall;
-	assign cpu_halt_n = (ctrl_writes == 2'd2) ? halt_n : 1'b1;
+	assign cpu_halt_n = tia_en ? halt_n : 1'b1;
 	// The 2600 cartridge slot only (cart2600). The 7800 one (cart.sv) served
 	// these while tia_en was low: in the 2600 core that is while the console
 	// is held in reset, a load included, and before the first image.
@@ -659,22 +655,17 @@ module Atari7800 (
 	);
 
 
-	ctrl_reg ctrl
-	(
-		.clk          (clk_sys),
-		.pclk0        (pclk0),
-		.d_in         (write_DB[3:0]),
-		.cs           (cs_tia),
-		.latch_b      (RW | lock_ctrl),
-		.rst          (effective_reset),
-		.lock_out     (lock_ctrl),
-		.bypass_bios  (bypass_bios),
-		.maria_en_out (maria_en),
-		.bios_en_out  (bios_en_b),
-		.tia_en_out   (tia_en),
-		.writes       (ctrl_writes),
-		.tia_mode     (tia_mode)
-	);
+	// The 7800's INPTCTRL (ctrl_reg) is gone. For a 2600 image the 7800
+	// core bypassed it: on the first clk_sys out of reset it set the lock, the
+	// TIA enable and the cartridge slot's A12 (bios_en, BIOS off) together and
+	// left MARIA off, its write count went to 2 (the CPU's halt input and the
+	// TIA clock source wait for that), the lock kept every later write out,
+	// and the reset cleared them all. One register does that now: tia_en
+	// stands for all of them, rising on that same clk_sys and falling with
+	// the reset. Before its first image the 7800 core ran in 7800 mode
+	// (tia_mode 0); the 2600 core has none, so tia_mode does not reach here.
+	always_ff @(posedge clk_sys)
+		tia_en <= !effective_reset;
 
 	// The 2600 mappers' cartridge RAM request, while the 2600 owns the bus or
 	// a mapper initialises its RAM. The 7800 core merged cart.sv's request in
@@ -892,9 +883,9 @@ module Atari7800 (
 	// same as cart2600 sees below: its address, phase 2, its access strobe
 	// (arm_access in cart2600: the stalled cycle is seen once, and only while
 	// the 2600 owns the bus) and the cartridge's reset.
-	assign daria_a_in_o   = {AB[12] & bios_en_b, AB[11:0]};
+	assign daria_a_in_o   = {AB[12] & tia_en, AB[11:0]};
 	assign daria_pclk0_o  = pclk0;
-	assign daria_access_o = mapper_phi2 && lock_ctrl && tia_en;
+	assign daria_access_o = mapper_phi2 && tia_en;
 	assign daria_reset_o  = effective_reset;
 `endif
 `endif
@@ -911,9 +902,10 @@ module Atari7800 (
 		.ddr_timeout    (arm_ddr_timeout),
 		.d_out          (cart_DB_out),
 		.d_in           (cart_din),
-		// The slot's A12 is gated by INPTCTRL's cart-enable bit, so the BIOS
-		// RAM test at $1800-$1FFF is never seen as $1xxx by a 2600 cart.
-		.a_in           ({AB[12] & bios_en_b, AB[11:0]}),
+		// The slot's A12 was gated by INPTCTRL's cart-enable bit (the 7800
+		// BIOS's RAM test at $1800-$1FFF); in the 2600 core that bit is
+		// tia_en, low only in reset.
+		.a_in           ({AB[12] & tia_en, AB[11:0]}),
 		.rw             (RW),
 		.reset          (effective_reset),
 		.clk            (clk_sys),
@@ -921,7 +913,7 @@ module Atari7800 (
 		.phi1           (pclk1),
 		// Held with the CPU: the stalled cycle is one held read, seen once.
 		.phi2           (mapper_phi2),
-		.arm_driver_run (lock_ctrl && tia_en),
+		.arm_driver_run (tia_en),
 		.sc             (sc),
 		.mapper         (|mapper ? mapper : force_bs),
 		.mapper_revision(mapper_revision),
@@ -1143,52 +1135,6 @@ module cpu_phase_controller
 		endcase
 	end
 
-endmodule
-
-// INPUTCTRL register. Uses TIA CS.
-module ctrl_reg
-(
-	input  logic       clk,
-	input  logic       latch_b,
-	input  logic       rst,
-	input  logic [3:0] d_in,
-	input  logic       cs,
-	input  logic       bypass_bios,
-	input  logic       tia_mode,
-	input  logic       pclk0,
-	output logic       lock_out,
-	output logic       maria_en_out,
-	output logic       bios_en_out,
-	output logic       tia_en_out,
-	output logic [1:0] writes
-);
-
-	always_ff @(posedge clk) begin
-		reg wrote_once;
-		if (rst) begin
-			lock_out <= 0;
-			maria_en_out <= 0;
-			bios_en_out <= 0;
-			tia_en_out <= 0;
-			wrote_once <= 0;
-			writes <= 0;
-		end else if (bypass_bios && ~wrote_once) begin
-			lock_out <= tia_mode ? 1'd1 : 1'd0;
-			maria_en_out <= tia_mode ? 1'd0 : 1'd1;
-			bios_en_out <= 1;
-			wrote_once <= 1;
-			tia_en_out <= tia_mode ? 1'd1 : 1'd0;
-			writes <= 2'd2;
-		end else if (~latch_b && cs && pclk0) begin
-			wrote_once <= 1;
-			lock_out <= d_in[0];
-			maria_en_out <= d_in[1];
-			bios_en_out <= d_in[2];
-			tia_en_out <= d_in[3];
-			if (writes < 2'd2)
-				writes <= writes + 1'b1;
-		end
-	end
 endmodule
 
 module M6502C
