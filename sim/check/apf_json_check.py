@@ -19,7 +19,7 @@ Checks (each prints a line; the last line is APF_JSON pass or APF_JSON FAIL):
   lists (each forcible bss_type once, names matching detect2600.sv's enum,
   BUS left out, not persisted), SaveKey Off/On;
 - the menu options against the RTL that acts on them: Port Input (the
-  wrapper's menu_port_type and header_port_type, and the code that uses each
+  wrapper's menu_port_type, the menu value alone, and the code that uses each
   port type), with a planted Paddles/Driving swap that must be caught;
   Palette (video_mux), Turbo, AtariVox Voice, Region (wrapper), Audio and
   2600 Video (core_top's split and stmix arms), Mapper (bss_type as is);
@@ -520,26 +520,16 @@ def rtl_find(pattern, text, what, flags=0):
 
 def port_types(wrap):
     """The Port Input menu value -> MiSTer port type, as atari2600_pocket.sv
-    computes it once a cartridge has loaded: menu_port_type's case arms, and
-    for its default (auto_type) header_port_type of the joy0/1_type that the
-    end of every load leaves."""
-    def fn(name):
-        body = rtl_find(rf"function \[7:0\] {name}\(.*?\);(.*?)endfunction", wrap, name, re.S).group(1)
-        arms = {int(k): int(t) for k, t in re.findall(rf"\d+'d(\d+):\s*{name}\s*=\s*8'd(\d+);", body)}
-        dflt = rtl_find(rf"default:\s*{name}\s*=\s*([\w']+);", body, f"{name} default").group(1)
-        return arms, dflt
-    menu, menu_dflt = fn("menu_port_type")
-    hdr, hdr_dflt = fn("header_port_type")
-    end_blk = rtl_find(r"else if \(old_cart_download\) begin(.*?)\n\s*end\b", wrap, "end-of-load block", re.S).group(1)
-    jt = [int(rtl_find(rf"joy{i}_type <= 8'd(\d+);", end_blk, f"joy{i}_type at the end of a load").group(1)) for i in (0, 1)]
-    if menu_dflt != "auto_type":
-        raise LookupError("menu_port_type's default is not auto_type")
-    if not re.search(r"porta_type = menu_port_type\(port1_input, header_port_type\(joy0_type\)\)", wrap) or \
-       not re.search(r"portb_type = menu_port_type\(port2_input, header_port_type\(joy1_type\)\)", wrap):
-        raise LookupError("porta_type / portb_type from menu_port_type(portN_input, header_port_type(joyN_type))")
-    hd = int(rtl_find(r"8'd(\d+)", hdr_dflt, "header_port_type default").group(1))
-    auto = [hdr.get(t, hd) for t in jt]
-    return [lambda v, a=a: menu.get(v, a) for a in auto], menu
+    computes it: menu_port_type's case arms, and its default (a constant: a
+    2600 image names no controller, so no header byte takes part)."""
+    body = rtl_find(r"function \[7:0\] menu_port_type\(input \[2:0\] m\);(.*?)endfunction", wrap,
+                    "menu_port_type(m), the menu value alone", re.S).group(1)
+    menu = {int(k): int(t) for k, t in re.findall(r"\d+'d(\d+):\s*menu_port_type\s*=\s*8'd(\d+);", body)}
+    dflt = int(rtl_find(r"default:\s*menu_port_type\s*=\s*8'd(\d+);", body, "menu_port_type default (a constant)").group(1))
+    if not re.search(r"porta_type = menu_port_type\(port1_input\);", wrap) or \
+       not re.search(r"portb_type = menu_port_type\(port2_input\);", wrap):
+        raise LookupError("porta_type / portb_type from menu_port_type(portN_input)")
+    return [lambda v: menu.get(v, dflt)] * 2, menu
 
 
 def port_meanings(wrap):
