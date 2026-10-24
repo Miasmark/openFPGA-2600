@@ -10,6 +10,17 @@ on:
 # itself stays on the runner: that image's glibc is too old for the Node
 # runtime that actions/checkout and actions/upload-artifact need.
 jobs:
+  # No game images, saves, firmware, release files, binaries or temporary
+  # paths in the tree (sim/check/game_data.py). The names check of
+  # sim/check/hygiene.sh needs a private list and stays local.
+  game-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No game data
+        run: python3 -I sim/check/game_data.py
+
   build:
     runs-on: ubuntu-latest
     steps:
