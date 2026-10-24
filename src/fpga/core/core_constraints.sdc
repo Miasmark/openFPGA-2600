@@ -52,9 +52,24 @@ set_multicycle_path -hold 1 \
 # client's access started just before the cart's; the usual one is E0+15.
 # Fix B has no clk_sdram to spare against this exception, so any added 2600
 # latency breaks it silently (docs/DARIA_CORE.md, "Fix B", 2 and 7). Its
-# other outputs (Flicker Blend, SaveKey) keep the default check.
+# other outputs (Flicker Blend, SaveKey) keep the default check, apart from
+# the SaveKey's read byte's hold check below.
 set_multicycle_path -setup 2 -from [get_registers -nowarn {*|sram_ctrl:sram|c_rdata[*]}] -to [get_clocks $clk_sys]
 set_multicycle_path -hold  1 -from [get_registers -nowarn {*|sram_ctrl:sram|c_rdata[*]}] -to [get_clocks $clk_sys]
+
+# POCKET_SRAM: the SaveKey's read byte (sram|sk_rdata, clk_sdram) into the
+# EEPROM model's shift register (savekey|data, clk_sys). sram_ctrl writes
+# sk_rdata only on the clk_sdram edge where it toggles sk_ack, and only for an
+# outstanding request. The model loads data only when ram_done (sk_pend and
+# sk_ack == sk_req) was already true before the clk_sys edge, so the toggle
+# came at an earlier edge, no request is outstanding, and sk_rdata does not
+# change on any edge where data takes it: the same-edge hold check is false.
+# The 7800 core's 2.2.4 debug build failed it on one seed (-0.504 ns, slow
+# 85 C; openFPGA-7800 docs/daria_step10/plan.md 3.1). -from names sk_rdata
+# only, so the enable path (sk_ack -> sk_ram_done -> data) keeps its check.
+set_multicycle_path -hold 1 \
+ -from [get_registers -nowarn {*|sram_ctrl:sram|sk_rdata[*]}] \
+ -to [get_registers -nowarn {*|EEPROM_24LC0X:savekey|data[*]}]
 
 # Fitter only: more margin than the real constraints, which the Timing
 # Analyzer (quartus_sta) still checks unchanged. The fitter stops improving a
