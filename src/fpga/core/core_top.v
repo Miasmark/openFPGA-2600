@@ -847,8 +847,6 @@ atari2600_pocket atari (
     .bw_setting     ( s_bw ),
     .region_setting ( s_region ),
     .palette_temp   ( s_palette ),
-    .show_overscan  ( 1'b0 ),           // 7800 only (MARIA), plan step 4
-    .hide_border    ( 1'b0 ),
     .stereo_tia     ( s_stereo ),
     .flicker_blend  ( s_blend ),
     .savekey_setting( {1'b0, s_savekey} ),

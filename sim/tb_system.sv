@@ -91,9 +91,7 @@ module tb_system;
 	logic [1:0] sk_setting = 2'd2; logic [1:0] vox_setting = 2'd2; logic [12:0] sk_addr = 0; logic sk_wr = 0, sk_rd = 0;
 	logic [31:0] sk_din = 0; wire [31:0] sk_dout; logic [31:0] hsc_din = 0; wire [31:0] hsc_dout;
 	logic [5:0] fa2_addr = 0; logic fa2_wr = 0, fa2_rd = 0; logic [31:0] fa2_din = 0; wire [31:0] fa2_dout;
-	logic hide_border = 1'b0;
 	logic [1:0] region = 2'd1;   // NTSC; +pal for PAL
-	logic overscan = 1'b0;       // +overscan
 	logic clk_74a = 1'b0;
 	always #6.734 clk_74a = ~clk_74a;
 
@@ -129,8 +127,8 @@ module tb_system;
 `endif
 		.clk_sys(clk_sys), .clk_sdram(clk_sdram), .pll_locked(pll_locked_tb), .pll_busy(pll_busy_tb), .reset_in(reset_in),
 		.cart_download(1'b0), .arfw_download(1'b0), .ioctl_wr(1'b0), .ioctl_addr(25'd0), .ioctl_dout(8'd0),
-		.region_setting(region), .palette_temp(2'd0), .show_overscan(overscan),
-		.hide_border(hide_border), .stereo_tia(1'b0), .swap_joysticks(1'b0), .diff_left_b(1'b1),
+		.region_setting(region), .palette_temp(2'd0),
+		.stereo_tia(1'b0), .swap_joysticks(1'b0), .diff_left_b(1'b1),
 		.diff_right_b(1'b1), .bw_setting(1'b0), .flicker_blend(1'b0), .pause_core(1'b0),
 		.decomb(1'b0), .bs_override(5'd0),
 		.joy0(16'd0), .joy1(16'd0), .joy2(16'd0), .joy3(16'd0),
@@ -373,9 +371,8 @@ module tb_system;
 	real measured, ideal;
 	initial begin
 		if (!$value$plusargs("audf=%d", audf)) audf = 0;
-		if ($test$plusargs("hide_border")) hide_border = 1'b1;
 		if ($test$plusargs("pal")) region = 2'd2;
-		if ($test$plusargs("overscan")) overscan = 1'b1;
+		// +hide_border and +overscan were MARIA's (7800) settings, gone (plan step 4)
 		// 2600 mode: what the wrapper latches after loading a headerless image.
 		if ($test$plusargs("mode2600")) force dut.tia_mode = 1'b1;
 		repeat (200) @(posedge clk_sys);

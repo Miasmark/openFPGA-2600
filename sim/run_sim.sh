@@ -68,7 +68,7 @@ for f in vox_irom.hex vox_drom.hex; do ln -sfn "$FPGA/core/atarivox/$f" "$WORK/r
 # those declarations as `logic`; the sources themselves are not touched.
 PATCHED="$WORK/patched"
 mkdir -p "$PATCHED"
-for f in Maria/control.sv banks2600.sv video_mux.sv RIOT/M6532.sv; do
+for f in banks2600.sv video_mux.sv RIOT/M6532.sv; do
 	mkdir -p "$PATCHED/$(dirname "$f")"
 	sed -E 's/^(\s*)wire(\s+\[[^]]+\]\s+\w+\s*\[[0-9]+\]\s*=)/\1logic\2/' "$RTL/$f" > "$PATCHED/$f"
 done
@@ -85,7 +85,7 @@ SRCS=(
 	"$RTL/arm7tdmi/arm7tdmi_pkg.sv"
 	"$RTL/6502/mos6502_pkg.sv"
 	$(ls "$RTL"/6502/*.sv | grep -v pkg)
-	$(ls "$RTL"/Maria/*.sv | grep -v control.sv) "$PATCHED/Maria/control.sv"
+	"$RTL/Maria/maria.sv"
 	"$RTL/cache_ram.v" "$RTL/bram.v"
 	"$RTL/composite_out.sv" "$RTL/cart_ram_tdp.sv" "$RTL/cdf_fastjump_table.sv"
 	"$RTL"/arm_mapper_{memory,controller,subsystem,tables,ram_init,writeback,audio}.sv

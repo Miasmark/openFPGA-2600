@@ -48,8 +48,6 @@ module atari2600_pocket
 	// Settings
 	input  wire  [1:0] region_setting,  // 0 auto, 1 NTSC, 2 PAL
 	input  wire  [1:0] palette_temp,    // 0 warm, 1 cool, 2 hot
-	input  wire        show_overscan,
-	input  wire        hide_border,
 	input  wire        stereo_tia,
 	input  wire        swap_joysticks,
 	input  wire        diff_left_b,     // 1 = B (novice)
@@ -823,10 +821,13 @@ wire [7:0] gun_ax = gun_port ? vx_pos[1] : vx_pos[0];
 
 // lightgun.sv's joystick mode (JOY_X/Y offset by 128) puts the crosshair
 // 1.5 x X pixels across and Y - 8 lines down, so scale the 0..255 axes to the
-// picture: 372, 320 or 160 pixels wide and 224 to 247 lines tall (a PAL
-// picture is taller, and its bottom lines are out of the gun's reach).
-wire [7:0] gun_kx = tia_en ? 8'd107 : hide_border ? 8'd213 : 8'd248;
-wire [7:0] gun_ky = video_pal_o ? 8'd248 : tia_en ? 8'd240 : (show_overscan ? 8'd242 : 8'd224);
+// picture: 160 pixels wide and 240 lines tall (a PAL picture is taller, and
+// its bottom lines are out of the gun's reach). The other factors are the
+// 7800 core's MARIA picture (372 wide with the border, 224 lines without
+// Show Overscan, both 7800 settings tied off on the Pocket), which applied
+// while tia_en was low: in the 2600 core, while the console is in reset.
+wire [7:0] gun_kx = tia_en ? 8'd107 : 8'd248;
+wire [7:0] gun_ky = video_pal_o ? 8'd248 : tia_en ? 8'd240 : 8'd224;
 wire [15:0] gun_mx = gun_ax * gun_kx;
 wire [15:0] gun_my = gun_y * gun_ky;
 wire [7:0] gun_x  = gun_mx[15:8];
@@ -872,7 +873,7 @@ lightgun lightgun (
 	.MOUSE        (25'd0),
 	.MOUSE_XY     (1'b0),
 	.LIGHT        (|core_r[7:4] || |core_g[7:4] || |core_b[7:4]),
-	.H_WIDTH      (tia_en ? 10'd160 : (hide_border ? 10'd320 : 10'd372)),
+	.H_WIDTH      (tia_en ? 10'd160 : 10'd372),     // 372: MARIA's width, in reset (gun_kx)
 	.JOY_X        ({~gun_x[7], gun_x[6:0]}),
 	.JOY_Y        ({~gun_yl[7], gun_yl[6:0]}),
 	.JOY_TRIG     (gun_port ? vbutton[1] : vbutton[0]),
@@ -1173,11 +1174,6 @@ Atari7800 main
 	.comp_vb      (),
 	.comp_burst_start(),
 	.comp_burst_len  (),
-	.show_border  (~hide_border),
-	// PAL ignores Show Overscan: its 274 line window already holds the whole
-	// picture, and the Pocket has no scaler slot left for 292 lines (the APF
-	// allows 8 modes; see core_top.v).
-	.show_overscan(show_overscan & ~region_select),
 	.PAL          (region_select),
 	.pal_temp     (palette_temp),
 	.tia_mode     (tia_mode && ~use_bios),

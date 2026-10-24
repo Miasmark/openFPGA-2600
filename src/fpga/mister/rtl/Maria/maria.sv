@@ -21,13 +21,22 @@
 // SOFTWARE.
 
 
+// openFPGA-2600 (plan step 4): what is left of MARIA is the part the 2600
+// side runs on. The clock block below is MARIA's own, verbatim: the master
+// clock halves (mclk0/mclk1), the TIA's clock enable (tia_clk_x2, with its
+// two-tick start-up count) and the processor clock's two phases (pclk0/1),
+// which carry the CPU until the reset is released and the TIA takes over
+// (top.sv's cpu_phase_controller). The decode is control.sv's 2600 memory
+// map, verbatim, for the TIA and RIOT selects. MARIA's video, DMA, line RAM,
+// registers and 7800 memory map are gone, and so is everything they fed:
+// MEN (maria_en) was never set in the 2600 core, so the constants below are
+// the values those inputs always had there: every access is a slow one
+// (control.sv's sel_slow_clock with MEN low), WSYNC is never written (no
+// MARIA registers in the 2600 map) and the line RAM's lrc never comes
+// (video_sync was held in reset while MEN was low).
 module maria(
 	// Busses
 	input  logic [15:0] AB_in,
-	output logic [15:0] AB_out,
-	input  logic  [7:0] d_in,
-	output logic  [7:0] DB_out,
-	output logic  [7:0] DB_out_oe,
 
 	// Clocking
 	input logic         reset,
@@ -38,116 +47,34 @@ module maria(
 	output logic        tia_clk_x2,
 	output logic        pclk0,
 	output logic        pclk1,
-	input logic         pclk2,
 
 	// Chip Select lines
-	output logic        cs_ram0,
-	output logic        cs_ram1,
 	output logic        cs_riot,
 	output logic        cs_tia,
-	output logic        cs_maria,
-
-	// Maria configuration
-	input logic         RW,
-	input logic         maria_en,
-
-	// Video
-	output logic [7:0]  YC,
-	output logic        hsync,
-	output logic        vsync,
-	output logic        hblank,
-	output logic        vblank,
-	output logic        vblank_ex,
 
 	// CPU
-	output logic        NMI_n,
-	output logic        halt_n,
-	output logic        ready,
-
-	// Abstract Pins
-	output logic        drive_AB,    // Used to overcome the lack of a bidirectional bus
-	input  logic        hide_border, // Option to hide the boarder
-	input  logic        bypass_bios, // Flag to tell maria to initialize to a post-bios state
-	input  logic        PAL          // Indicates the system is in either NTSC or PAL
-
+	output logic        ready
 );
 
-	/* Original Pins:
-		A0-A15        memory address bus
-		D0-D7         memory data bus
-		Vss           ground
-		Vdd           power
-		/NMI          output to cpu
-		XTAL1         14 MHz input
-		XTAL2         main clock output
-		MEN           Maria enable input. When lo, video is off and memory map is 2600
-		Ø2            phase 2 clock input
-		TCLK          TIA main/4 clock
-		Ø0            phase 0 clock output. 1.79M or 1.19M
-		DEL           delay line control voltage input
-		/SRAM0-1      RAM chipselects
-		/SEL32        RIOT chipselect
-		/TIASEL       TIA chipselect
-		R/W           Read/write input
-		/HALT         cpu halt output
-		READY         cpu ready output
-		LUM0-3        luminance output
-		COLOR         color output
-		BLANK         blank output
-		SYNC          video sync output
-	*/
+	wire              maria_en = 1'b0;
+	wire              sel_slow_clock = 1'b1;
+	wire              wsync = 1'b0;
+	wire              lrc = 1'b0;
+	/* verilator lint_off UNUSEDSIGNAL */
+	wire [15:0]       AB = AB_in;     // the decode reads A15-A5
 
-	logic [7:0]       ctrl;
-	logic [24:0][7:0] color_map;
-	logic [7:0]       char_base;
-	logic [15:0]      ZP;
-	logic [2:0]       palette;
-	logic [1:0]       zp_written;
-	logic [7:0]       UV_out;
 	logic [2:0]       clock_div = 3'd2;
-	logic [1:0]       edge_counter;
-	logic             wsync;
-	logic             border;
-	logic             prst;
-	logic             vbe;
-	logic             hbs;
-	logic             lrc;
-	logic             wm;
-	logic             latch_hpos;
-	logic             halt_en;
-	logic             DLI_en;
-	logic             dli_latch;
 	logic             clk_toggle = 1'b0;
-	logic             old_dli;
-	logic             latch_byte;
 	logic             pclk_toggle = 1'b0;
-	logic             sel_slow_clock;
-	logic             NMI_ung_n;
 	logic             slow_clk_latch = 1'b0;
 	logic             ready_int;
-	logic             cram_sel;
-	logic             ABEN;
 	logic             old_men = 1'b0;
 	logic [3:0]       men_count = 4'd0;
-	logic             pclk = 1'b0;
+	logic             pclk = 1'b0;    // the phase level control.sv and DMA read
+	/* verilator lint_on UNUSEDSIGNAL */
 	logic             tia_clk_en;
 	logic [3:0]       tia_enable_count = 4'd2;
 
-	// Apply color kill if needed
-	assign YC = UV_out & (ctrl[7] ? 8'h0F : 8'hFF);
-	assign drive_AB = ABEN && maria_en;
-
-	// Maria being enabled is a condition for NMI
-	assign NMI_n = NMI_ung_n || ~maria_en;
-	assign halt_n = ~halt_en;
-	// WSYNC on the die is an asynchronous cross-coupled NOR latch - page 18,
-	// MARIA_CONTROL, x 7300-7840 - and its output reaches the WAIT pad through
-	// a NOR and two inverters with nothing clocked in between. So READY is the
-	// latch straight out. The phase 2 hold this replaces made SALLY read a
-	// value one phase old, which cost an extra CPU cycle whenever the
-	// processor clock was stretched; the separate `lrc` term was redundant,
-	// since `lrc` sets `ready_int` on the same tick, and glitched the pin for
-	// one clk_sys where phase 2 began before that value was consumed.
 	assign ready = ready_int;
 
 	assign tia_clk_en = ~|tia_enable_count;
@@ -228,114 +155,16 @@ module maria(
 		end
 	end
 
-	line_ram line_ram_inst (
-		.mclk0           (mclk0),
-		.mclk1           (mclk1),
-		.border          (border),
-		.clk_sys         (clk_sys),
-		.latch_byte      (latch_byte),
-		.latch_hpos      (latch_hpos),
-		.RESET           (reset || ~maria_en),
-		.PLAYBACK        (UV_out),
-		.PALETTE         (palette),
-		.d_in            (d_in),
-		.WM              (wm),
-		.COLOR_MAP       (color_map),
-		.RM              (ctrl[1:0]),
-		.KANGAROO_MODE   (ctrl[2]),
-		.BORDER_CONTROL  (ctrl[3]),
-		.COLOR_KILL      (ctrl[7]),
-		.lrc             (lrc),
-		.cram_write      (cram_sel)
-	);
-
-	control control_inst (
-		.mclk0           (mclk0),
-		.mclk1           (mclk1),
-		.pclkp           (pclk),
-		.maria_en        (maria_en),
-		.AB              (AB_in),
-		.ABEN            (drive_AB),
-		.DB_in           (d_in),
-		.DB_out          (DB_out),
-		.DB_out_oe       (DB_out_oe),
-		.RW              (RW),
-		.drive_AB        (drive_AB),
-		.ctrl            (ctrl),
-		.color_map       (color_map),
-		.status_read     ({vblank, 7'b0}),
-		.char_base       (char_base),
-		.ZP              (ZP),
-		.pal             (PAL),
-		.sel_slow_clock  (sel_slow_clock),
-		.wsync           (wsync),
-		.clk_sys         (clk_sys),
-		.reset           (reset),
-		.pclk0           (pclk2),
-		.bypass_bios     (bypass_bios),
-		.cs_ram0         (cs_ram0),
-		.cs_ram1         (cs_ram1),
-		.cs_riot         (cs_riot),
-		.cs_tia          (cs_tia),
-		.cs_maria        (cs_maria),
-		.cram_select     (cram_sel)
-	);
-
-	dma dma_inst (
-		.clk_sys         (clk_sys),
-		// Not `|| ~maria_en`. The BIOS clears the register block with
-		// STA $01,X, which turns MEN off and on again mid-frame. Restarting
-		// the engine from its zero state there drops ABENF at a raster
-		// position it never sequenced up to, so it takes the address bus
-		// with the CPU still running - the CPU then fetched from $0000 and
-		// the BIOS bailed to its 2600 fallback. Let it keep running instead;
-		// `drive_AB` is already gated by MEN.
-		.reset           (reset),
-		.mclk0           (mclk0),
-		.mclk1           (mclk1),
-		.vblank          (vblank),
-		.vbe             (vbe),
-		.hbs             (hbs),
-		.lrc             (lrc),
-		.pclk1           (pclk1),
-		.pclk0           (pclk0),
-		.DM              (ctrl[6:5]),
-		.AB              (AB_out),
-		.ABEN            (ABEN),
-		.PCLKEDGE        (~pclk_toggle),
-		.pclk            (pclk),
-		.latch_byte      (latch_byte),
-		.d_in            (d_in),
-		.latch_hpos      (latch_hpos),
-		.HALT            (halt_en),
-		.DLI             (DLI_en),
-		.WM              (wm),
-		.PAL             (palette),
-		.ZP              (ZP),
-		.char_width      (ctrl[4]),
-		.char_base       (char_base),
-		.bypass_bios     (bypass_bios),
-		.nmi_n           (NMI_ung_n)
-		);
-
-	video_sync sync_inst (
-		.mclk0           (mclk0),
-		.mclk1           (mclk1),
-		.clk             (clk_sys),
-		.reset           (reset || ~maria_en),
-		.bypass_bios     (bypass_bios),
-		.PAL             (PAL),
-		.HSync           (hsync),
-		.VSync           (vsync),
-		.hblank          (hblank),
-		.vblank          (vblank),
-		.vblank_ex       (vblank_ex),
-		.border          (border),
-		.hide_border     (hide_border),
-		.lrc             (lrc),
-		.prst            (prst),
-		.vbe             (vbe),
-		.hbs             (hbs)
-	);
+	/* verilator lint_off CASEX */
+	always_comb begin
+		{cs_riot, cs_tia} = 0;
+		casex (AB[15:5])
+				11'bXXX0_XX0X_1XX,
+				11'bxxx0_xx1x_1xx: cs_riot = 1;
+				11'bxxx0_xxxx_0xx: cs_tia = 1;
+				default: ;
+		endcase
+	end
+	/* verilator lint_on CASEX */
 
 endmodule

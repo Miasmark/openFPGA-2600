@@ -93,10 +93,8 @@ module tb_load;
 		void'($value$plusargs("skipbios=%d", skip_bios));
 		nocart = $test$plusargs("nocart");
 	end
-	logic overscan_on = 1'b0;
 	logic [4:0] bs_ovr = 5'd0;                            // +bs=N
 	initial void'($value$plusargs("bs=%d", bs_ovr));
-	initial overscan_on = $test$plusargs("overscan");
 	logic blend_on = 1'b0;                                // +blend: 2600 Flicker Blend
 	initial blend_on = $test$plusargs("blend");
 	logic [15:0] joy0 = 16'd0, joy1 = 16'd0, joy2 = 16'd0, joy3 = 16'd0;
@@ -179,8 +177,8 @@ module tb_load;
 		// (their downloads below reach no port; ioctl_wr as core_top.v gates it)
 		.cart_download(cart_download), .arfw_download(arfw_download),
 		.ioctl_wr(ioctl_wr_r & (cart_download | arfw_download)), .ioctl_addr(ioctl_addr_r), .ioctl_dout(ioctl_dout_r),
-		.region_setting(region_tb), .palette_temp(2'd0), .show_overscan(overscan_on),
-		.hide_border(1'b0), .stereo_tia(1'b0), .swap_joysticks(1'b0), .diff_left_b(1'b1),
+		.region_setting(region_tb), .palette_temp(2'd0),
+		.stereo_tia(1'b0), .swap_joysticks(1'b0), .diff_left_b(1'b1),
 		.diff_right_b(1'b1), .bw_setting(1'b0), .flicker_blend(blend_on), .pause_core(1'b0),
 		.decomb(1'b0), .bs_override(bs_ovr),
 		.joy0(joy0), .joy1(joy1), .joy2(joy2), .joy3(joy3),
@@ -971,8 +969,8 @@ module tb_load;
 	longint nmis = 0, main_writes = 0, audf_writes = 0;
 	logic old_nmi = 1'b1, old_wr41 = 1'b0, old_wr4k = 1'b0;
 	always @(posedge clk_sys) if (recording) begin
-		old_nmi <= dut.main.NMI_n;
-		if (old_nmi && !dut.main.NMI_n) nmis <= nmis + 1;
+		// No NMI in the 2600 core (MARIA's, plan step 4): nmis stays 0
+		old_nmi <= 1'b1;
 		old_wr41 <= !dut.RW && dut.bios_addr == 16'h0041;
 		if (!old_wr41 && !dut.RW && dut.bios_addr == 16'h0041) main_writes <= main_writes + 1;
 		old_wr4k <= !dut.RW && dut.bios_addr == 16'h4000;
@@ -991,8 +989,9 @@ module tb_load;
 	initial cp_on = $test$plusargs("cpuprobe");
 	always @(posedge clk_sys) if (cp_on && !reset_in) begin
 		automatic longint ms = longint'($realtime / 1.0e6);
-		cp_old_w <= !dut.RW && dut.main.cs_maria;
-		if (!cp_old_w && !dut.RW && dut.main.cs_maria && (cp_mw < 300 || dut.bios_addr[5:0] == 6'h3C)) begin
+		// MARIA's registers are gone from the 2600 core (plan step 4): no writes
+		cp_old_w <= 1'b0;
+		if (1'b0) begin
 			$display("MARIA %0d ms: $%04x = $%02x", ms, dut.bios_addr, dut.main.write_DB);
 			cp_mw <= cp_mw + 1;
 		end

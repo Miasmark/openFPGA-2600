@@ -67,8 +67,6 @@ module Atari7800 (
 
 	output logic [15:0] AUDIO_R,
 	output logic [15:0] AUDIO_L,
-	input logic         show_border,
-	input logic         show_overscan,
 	input logic         bypass_bios,
 	input logic         cart_present, // 0: empty slot, cart reads as open bus
 	input logic         tia_mode,
@@ -175,11 +173,7 @@ module Atari7800 (
 	// Signals //
 	/////////////
 
-	logic           NMI_n;
 	logic           maria_RDY;
-	logic           halt_n;
-	logic           maria_drive_AB;
-	logic [15:0]    maria_AB_out;
 	logic           tia_RDY;
 	logic           tia_RDY_seen_high;
 	logic [3:0]     audv0, audv1;
@@ -189,23 +183,20 @@ module Atari7800 (
 	// drove SALLY's (cart.sv: high without one, so for every 2600 image).
 	wire            IRQ_n = 1'b1;
 	logic [15:0]    cpu_AB;
-	logic           cpu_halt_n;
 	logic           cpu_released;
-	wire            maria_en = 1'b0;   // MARIA's MEN: never set in the 2600 core
 	logic [7:0]     read_DB;
 	logic [7:0]     write_DB;
 	logic           bus_stuff_valid;
 	logic [7:0]     bus_stuff_data;
 	wire [7:0]      physical_write_DB = tia_en && bus_stuff_valid ?
 		(write_DB & bus_stuff_data) : write_DB;
-	logic [7:0]     tia_DB_out, riot_DB_out, maria_DB_out, cart_DB_out;
+	logic [7:0]     tia_DB_out, riot_DB_out, cart_DB_out;
 	// Which data lines each chip is actually driving. Everything else on the
 	// bus drives all eight or none.
-	logic [7:0]     tia_DB_oe, riot_DB_oe, maria_DB_oe, cart_DB_oe;
+	logic [7:0]     tia_DB_oe, riot_DB_oe, cart_DB_oe;
 	logic           cpu_DB_oe, cpu_AB_oe, cpu_RW_oe;
-	logic           mclk0;
 	logic           mclk1;
-	logic           cs_ram0, cs_ram1, cs_tia, cs_riot, cs_maria;
+	logic           cs_tia, cs_riot;
 	logic [7:0]     open_bus;
 	logic           cpu_rwn;
 	logic [15:0]    last_address;
@@ -302,22 +293,22 @@ module Atari7800 (
 	wire mapper_phi2 = pclk0 && (!arm_call_stall || !stall_cycle_taken);
 	assign RDY = maria_RDY && tia_RDY && (~tia_en || tia_RDY_seen_high) &&
 		!arm_call_stall;
-	assign cpu_halt_n = tia_en ? halt_n : 1'b1;
 	// The 2600 cartridge slot only (cart2600). The 7800 one (cart.sv) served
 	// these while tia_en was low: in the 2600 core that is while the console
 	// is held in reset, a load included, and before the first image.
 	assign cart_read = tia_en ? (pause ? ~|pause_clock : read_2600) : 1'b0;
 	assign cpu_ce = pclk1;
-	assign VBlank_orig = maria_en ? maria_vblank : tia_vblank;
+	assign VBlank_orig = tia_vblank;
 
 	// The data bus is a wire with capacitance: nothing pulls it anywhere, so it
 	// keeps the last value something drove onto it. The CPU only drives through
 	// phase 2 of a write, which is what DB_OE marks; read_DB below carries every
 	// other driver, and holds this same value wherever no one drives.
 	// The bus as it actually stands: the CPU's byte while it is driving, and
-	// whatever the selected chip answers with otherwise. MARIA is the only part
-	// that both reads memory and takes register writes, so it is the only one
-	// that needs the whole thing rather than one direction.
+	// whatever the selected chip answers with otherwise. MARIA was the only part
+	// that both read memory and took register writes, and so the only one
+	// that needed the whole thing rather than one direction; the bus's
+	// charge (open_bus) is what still takes it.
 	wire [7:0] DB = cpu_DB_oe ? physical_write_DB : read_DB;
 
 	always_ff @(posedge clk_sys) begin
@@ -326,7 +317,7 @@ module Atari7800 (
 		last_address <= AB;
 	end
 
-	wire cs_cart = ~|{cs_ram0, cs_ram1, cs_tia, cs_riot, cs_maria};
+	wire cs_cart = ~|{cs_tia, cs_riot};
 `ifdef POCKET_SRAM
 	assign mclk1_out = mclk1;
 `endif
@@ -335,25 +326,16 @@ module Atari7800 (
 	// no drivers at all on D5:D0 - and the bus keeps its charge on the rest.
 	// Nothing drives during a write, or into an empty cartridge slot.
 	always_comb begin
-		// A halt releases all three of SALLY's buses. The address lines hold
-		// their charge when neither the CPU nor MARIA drives them, and a cycle
-		// where both do is the wired AND of the two.
-		case ({cpu_AB_oe, maria_drive_AB})
-			2'b00 : AB = last_address;
-			2'b01 : AB = maria_AB_out;
-			2'b10 : AB = cpu_AB;
-			2'b11 : AB = cpu_AB & maria_AB_out;
-		endcase
-		// R/W is the one line nothing takes over: MARIA drives the address and
-		// reads the data, but leaves R/W to the board's pull up. That reads as
-		// a read for the whole halt, which is all DMA ever does.
+		// The address lines hold their charge when the CPU does not drive
+		// them. (MARIA's DMA, the other driver on a 7800, is gone.)
+		AB = cpu_AB_oe ? cpu_AB : last_address;
+		// R/W reads as a read (the board's pull up) when the CPU releases it.
 		RW = cpu_RW_oe ? cpu_rwn : 1'b1;
 
 		read_DB = open_bus;
 		if (RW) begin
 			if (cs_tia)   read_DB = (tia_DB_out   & tia_DB_oe)   | (open_bus & ~tia_DB_oe);
 			if (cs_riot)  read_DB = (riot_DB_out  & riot_DB_oe)  | (open_bus & ~riot_DB_oe);
-			if (cs_maria) read_DB = (maria_DB_out & maria_DB_oe) | (open_bus & ~maria_DB_oe);
 			// Last, so the cartridge - the slowest source by far - reaches the bus
 			// through the fewest mux levels. cs_cart is the complement of the other
 			// selects, so the two can never both be true and the order is free.
@@ -382,46 +364,23 @@ module Atari7800 (
 
 	assign dout = write_DB;
 
-	// MARIA
-	logic maria_vblank, maria_vblank_ex, maria_vsync, maria_hblank, maria_hsync;
-
-	logic [3:0] maria_luma, maria_chroma;
-
+	// MARIA's clock, phase and 2600 decode block (Maria/maria.sv): its
+	// video, DMA, registers and 7800 memory map are gone (plan step 4).
 	maria maria_inst(
 		.ce             (~pause || effective_reset),
-		.mclk0          (mclk0),
+		/* verilator lint_off PINCONNECTEMPTY */
+		.mclk0          (),             // MARIA's own tia_clk_x2 uses it
+		/* verilator lint_on PINCONNECTEMPTY */
 		.mclk1          (mclk1),
 		.tia_clk_x2     (tia_clk_x2),
 		.AB_in          (AB),
-		.AB_out         (maria_AB_out),
-		.drive_AB       (maria_drive_AB),
-		.hide_border    (~show_border),
-		.bypass_bios    (bypass_bios),
-		.PAL            (PAL),
-		.d_in           (DB),
-		.DB_out         (maria_DB_out),
-		.DB_out_oe      (maria_DB_oe),
 		.reset          (effective_reset),
 		.clk_sys        (clk_sys),
 		.pclk0          (pclk0_m),
 		.pclk1          (pclk1_m),
-		.pclk2          (pclk0),
-		.RW             (RW),
-		.maria_en       (maria_en),
-		.YC             ({maria_chroma, maria_luma}),
-		.cs_ram0        (cs_ram0),
-		.cs_ram1        (cs_ram1),
 		.cs_riot        (cs_riot),
 		.cs_tia         (cs_tia),
-		.cs_maria       (cs_maria),
-		.NMI_n          (NMI_n),
-		.halt_n         (halt_n),
-		.ready          (maria_RDY),
-		.vsync          (maria_vsync),
-		.vblank         (maria_vblank),
-		.vblank_ex      (maria_vblank_ex),
-		.hsync          (maria_hsync),
-		.hblank         (maria_hblank)
+		.ready          (maria_RDY)
 	);
 
 	logic tia_vblank, tia_vsync, tia_hblank, tia_blank_n;
@@ -478,37 +437,26 @@ module Atari7800 (
 		.paddle_read    (i_read)
 	);
 
-	// One output stage for both chips, which is what the board has. MARIA owns it:
-	// tia-maria.pdf page 47 shows its COLOR DELAY LINE & LUM sheet taking TC0-3 and
-	// TL0-3F beside its own MC0-3 / ML0-3F, gated by MENBLF, driving the single
-	// COLOR pin. On a 7800 the 2600's colour never reaches a pin of its own, so the
-	// codes are what get selected, not two finished composite signals.
-	wire        c_maria = maria_en;
-	wire [3:0]  c_col   = c_maria ? maria_chroma : tia_chroma;
-	wire [3:0]  c_lum   = c_maria ? maria_luma   : {tia_luma, 1'b0};
-	wire        c_hs    = c_maria ? maria_hsync  : tia_hsync;
-	wire        c_vs    = c_maria ? maria_vsync  : tia_vsync;
-	wire        c_hb    = c_maria ? maria_hblank : tia_hblank;
-	wire        c_vb    = c_maria ? maria_vblank : tia_vblank;
-
+	// The composite encoder (unused on the Pocket), on the TIA's signals: the
+	// 7800 core selected MARIA's here while MEN was set, never in 2600 mode.
 	composite_out comp_out
 	(
 		.clk          (clk_sys),
-		// MARIA's burst sits at columns 38-56 and its pixel is 2*fsc; the 2600's is
-		// at colour clocks 36-51 and its pixel is a whole cycle.
-		.burst_on     (c_maria ? 10'd8  : 10'd16),
-		.burst_off    (c_maria ? 10'd44 : 10'd80),
-		.chroma_scale (c_maria ? 9'd256 : 9'd236),
-		.pix_samples  (c_maria ? 2'd2   : 2'd0),
+		// The 2600's burst sits at colour clocks 36-51 and its pixel is a whole
+		// cycle.
+		.burst_on     (10'd16),
+		.burst_off    (10'd80),
+		.chroma_scale (9'd236),
+		.pix_samples  (2'd0),
 		.phase_adj    (2'd1),
-		.col          (c_col),
-		.lum          (c_lum),
-		.blank        (c_hb || c_vb),
-		.hsync        (c_hs),
-		.pix_tick     (c_maria ? mclk0 : tia_pix_ce),
-		.hblank       (c_hb),
-		.vblank       (c_vb),
-		.vsync        (c_vs),
+		.col          (tia_chroma),
+		.lum          ({tia_luma, 1'b0}),
+		.blank        (tia_hblank || tia_vblank),
+		.hsync        (tia_hsync),
+		.pix_tick     (tia_pix_ce),
+		.hblank       (tia_hblank),
+		.vblank       (tia_vblank),
+		.vsync        (tia_vsync),
 		.temp         (pal_temp),
 		.comp         (comp),
 		.sample_tog   (comp_tog),
@@ -518,18 +466,19 @@ module Atari7800 (
 		.vb_out       (comp_vb)
 	);
 
-	assign comp_burst_start = c_maria ? 10'd12 : 10'd24;
-	assign comp_burst_len   = c_maria ? 10'd36 : 10'd56;
+	assign comp_burst_start = 10'd24;
+	assign comp_burst_len   = 10'd56;
 
 	video_mux mux
 	(
 		.clk_sys        (clk_sys),
-		.maria_luma     (maria_luma),
-		.maria_chroma   (maria_chroma),
-		.maria_hblank   (maria_hblank),
-		.maria_vblank   (show_overscan ? maria_vblank : maria_vblank_ex),
-		.maria_hsync    (maria_hsync),
-		.maria_vsync    (maria_vsync),
+		// MARIA's picture is gone (video_mux.sv itself is unchanged)
+		.maria_luma     (4'd0),
+		.maria_chroma   (4'd0),
+		.maria_hblank   (1'b0),
+		.maria_vblank   (1'b0),
+		.maria_hsync    (1'b0),
+		.maria_vsync    (1'b0),
 		.maria_pix_ce   (mclk1),
 		.tia_luma       (tia_luma),
 		.tia_chroma     (tia_chroma),
@@ -539,7 +488,7 @@ module Atari7800 (
 		.tia_vsync      (tia_vsync),
 		.tia_pix_ce     (tia_pix_ce),
 		.pause          (pause),
-		.is_maria       (maria_en),
+		.is_maria       (1'b0),
 		.pal_temp       (pal_temp),
 		.pal_load       (pal_load),
 		.pal_data       (pal_data),
@@ -594,8 +543,8 @@ module Atari7800 (
 	// as it never was for a 2600 image (its header flags were all clear).
 	// 16 bits: the 7800 core's sum had a 17th for the halving, and without
 	// it took these 16 (a sum past $FFFF wraps here as it did there).
-	wire [15:0] audio_mix_r = tia_r + {tape_audio, 12'd0};
-	wire [15:0] audio_mix_l = tia_l + {tape_audio, 12'd0};
+	wire [15:0] audio_mix_r = tia_r + {3'd0, tape_audio, 12'd0};
+	wire [15:0] audio_mix_l = tia_l + {3'd0, tape_audio, 12'd0};
 
 	assign AUDIO_R = audio_mix_r;
 	assign AUDIO_L = audio_mix_l;
@@ -648,9 +597,9 @@ module Atari7800 (
 		.RW_OE        (cpu_RW_oe),
 		.RD           (cpu_rwn),
 		.IRQ_n        (IRQ_n),
-		.NMI_n        (NMI_n),
+		.NMI_n        (1'b1),        // MARIA's NMI needed MEN
 		.RDY          (RDY),
-		.halt_n       (cpu_halt_n),
+		.halt_n       (1'b1),        // no DMA halts the CPU
 		.is_halted    (cpu_released)
 	);
 
