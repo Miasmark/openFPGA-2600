@@ -11,31 +11,65 @@
         "value": 1
       },
       {
-        "name": "Difficulty",
+        "name": "Left Difficulty",
         "id": 23,
         "type": "list",
         "enabled": true,
         "persist": true,
         "writeonly": true,
-        "address": "0x100002B0",
+        "address": "0x10000264",
         "defaultval": 0,
-        "mask": "0xFFFFFFFC",
+        "mask": "0xFFFFFFFE",
         "options": [
           {
-            "value": 3,
-            "name": "Left B, Right B"
-          },
-          {
-            "value": 2,
-            "name": "Left A, Right B"
+            "value": 0,
+            "name": "A"
           },
           {
             "value": 1,
-            "name": "Left B, Right A"
-          },
+            "name": "B"
+          }
+        ]
+      },
+      {
+        "name": "Right Difficulty",
+        "id": 29,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x10000268",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFE",
+        "options": [
           {
             "value": 0,
-            "name": "Left A, Right A"
+            "name": "A"
+          },
+          {
+            "value": 1,
+            "name": "B"
+          }
+        ]
+      },
+      {
+        "name": "TV Type",
+        "id": 30,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x100002CC",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFE",
+        "options": [
+          {
+            "value": 0,
+            "name": "Colour"
+          },
+          {
+            "value": 1,
+            "name": "B&W"
           }
         ]
       },
@@ -205,31 +239,6 @@
         ]
       },
       {
-        "name": "High Score Cart",
-        "id": 8,
-        "type": "list",
-        "enabled": true,
-        "persist": true,
-        "writeonly": true,
-        "address": "0x10000274",
-        "defaultval": 0,
-        "mask": "0xFFFFFFFC",
-        "options": [
-          {
-            "value": 0,
-            "name": "Auto"
-          },
-          {
-            "value": 1,
-            "name": "On"
-          },
-          {
-            "value": 2,
-            "name": "Off"
-          }
-        ]
-      },
-      {
         "name": "SaveKey (port 2)",
         "id": 15,
         "type": "list",
@@ -238,19 +247,15 @@
         "writeonly": true,
         "address": "0x10000290",
         "defaultval": 0,
-        "mask": "0xFFFFFFFC",
+        "mask": "0xFFFFFFFE",
         "options": [
           {
             "value": 0,
-            "name": "Auto"
+            "name": "Off"
           },
           {
             "value": 1,
             "name": "On"
-          },
-          {
-            "value": 2,
-            "name": "Off"
           }
         ]
       },
@@ -280,47 +285,6 @@
           {
             "value": 3,
             "name": "Loud"
-          }
-        ]
-      },
-      {
-        "name": "Skip BIOS",
-        "id": 12,
-        "type": "check",
-        "enabled": true,
-        "persist": true,
-        "writeonly": true,
-        "address": "0x10000284",
-        "defaultval": 1,
-        "value": 1,
-        "mask": "0xFFFFFFFE"
-      },
-      {
-        "name": "Picture",
-        "id": 24,
-        "type": "list",
-        "enabled": true,
-        "persist": true,
-        "writeonly": true,
-        "address": "0x100002B4",
-        "defaultval": 0,
-        "mask": "0xFFFFFFFC",
-        "options": [
-          {
-            "value": 0,
-            "name": "Normal"
-          },
-          {
-            "value": 1,
-            "name": "No Border"
-          },
-          {
-            "value": 2,
-            "name": "Overscan"
-          },
-          {
-            "value": 3,
-            "name": "Overscan, No Border"
           }
         ]
       },
@@ -387,31 +351,156 @@
         ]
       },
       {
-        "name": "Compatibility",
-        "id": 27,
+        "name": "Mapper",
+        "id": 31,
         "type": "list",
         "enabled": true,
-        "persist": true,
+        "persist": false,
         "writeonly": true,
-        "address": "0x100002C0",
+        "address": "0x100002A0",
         "defaultval": 0,
-        "mask": "0xFFFFFFFC",
+        "mask": "0xFFFFFFE0",
         "options": [
           {
             "value": 0,
-            "name": "Default"
+            "name": "Auto"
+          },
+          {
+            "value": 10,
+            "name": "2K"
           },
           {
             "value": 1,
-            "name": "POKEY IRQ"
+            "name": "F8 (8K)"
           },
           {
             "value": 2,
-            "name": "Random RAM"
+            "name": "F6 (16K)"
+          },
+          {
+            "value": 6,
+            "name": "F4 (32K)"
+          },
+          {
+            "value": 13,
+            "name": "F0 (64K)"
+          },
+          {
+            "value": 8,
+            "name": "FA (CBS RAM+)"
           },
           {
             "value": 3,
-            "name": "POKEY IRQ + Random RAM"
+            "name": "FE (Activision)"
+          },
+          {
+            "value": 4,
+            "name": "E0 (Parker Bros.)"
+          },
+          {
+            "value": 12,
+            "name": "E7 (M Network)"
+          },
+          {
+            "value": 5,
+            "name": "3F (Tigervision)"
+          },
+          {
+            "value": 16,
+            "name": "3E"
+          },
+          {
+            "value": 9,
+            "name": "CV (Commavid)"
+          },
+          {
+            "value": 11,
+            "name": "UA (UA Ltd.)"
+          },
+          {
+            "value": 19,
+            "name": "EF"
+          },
+          {
+            "value": 17,
+            "name": "SB"
+          }
+        ]
+      },
+      {
+        "name": "Mapper (more)",
+        "id": 32,
+        "type": "list",
+        "enabled": true,
+        "persist": false,
+        "writeonly": true,
+        "address": "0x100002C8",
+        "defaultval": 0,
+        "mask": "0xFFFFFFE0",
+        "options": [
+          {
+            "value": 0,
+            "name": "Auto"
+          },
+          {
+            "value": 15,
+            "name": "AR (Supercharger)"
+          },
+          {
+            "value": 7,
+            "name": "DPC (Pitfall II)"
+          },
+          {
+            "value": 21,
+            "name": "DPC+"
+          },
+          {
+            "value": 23,
+            "name": "CDF / CDFJ / CDFJ+"
+          },
+          {
+            "value": 25,
+            "name": "FA2"
+          },
+          {
+            "value": 18,
+            "name": "WD (Pink Panther)"
+          },
+          {
+            "value": 20,
+            "name": "JANE (Tarzan)"
+          },
+          {
+            "value": 22,
+            "name": "CTY (Chetiry)"
+          },
+          {
+            "value": 26,
+            "name": "0840"
+          },
+          {
+            "value": 27,
+            "name": "FC (Power Play)"
+          },
+          {
+            "value": 28,
+            "name": "DF / BF"
+          },
+          {
+            "value": 29,
+            "name": "Multicart 2K"
+          },
+          {
+            "value": 30,
+            "name": "Multicart 4K"
+          },
+          {
+            "value": 31,
+            "name": "Multicart 8K"
+          },
+          {
+            "value": 14,
+            "name": "32-in-1"
           }
         ]
       }

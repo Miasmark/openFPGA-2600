@@ -103,7 +103,11 @@
 
 `default_nettype none
 
-module bup_capture (
+module bup_capture #(
+	// 0: every file is in image mode, the A78 test below never true
+	// (openFPGA-2600, which has no Souper profile). 1: as described above.
+	parameter bit A78 = 1'b1
+) (
 	input  wire        clk,             // clk_sys
 
 	// Cartridge download (atari2600_pocket.sv's mapper_load_* expressions).
@@ -177,7 +181,7 @@ module bup_capture (
 	logic [47:0] head = 48'd0;	// bytes 0-5, little-endian
 	wire         h_byte = c_valid && load_addr < 25'd6;
 	wire         h_last = h_byte && load_addr[2:0] == 3'd5;
-	wire         a78_now = h_match && load_data == "I";	// with h_last
+	wire         a78_now = A78 && h_match && load_data == "I";	// with h_last
 	wire         img_on = g_known && !g_a78;
 	always_ff @(posedge clk) begin
 		if (load_start) begin

@@ -173,19 +173,20 @@ module tb_load;
 
 	atari2600_pocket dut (
 `ifdef POCKET_BUPCHIP
-		.clk_arm(clk_arm), .bupfw_download(bupfw_download), .ioctl_wr_any(ioctl_wr_r), .ioctl_hi(ioctl_hi_r),
+		.clk_arm(clk_arm), .ioctl_wr_any(ioctl_wr_r), .ioctl_hi(ioctl_hi_r),
 		.cram0_a(cram0_a), .cram0_dq(cram0_dq), .cram0_wait(cram0_wait), .cram0_clk(cram0_clk),
 		.cram0_adv_n(cram0_adv_n), .cram0_cre(cram0_cre), .cram0_ce0_n(cram0_ce0_n),
 		.cram0_ce1_n(cram0_ce1_n), .cram0_oe_n(cram0_oe_n), .cram0_we_n(cram0_we_n),
 		.cram0_ub_n(cram0_ub_n), .cram0_lb_n(cram0_lb_n),
 `endif
 		.clk_sys(clk_sys), .clk_sdram(clk_sdram), .pll_locked(pll_locked_tb), .pll_busy(pll_busy_tb), .reset_in(reset_in),
-		.cart_download(cart_download), .bios_download(bios_download),
-		.hscfw_download(hscfw_download), .arfw_download(arfw_download),
-		.ioctl_wr(ioctl_wr_r & (cart_download | bios_download | hscfw_download | arfw_download | bupfw_download)), .ioctl_addr(ioctl_addr_r), .ioctl_dout(ioctl_dout_r),
-		.region_setting(region_tb), .palette_temp(2'd0), .hsc_setting(hsc_setting), .show_overscan(overscan_on),
+		// openFPGA-2600: no 7800 BIOS, HSC firmware or BupChip firmware slot
+		// (their downloads below reach no port; ioctl_wr as core_top.v gates it)
+		.cart_download(cart_download), .arfw_download(arfw_download),
+		.ioctl_wr(ioctl_wr_r & (cart_download | arfw_download)), .ioctl_addr(ioctl_addr_r), .ioctl_dout(ioctl_dout_r),
+		.region_setting(region_tb), .palette_temp(2'd0), .show_overscan(overscan_on),
 		.hide_border(1'b0), .stereo_tia(1'b0), .swap_joysticks(1'b0), .diff_left_b(1'b1),
-		.diff_right_b(1'b1), .skip_bios(skip_bios), .flicker_blend(blend_on), .pokey_irq(pokey_irq_on), .pause_core(1'b0),
+		.diff_right_b(1'b1), .bw_setting(1'b0), .flicker_blend(blend_on), .pokey_irq(pokey_irq_on), .pause_core(1'b0),
 		.clear_random(clear_rnd), .decomb(1'b0), .bs_override(bs_ovr),
 		.joy0(joy0), .joy1(joy1), .joy2(joy2), .joy3(joy3),
 		.analog0(ana0), .analog1(16'h8080), .analog2(16'h8080), .analog3(16'h8080),
@@ -194,8 +195,7 @@ module tb_load;
 		.R(R), .G(G), .B(B), .HSync(HSync), .VSync(VSync), .HBlank(HBlank), .VBlank(VBlank),
 		.ce_pix(ce_pix), .tia_mode_o(tia_mode), .is_pal_o(is_pal), .video_pal_o(),
 		.AUDIO_L(AUDIO_L), .AUDIO_R(AUDIO_R),
-		.clk_74a(clk_74a), .hsc_bridge_addr(hsc_addr), .hsc_bridge_wr(hsc_wr), .hsc_bridge_rd(hsc_rd), .hsc_bridge_din(hsc_din),
-		.hsc_bridge_dout(hsc_dout), .hsc_active(),
+		.clk_74a(clk_74a),
 		.savekey_setting(sk_setting), .atarivox_setting(vox_setting), .sk_bridge_addr(sk_addr), .sk_bridge_wr(sk_wr), .sk_bridge_rd(sk_rd),
 		.sk_bridge_din(sk_din), .sk_bridge_dout(sk_dout),
 		.fa2_bridge_addr(fa2_addr), .fa2_bridge_wr(fa2_wr), .fa2_bridge_rd(fa2_rd), .fa2_bridge_din(fa2_din),
@@ -816,6 +816,37 @@ module tb_load;
 	endtask
 `endif
 
+	// ---------------- A78 refusal (+refuse; openFPGA-2600, plan D8) ---------
+	// What the region logic asked of the PLL (is_pal_o, pll_region's input:
+	// every change is a retune on the Pocket), from power-up; and, from the
+	// last release of the console reset, the frames, their length and how
+	// many of the last ones show the same picture. Reported after the run
+	// (REFUSE lines, below); run_sim.sh's A78 refusal section judges them.
+	int          rf_pal_changes = 0, rf_frames = 0, rf_same = 0;
+	longint      rf_len = 0, rf_t = 0, rf_now = 0;
+	logic        rf_pal = 1'b0, rf_vs = 1'b0, rf_rs = 1'b1, rf_first = 1'b1;
+	logic [63:0] rf_pic = FNV_OFFSET, rf_last_pic = 64'd0;
+	always @(posedge clk_sys) begin
+		rf_now++;
+		rf_pal <= is_pal;
+		if (!rf_first && is_pal !== rf_pal) rf_pal_changes++;
+		rf_first <= 1'b0;
+		rf_vs <= VSync;
+		rf_rs <= dut.reset;
+		if (rf_rs && !dut.reset) begin
+			rf_frames = 0; rf_same = 0; rf_t = rf_now; rf_pic = FNV_OFFSET;
+		end
+		if (!dut.reset && VSync && !rf_vs) begin
+			rf_len = rf_now - rf_t;
+			rf_t = rf_now;
+			rf_frames++;
+			rf_same = (rf_pic == rf_last_pic) ? rf_same + 1 : 1;
+			rf_last_pic = rf_pic;
+			rf_pic = FNV_OFFSET;
+		end
+		if (!dut.reset && ce_pix && !HBlank && !VBlank) rf_pic = fnv(fnv(fnv(rf_pic, R), G), B);
+	end
+
 	// ---------------- frame capture (+dump=N: write N frames as PPM) --------
 	int dump_frames = 0, dumped = 0, fx = 0, fy = 0, line_px = 0, dump_at = 0, fire_at = 0, fire_at2 = 0, reset_at = 0;
 	logic capture = 0, old_vs2 = 0, old_hb2 = 1;
@@ -1420,6 +1451,26 @@ module tb_load;
 		    && dut.main.cart2600.mapper_FA2.copy_addr == 8'hFF) fa2_loads++;
 		if (dut.main.cart2600.mapper_FA2.nvram_dirty) fa2_saves++;
 	end
+	// +refuse: the A78 refusal's report (the monitor is above, by the frame
+	// fingerprint).
+	task automatic refuse_report();
+		$display("REFUSE image: header %s, cart_is_7800 %0d, a78_refused %0d, tia_mode %0d, tia_en %0d, 2600 mapper %0d, bad game screen %0d",
+			dut.cart_header, dut.cart_is_7800, dut.a78_refused, dut.tia_mode, tia_mode, dut.main.cart2600.mapper,
+			dut.main.cart2600.is_bad_game);
+`ifdef POCKET_DARIA
+		$display("REFUSE devices: use_sk %0d, fa2_on %0d, hsc_en %0d, gun_en %0d, port types %0d %0d, daria_profile %0d",
+			dut.use_sk, dut.fa2_on, dut.hsc_en, dut.gun_en, dut.porta_type, dut.portb_type, dut.daria_profile);
+`else
+		$display("REFUSE devices: use_sk %0d, fa2_on %0d, hsc_en %0d, gun_en %0d, port types %0d %0d, daria_profile 0",
+			dut.use_sk, dut.fa2_on, dut.hsc_en, dut.gun_en, dut.porta_type, dut.portb_type);
+`endif
+		$display("REFUSE region: is_pal_o %0d, changed %0d times since power-up; header byte 57 %0d",
+			is_pal, rf_pal_changes, image[57]);
+		$display("REFUSE frames: %0d since the reset's release, the last %0d with the same picture, the last %0d clk_sys long",
+			rf_frames, rf_same, rf_len);
+		$display("REFUSE saves: SaveKey SCL edges %0d, EEPROM bytes written %0d; FA2 flash loads %0d, saves %0d, slot RAM writes %0d",
+			scl_edges, sk_bytes, fa2_loads, fa2_saves, fa2_port_wr);
+	endtask
 	// Read the FA2 slot back the way the Pocket saves it, with the HSC's APF
 	// read protocol (below): 65 transactions for 64 words, the last address
 	// wrapping to word 0. fa2_diffs counts the bytes that differ from fa2_exp.
@@ -1675,34 +1726,24 @@ module tb_load;
 			$display("OPTIONS RAM0 bytes non-zero after load: %0d of 2048; 2600 mapper %0d (override %0d)",
 				nz, dut.main.cart2600.mapper, bs_ovr);
 		end
-		// The payload (image minus its 128 byte header) must sit at SDRAM 0.
+		// The image must sit at SDRAM 0 as it is: openFPGA-2600 stores a
+		// refused A78 whole too (the 7800 core stored an A78's payload, the
+		// image minus its 128 byte header).
 		mismatches = 0;
-		if (dut.cart_is_7800) begin
-			for (int i = 128; i < image.size(); i++)
-				if (dut.sdram.mem[i - 128] !== image[i]) begin
-					if (mismatches < 4) $display("  payload byte %0d: SDRAM %02x, image %02x", i - 128, dut.sdram.mem[i - 128], image[i]);
-					mismatches++;
-				end
-		end else begin
-			for (int i = 0; i < image.size(); i++)
-				if (dut.sdram.mem[i] !== image[i]) mismatches++;
-		end
+		for (int i = 0; i < image.size(); i++)
+			if (dut.sdram.mem[i] !== image[i]) begin
+				if (mismatches < 4) $display("  image byte %0d: SDRAM %02x, image %02x", i, dut.sdram.mem[i], image[i]);
+				mismatches++;
+			end
 		$display("LOAD %0d bytes, header %s, cart_is_7800=%0d, cart_size=%0d, tia_mode=%0d, payload mismatches=%0d",
 			image.size(), dut.cart_header, dut.cart_is_7800, dut.cart_size, dut.tia_mode, mismatches);
 
 		if (!have_save) begin
-		// High score save, bridge side: a word written through the 32 bit port
-		// must land as four bytes in address order and read back whole.
-		@(posedge clk_74a); hsc_addr = 9'd5; hsc_din = 32'h11223344; hsc_wr = 1'b1;
-		@(posedge clk_74a); hsc_wr = 1'b0;
-		// APF read of word 5, then one more transaction to collect it
-		repeat (4) @(posedge clk_74a); hsc_rd = 1'b1; @(posedge clk_74a); hsc_rd = 1'b0;
-		@(posedge clk_74a); hsc_addr = 9'd6;
-		repeat (4) @(posedge clk_74a);
-		$display("HSC word 5 = %08x, bytes 20..23 = %02x %02x %02x %02x (expect 11223344 / 11 22 33 44)",
-			hsc_dout, dut.hsc_ram.lane[0].ram.mem[5], dut.hsc_ram.lane[1].ram.mem[5],
-			dut.hsc_ram.lane[2].ram.mem[5], dut.hsc_ram.lane[3].ram.mem[5]);
-
+		// The 7800 core's High score save bridge check took these 12 clk_74a
+		// edges before the reset's release; openFPGA-2600 has no HSC, and the
+		// wait stays so that every run releases the reset where 2.2.4's did
+		// (the frame fingerprints' t_sys and rst_sys).
+		repeat (12) @(posedge clk_74a);
 		end
 		if (stop74) begin
 			if ($test$plusargs("bupms")) $display("STOP74 refused: +bupms needs clk_74a (the BupChip's 48 kHz tick)");
@@ -1949,6 +1990,7 @@ module tb_load;
 		ideal = 3579545.0 / 114.0 / (audf + 1) / 2.0;
 		$display("TONE from loaded cart AUDF0=%0d: measured %.1f Hz, TIA reference %.1f Hz, ratio %.3f",
 			audf, measured, ideal, measured / ideal);
+		if ($test$plusargs("refuse")) refuse_report();
 		run74 = 1'b1;   // the save-slot reads below are clk_74a transactions
 		if (have_save) begin
 			// Read it back the way the Pocket saves it. APF read transaction:

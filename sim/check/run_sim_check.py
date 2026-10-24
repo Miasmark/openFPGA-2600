@@ -162,8 +162,9 @@ FA2 = [
     (r"FA2 program: mapper 25, done after \d+ ms; flash loads 2, saves 1, slot RAM writes 256", 2),
     (r"FA2 work RAM after the reload: 0 of 255 bytes differ from the expected file", 2),
     (r"FA2 save slot read back \(APF read protocol\): 0 of 256 bytes differ from the expected file", 2),
-    (r"FA2 image: 2600 mapper (?!25,)\d+, cart_is_7800 1, tia_mode 0; flash loads 0, saves 0, slot RAM writes 0", 1),
-    (r"FA2 image: 2600 mapper 25, cart_is_7800 1, tia_mode 0; flash loads 0, saves 1, slot RAM writes 0", 1),
+    # openFPGA-2600: an A78 is refused (plan D8): it runs the bad game screen's
+    # scheme, 32, as a 2600 image (tia_mode 1), so no FA2 copy starts at all
+    (r"FA2 image: 2600 mapper 32, cart_is_7800 1, tia_mode 1; flash loads 0, saves 0, slot RAM writes 0", 2),
     (r"FA2 save slot after load, reset and 300 ms of running \(APF read protocol\): "
      r"0 of 256 bytes differ from the expected file", 2),
 ]
@@ -406,12 +407,19 @@ def check(log, build, audfs, only=None):
     need(b, r"\+overscan \+pal: 284204 clk_sys \(50\.380 Hz\), active lines 274, active pixels/line 372, video PAL 1", "+overscan +pal")
     h, b = L.section("-- PAL 2600 frame")
     need(b, r"FRAME 75: 284544 clk_sys \(50\.320 Hz\), active lines 288, active pixels/line 160, video PAL 1", "PAL 2600 frame")
+    # openFPGA-2600: the A78 is refused (plan D8): stored whole, run as a 2600
+    # image in the bad game screen, silent (its TONE line reads 0 Hz)
     h, b = L.section("-- load an A78")
     need(b, r"HSC_EN 0 \(setting 0, firmware loaded 0\)", "A78 load")
-    need(b, r"LOAD 16512 bytes, header ATARI, cart_is_7800=1, cart_size=16384, tia_mode=0, payload mismatches=0", "A78 load")
-    need(b, r"HSC word 5 = 11223344, bytes 20\.\.23 = 11 22 33 44 \(expect 11223344 / 11 22 33 44\)", "A78 load")
-    if not b or not any(tone_ok(x, 7) for x in b):
-        bad.append("A78 load: no tone AUDF0=7 with ratio 0.990-1.010")
+    need(b, r"LOAD 16512 bytes, header ATARI, cart_is_7800=1, cart_size=16512, tia_mode=1, payload mismatches=0", "A78 load")
+    need(b, r"TONE from loaded cart AUDF0=7: measured 0\.0 Hz, TIA reference 1962\.5 Hz, ratio 0\.000", "A78 load")
+    h, b = L.section("-- A78 refusal")
+    if b is None:
+        bad.append("A78 refusal: section missing")
+    elif "A78_REFUSAL pass" not in [x.strip() for x in b]:
+        bad.append("A78 refusal: no 'A78_REFUSAL pass'")
+    else:
+        notes.append("A78 refusal: pass")
     h, b = L.section("-- load a headerless 2600 image")
     need(b, r"LOAD 4096 bytes, header .*, cart_is_7800=0, cart_size=4096, tia_mode=1, payload mismatches=0", "2600 load")
     if not b or not any(tone_ok(x, 14) for x in b):

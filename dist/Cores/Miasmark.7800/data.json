@@ -8,64 +8,11 @@
         "required": true,
         "parameters": "0x109",
         "extensions": [
-          "a78",
           "a26",
           "bin"
         ],
         "size_maximum": "0x400000",
         "address": "0x00000000"
-      },
-      {
-        "name": "Atari 7800 BIOS",
-        "id": "0x103",
-        "required": false,
-        "filename": "7800bios.bin",
-        "parameters": "0x88",
-        "extensions": [
-          "bin",
-          "rom"
-        ],
-        "size_maximum": "0x4000",
-        "address": "0x02000000"
-      },
-      {
-        "name": "High Score Cart",
-        "id": "0x104",
-        "required": false,
-        "filename": "hsc.sav",
-        "parameters": "0x80",
-        "nonvolatile": true,
-        "extensions": [
-          "sav"
-        ],
-        "size_maximum": "0x800",
-        "address": "0x20000000"
-      },
-      {
-        "name": "SaveKey",
-        "id": "0x105",
-        "required": false,
-        "filename": "savekey.sav",
-        "parameters": "0x80",
-        "nonvolatile": true,
-        "extensions": [
-          "sav"
-        ],
-        "size_maximum": "0x8000",
-        "address": "0x30000000"
-      },
-      {
-        "name": "High Score Cart firmware",
-        "id": "0x106",
-        "required": false,
-        "filename": "highscor.rom",
-        "parameters": "0x88",
-        "extensions": [
-          "rom",
-          "bin"
-        ],
-        "size_maximum": "0x4000",
-        "address": "0x04000000"
       },
       {
         "name": "Supercharger BIOS",
@@ -81,28 +28,17 @@
         "address": "0x06000000"
       },
       {
-        "name": "High Score Cart firmware (A78)",
-        "id": "0x108",
+        "name": "SaveKey",
+        "id": "0x105",
         "required": false,
-        "filename": "hsc.a78",
-        "parameters": "0x88",
+        "filename": "savekey.sav",
+        "parameters": "0x80",
+        "nonvolatile": true,
         "extensions": [
-          "a78"
+          "sav"
         ],
-        "size_maximum": "0x4080",
-        "address": "0x08000000"
-      },
-      {
-        "name": "BupChip firmware",
-        "id": "0x109",
-        "required": false,
-        "filename": "bupchip.bin",
-        "parameters": "0x88",
-        "extensions": [
-          "bin"
-        ],
-        "size_maximum": "0x4000",
-        "address": "0x0A000000"
+        "size_maximum": "0x8000",
+        "address": "0x30000000"
       },
       {
         "name": "FA2 flash",

@@ -12,7 +12,9 @@ are, with old_cart_download and pll_busy_s as the wrapper registers them.
 Compiled with POCKET_DARIA it is the DARIA build's logic, without it the
 plain build's. The inputs the wrapper computes elsewhere (region_select,
 cart_is_7800, tia_mode, tia_en, daria_reset, daria_arm) are ports, which
-tb_region.sv models.
+tb_region.sv models. openFPGA-2600's wrapper ties the block's A78 input,
+rgn_a78, to 0 (no A78 reaches its region logic); here it is the
+cart_is_7800 port, as in the 7800 core, so the A78 scenarios still run.
 
 VARIANT plants one change (each replacement must match exactly once):
   rtl2    RTL-2 undone: the withdrawal takes daria_rgn's old value
@@ -28,8 +30,8 @@ import re, sys
 VARIANTS = {
     "rtl2": [("region_pll <= daria_rgn_nx;", "region_pll <= daria_rgn;")],
     "rtl1": [("(!daria_rt_pend || daria_a78_hdr)", "!daria_rt_pend")],
-    "sketch": [("wire daria_a78_hdr = cart_download & cart_is_7800 & (ioctl_addr < 25'd128);",
-                "wire daria_a78_hdr = (cart_download | old_cart_download) & cart_is_7800;")],
+    "sketch": [("wire daria_a78_hdr = cart_download & rgn_a78 & (ioctl_addr < 25'd128);",
+                "wire daria_a78_hdr = (cart_download | old_cart_download) & rgn_a78;")],
 }
 VARIANTS["old"] = VARIANTS["rtl2"] + VARIANTS["rtl1"]
 
@@ -50,6 +52,7 @@ module region_unit (
 	output wire        rgn_o,
 	output wire  [3:0] rt_cnt_o
 );
+wire rgn_a78 = cart_is_7800;
 reg old_cart_download = 1'b0;
 reg [1:0] pll_busy_s = 2'b00;
 always @(posedge clk_sys) begin

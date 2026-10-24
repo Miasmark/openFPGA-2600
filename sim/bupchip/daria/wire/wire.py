@@ -850,7 +850,7 @@ MUTANTS = {
                "wire daria_rt_mask = pll_busy_s[1] | (daria_rt_cnt[3:2] == 2'b11);\n"),
     # no withdrawal during a 2600 download: a retune pending from earlier in
     # the sequence starts at allcomplete, inside the window-close F6
-    "nowd": ("\t\tif ((cart_download | old_cart_download) & ~cart_is_7800)\n\t\t\tregion_pll <= daria_rgn_nx;\n",
+    "nowd": ("\t\tif ((cart_download | old_cart_download) & ~rgn_a78)\n\t\t\tregion_pll <= daria_rgn_nx;\n",
              "\t\tif (1'b0)\n\t\t\tregion_pll <= daria_rgn_nx;\n"),
     # a console reset during a pending retune not held to the retune: the
     # 6507 restarts without F6, then again after the retune's F6

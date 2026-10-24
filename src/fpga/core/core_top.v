@@ -343,45 +343,38 @@ synch_3 s01(pll_core_locked, pll_core_locked_s, clk_74a);
 // Bridge
 ////////////////////////////////////////////////////////////////////////////////
 
-// Bridge address map
+// Bridge address map (data.json's slots, by index)
 //   0x00000000  cartridge image (data slot 0)       -> SDRAM via the loader
-//   0x02000000  7800 BIOS       (data slot 1)       -> BIOS block RAM
-//   0x04000000  HSC firmware    (data slot 4)       -> HSC ROM block RAM
-//   0x06000000  Supercharger BIOS (data slot 5)     -> AR ROM block RAM
-//   0x08000000  HSC firmware as hsc.a78 (data slot 6) -> HSC ROM block RAM
-//   0x0A000000  BupChip firmware (data slot 7)      -> BupChip ROM block RAM
-//                                                      (POCKET_BUPCHIP)
+//   0x06000000  Supercharger BIOS (data slot 1)     -> AR ROM block RAM
 //   0x10000000  settings (interact.json)
-//   0x20000000  high score cartridge RAM (save slot 2, 2 KiB)
-//   0x30000000  SaveKey EEPROM RAM (save slot 3, 32 KiB)
-//   0x40000000  FA2 cartridge flash (save slot 8, 256 bytes)
+//   0x30000000  SaveKey EEPROM RAM (save slot 2, 32 KiB)
+//   0x40000000  FA2 cartridge flash (save slot 3, 256 bytes)
 //   0xF8000000  APF command interface
+// The 7800 core's 7800 BIOS (0x02000000), HSC firmware (0x04000000,
+// 0x08000000), BupChip firmware (0x0A000000) and HSC save (0x20000000)
+// slots are gone; the remaining slots keep their ids and addresses.
 
 localparam [15:0] SLOT_CART = 16'h0100;
-localparam [15:0] SLOT_BIOS = 16'h0103;
-localparam [15:0] SLOT_HSCFW = 16'h0106;
 localparam [15:0] SLOT_ARFW = 16'h0107;
-localparam [15:0] SLOT_HSCA78 = 16'h0108;
-localparam [15:0] SLOT_BUPFW = 16'h0109;
 
-// Settings. Written by the host from interact.json, clk_74a.
+// Settings. Written by the host from interact.json, clk_74a. The 7800
+// core's High Score Cart (0x274), Picture (0x2B4: border 0x27C, overscan
+// 0x278), Skip BIOS (0x284) and Compatibility (0x2C0: POKEY IRQ 0x28C,
+// Random RAM 0x298) items are gone, and so is its combined Difficulty item
+// (0x2B0): Left and Right Difficulty are an item each (0x264, 0x268).
     reg             set_swap      = 1'b0;
     reg             set_ldiff_b   = 1'b1;
     reg             set_rdiff_b   = 1'b1;
     reg     [1:0]   set_region    = 2'd0;
     reg     [1:0]   set_palette   = 2'd0;
-    reg     [1:0]   set_hsc       = 2'd0;
-    reg             set_overscan  = 1'b0;
-    reg             set_border    = 1'b0;
     reg             set_stereo    = 1'b0;
-    reg             set_skip_bios = 1'b1;
     reg             set_blend     = 1'b0;
-    reg             set_pokey_irq = 1'b0;
-    reg     [1:0]   set_savekey   = 2'd0;
+    reg             set_savekey   = 1'b0;   // SaveKey: 0 off, 1 on (no Auto: no header)
     reg     [1:0]   set_stmix     = 2'd0;   // stereo mix: none, 25%, 50%, 100%
-    reg             set_clear_rnd = 1'b0;   // clear RAM to random values
     reg             set_decomb    = 1'b0;   // 2600 de-comb
-    reg     [4:0]   set_bs        = 5'd0;   // 2600 bankswitching: 0 auto, else forced
+    reg     [4:0]   set_bs        = 5'd0;   // Mapper: 0 auto, else forced (bss_type index)
+    reg     [4:0]   set_bs_more   = 5'd0;   // Mapper (more): the same, the second list
+    reg             set_bw        = 1'b0;   // Colour/B&W: 0 colour, 1 B&W
     reg     [2:0]   set_port1     = 3'd0;   // 0 auto, 1 joystick, 2 paddles, 3 driving, 4 light gun
     reg     [2:0]   set_port2     = 3'd0;
     reg     [1:0]   set_turbo     = 2'd0;   // X / Y turbo: off, fast, medium, slow
@@ -400,52 +393,34 @@ always @(posedge clk_74a) begin
             12'h268: set_rdiff_b   <= bridge_wr_data[0];
             12'h26C: set_region    <= bridge_wr_data[1:0];
             12'h270: set_palette   <= bridge_wr_data[1:0];
-            12'h274: set_hsc       <= bridge_wr_data[1:0];
-            12'h278: set_overscan  <= bridge_wr_data[0];
-            12'h27C: set_border    <= bridge_wr_data[0];
             12'h280: set_stereo    <= bridge_wr_data[0];
-            12'h284: set_skip_bios <= bridge_wr_data[0];
             12'h288: set_blend     <= bridge_wr_data[0];
-            12'h28C: set_pokey_irq <= bridge_wr_data[0];
-            12'h290: set_savekey   <= bridge_wr_data[1:0];
+            12'h290: set_savekey   <= bridge_wr_data[0];
             12'h294: set_stmix     <= bridge_wr_data[1:0];
-            12'h298: set_clear_rnd <= bridge_wr_data[0];
             12'h29C: set_decomb    <= bridge_wr_data[0];
             12'h2A0: set_bs        <= bridge_wr_data[4:0];
             12'h2A4: set_port1     <= bridge_wr_data[2:0];
             12'h2A8: set_port2     <= bridge_wr_data[2:0];
             12'h2AC: set_turbo     <= bridge_wr_data[1:0];
             12'h2C4: set_atarivox  <= bridge_wr_data[1:0];
+            12'h2C8: set_bs_more   <= bridge_wr_data[4:0];
+            12'h2CC: set_bw        <= bridge_wr_data[0];
             // Combined menu entries (the Pocket takes at most 16): each
             // sets two of the settings above.
-            12'h2B0: {set_rdiff_b, set_ldiff_b}   <= bridge_wr_data[1:0];
-            12'h2B4: {set_overscan, set_border}   <= bridge_wr_data[1:0];
             12'h2B8: {set_stereo, set_stmix}      <= bridge_wr_data[2:0];
             12'h2BC: {set_decomb, set_blend}      <= bridge_wr_data[1:0];
-            12'h2C0: {set_clear_rnd, set_pokey_irq} <= bridge_wr_data[1:0];
             default: ;
         endcase
     end
 end
 
-// High score cartridge RAM, bridge side: 512 words of 32 bits at
-// 0x20000000. Writes go straight in.
-//
-// Reads follow the APF bridge's one-transaction lag: the host samples
-// bridge_rd_data a few cycles into a read and pulses bridge_rd afterwards,
-// and what it expects to sample is the word latched at the previous
-// bridge_rd, for the previous address (core_bridge_cmd and agg23's
-// data_unloader work the same way). Answering with the current address
-// instead shifted every saved word by one: the .sav files came out rotated
-// by four bytes, the HSC signature at $1002 moved, and the HSC firmware
-// asked to be personalised again after every load.
-// The latch lives in atari2600_pocket.sv (hsc_bridge_rd), where the
-// simulation exercises it.
-    wire    [31:0]  hsc_rd_latched;
-wire hsc_sel = bridge_addr[31:24] == 8'h20;
-wire hsc_wr  = bridge_wr && hsc_sel;
-
-// SaveKey EEPROM RAM: 8192 words of 32 bits at 0x30000000, same scheme.
+// SaveKey EEPROM RAM: 8192 words of 32 bits at 0x30000000. Reads follow the
+// APF bridge's one-transaction lag: the host samples bridge_rd_data a few
+// cycles into a read and pulses bridge_rd afterwards, and what it expects to
+// sample is the word latched at the previous bridge_rd, for the previous
+// address (core_bridge_cmd and agg23's data_unloader work the same way). The
+// latch lives in atari2600_pocket.sv (save_ram_dp, or sram_ctrl with
+// POCKET_SRAM), where the simulation exercises it.
     wire    [31:0]  sk_rd_latched;
 wire sk_sel = bridge_addr[31:24] == 8'h30;
 wire sk_wr  = bridge_wr && sk_sel;
@@ -461,9 +436,6 @@ always @(*) begin
     casex(bridge_addr)
     default: begin
         bridge_rd_data <= 0;
-    end
-    32'h20xxxxxx: begin
-        bridge_rd_data <= hsc_rd_latched;
     end
     32'h30xxxxxx: begin
         bridge_rd_data <= sk_rd_latched;
@@ -659,30 +631,19 @@ always @(posedge clk_74a) begin
     end
 end
 
-// Save slot sizes, constants: one shared file each for every cart. The HSC's
-// is 2 KiB, always (see hsc_active in atari2600_pocket.sv). dt_sel rotates
-// over the three save slots, one size field written per clk_74a.
-    wire            hsc_active;
-    reg             hsc_active_74a;
-    reg     [1:0]   dt_sel = 2'd0;
+// Save slot sizes, constants: one shared file each for every cart. dt_sel
+// alternates between the two save slots, one size field written per clk_74a.
+    reg             dt_sel = 1'b0;
 always @(posedge clk_74a) begin
-    hsc_active_74a <= hsc_active;
     datatable_wren <= 1'b1;
-    dt_sel         <= dt_sel == 2'd2 ? 2'd0 : dt_sel + 2'd1;
-    case (dt_sel)
-    2'd0: begin
-        datatable_addr <= 10'd2 * 2 + 1;   // data slot index 2 (HSC), size field
-        datatable_data <= hsc_active_74a ? 32'd2048 : 32'd0;
-    end
-    2'd1: begin
-        datatable_addr <= 10'd3 * 2 + 1;   // data slot index 3 (SaveKey), size field
-        datatable_data <= 32'd32768;       // always, like the HSC: one shared file
-    end
-    default: begin
-        datatable_addr <= 10'd8 * 2 + 1;   // data slot index 8 (FA2), size field
+    dt_sel         <= ~dt_sel;
+    if (!dt_sel) begin
+        datatable_addr <= 10'd2 * 2 + 1;   // data slot index 2 (SaveKey), size field
+        datatable_data <= 32'd32768;       // always: one shared file
+    end else begin
+        datatable_addr <= 10'd3 * 2 + 1;   // data slot index 3 (FA2), size field
         datatable_data <= 32'd256;         // always: one shared fa2.sav
     end
-    endcase
 end
 
 // The loader runs on clk_sdram and holds each byte's write strobe for four
@@ -738,44 +699,46 @@ always @(posedge clk_sys)
 `endif
 
 // Into clk_sys
-    reg     [2:0]   dl_s, cart_s, bios_s, hscfw_s, arfw_s, bupfw_s, rst_s, mrst_s;
+    reg     [2:0]   dl_s, cart_s, arfw_s, rst_s, mrst_s;
     reg             cart_download = 1'b0;
-    reg             bios_download = 1'b0;
-    reg             hscfw_download = 1'b0;
     reg             arfw_download = 1'b0;
-    reg             bupfw_download = 1'b0;
     reg             core_reset = 1'b1;
 
 always @(posedge clk_sys) begin
     dl_s   <= {dl_s[1:0],   is_downloading};
     cart_s <= {cart_s[1:0], download_slot == SLOT_CART};
-    bios_s <= {bios_s[1:0], download_slot == SLOT_BIOS};
-    hscfw_s <= {hscfw_s[1:0], download_slot == SLOT_HSCFW || download_slot == SLOT_HSCA78};
     arfw_s <= {arfw_s[1:0], download_slot == SLOT_ARFW};
-    bupfw_s <= {bupfw_s[1:0], download_slot == SLOT_BUPFW};
     rst_s  <= {rst_s[1:0],  reset_n};
     mrst_s <= {mrst_s[1:0], menu_reset_cnt != 0};
 
     cart_download <= dl_s[2] & cart_s[2];
-    bios_download <= dl_s[2] & bios_s[2];
-    hscfw_download <= dl_s[2] & hscfw_s[2];
     arfw_download <= dl_s[2] & arfw_s[2];
-`ifdef POCKET_BUPCHIP
-    bupfw_download <= dl_s[2] & bupfw_s[2];
-`endif
     core_reset    <= ~rst_s[2] | mrst_s[2];
 end
 
 // Settings into clk_sys. They change rarely and only ever from the menu;
 // a two stage synchroniser per bit is enough.
-    reg     [36:0]  set_s1, set_s2;
+    reg     [33:0]  set_s1, set_s2;
+    wire            s_bw, s_decomb, s_swap, s_ldiff_b, s_rdiff_b, s_stereo, s_blend, s_savekey;
+    wire    [4:0]   s_bs, s_bs_more;
+    wire    [2:0]   s_port1, s_port2;
+    wire    [1:0]   s_atarivox, s_turbo, s_stmix, s_region, s_palette;
 always @(posedge clk_sys) begin
-    set_s1 <= {set_atarivox, set_turbo, set_port2, set_port1, set_bs, set_decomb, set_clear_rnd, set_stmix,
-               set_swap, set_ldiff_b, set_rdiff_b, set_region, set_palette,
-               set_hsc, set_overscan, set_border, set_stereo, set_skip_bios,
-               set_blend, set_pokey_irq, set_savekey, 1'b0};
+    set_s1 <= {set_bw, set_bs_more, set_bs, set_atarivox, set_turbo, set_port2, set_port1,
+               set_decomb, set_stmix, set_swap, set_ldiff_b, set_rdiff_b, set_region, set_palette,
+               set_stereo, set_blend, set_savekey};
     set_s2 <= set_s1;
 end
+assign {s_bw, s_bs_more, s_bs, s_atarivox, s_turbo, s_port2, s_port1,
+        s_decomb, s_stmix, s_swap, s_ldiff_b, s_rdiff_b, s_region, s_palette,
+        s_stereo, s_blend, s_savekey} = set_s2;
+
+// The Mapper menu (bs_override): bss_type's index, 0 for Auto. The 30
+// schemes that can be forced (1-31 but BUS, 24: under NO_ARM_MAPPER a bad
+// game; BANK00, 0, and ELF, 32, cannot be) do not fit one APF list of at
+// most 16 options, so they are two items, Mapper and Mapper (more), each
+// with Auto. A scheme in Mapper wins over one in Mapper (more).
+wire [4:0] bs_override = |s_bs ? s_bs : s_bs_more;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -869,38 +832,34 @@ atari2600_pocket atari (
     .reset_in       ( core_reset ),
 
     .cart_download  ( cart_download ),
-    .bios_download  ( bios_download ),
-    .hscfw_download ( hscfw_download ),
     .arfw_download  ( arfw_download ),
 `ifdef POCKET_BUPCHIP
-    .bupfw_download ( bupfw_download ),
     .ioctl_wr_any   ( ioctl_wr_r ),
     .ioctl_hi       ( ioctl_hi_r ),
 `endif
-    .ioctl_wr       ( ioctl_wr_r & (cart_download | bios_download | hscfw_download | arfw_download | bupfw_download) ),
+    .ioctl_wr       ( ioctl_wr_r & (cart_download | arfw_download) ),
     .ioctl_addr     ( ioctl_addr_r ),
     .ioctl_dout     ( ioctl_dout_r ),
 
-    .swap_joysticks ( set_s2[17] ),
-    .diff_left_b    ( set_s2[16] ),
-    .diff_right_b   ( set_s2[15] ),
-    .region_setting ( set_s2[14:13] ),
-    .palette_temp   ( set_s2[12:11] ),
-    .hsc_setting    ( set_s2[10:9] ),
-    .show_overscan  ( set_s2[8] ),
-    .hide_border    ( set_s2[7] ),
-    .stereo_tia     ( set_s2[6] ),
-    .skip_bios      ( set_s2[5] ),
-    .flicker_blend  ( set_s2[4] ),
-    .pokey_irq      ( set_s2[3] ),
-    .savekey_setting( set_s2[2:1] ),
-    .atarivox_setting( set_s2[36:35] ),
-    .clear_random   ( set_s2[20] ),
-    .decomb         ( set_s2[21] ),
-    .bs_override    ( set_s2[26:22] ),
-    .port1_input    ( set_s2[29:27] ),
-    .port2_input    ( set_s2[32:30] ),
-    .turbo          ( set_s2[34:33] ),
+    .swap_joysticks ( s_swap ),
+    .diff_left_b    ( s_ldiff_b ),
+    .diff_right_b   ( s_rdiff_b ),
+    .bw_setting     ( s_bw ),
+    .region_setting ( s_region ),
+    .palette_temp   ( s_palette ),
+    .show_overscan  ( 1'b0 ),           // 7800 only (MARIA), plan step 4
+    .hide_border    ( 1'b0 ),
+    .stereo_tia     ( s_stereo ),
+    .flicker_blend  ( s_blend ),
+    .pokey_irq      ( 1'b0 ),
+    .savekey_setting( {1'b0, s_savekey} ),
+    .atarivox_setting( s_atarivox ),
+    .clear_random   ( 1'b0 ),
+    .decomb         ( s_decomb ),
+    .bs_override    ( bs_override ),
+    .port1_input    ( s_port1 ),
+    .port2_input    ( s_port2 ),
+    .turbo          ( s_turbo ),
     .pause_core     ( 1'b0 ),
 
     .joy0           ( joy0_s2 ),
@@ -930,12 +889,6 @@ atari2600_pocket atari (
     .AUDIO_R        ( audio_r ),
 
     .clk_74a        ( clk_74a ),
-    .hsc_bridge_addr( bridge_addr[10:2] ),
-    .hsc_bridge_wr  ( hsc_wr ),
-    .hsc_bridge_rd  ( bridge_rd && hsc_sel ),
-    .hsc_bridge_din ( bridge_wr_data ),
-    .hsc_bridge_dout( hsc_rd_latched ),
-    .hsc_active     ( hsc_active ),
     .sk_bridge_addr ( bridge_addr[14:2] ),
     .sk_bridge_wr   ( sk_wr ),
     .sk_bridge_rd   ( bridge_rd && sk_sel ),
@@ -1008,18 +961,13 @@ wire core_de = ~(core_hb | core_vb);
 //        with border  no border  2600
 //   NTSC      0 372x224  1 320x224  2 160x240
 //   PAL       3 372x274  4 320x274  5 160x288
-// Show Overscan (MARIA's full blanking window instead of vblank_ex; the
-// TIA's window is unchanged), NTSC only:
-//   NTSC      6 372x242  7 320x242
-// The APF takes at most 8 scaler modes, so there is no PAL overscan mode;
-// atari2600_pocket.sv ignores Show Overscan in PAL instead (274 lines already
-// show the whole PAL picture). Slots 8 and above make the Pocket fall back to
-// the wrong height, which is what a 292 line PAL mode did on hardware.
-wire       hide_border = set_s2[7];
-wire       overscan    = set_s2[8] & ~core_video_pal;
+// The 7800 core's Show Overscan slots (6 372x242, 7 320x242) and No Border
+// are gone with the Picture item; MARIA (no cartridge loaded yet) uses 0 or
+// 3. The renumbering to the 2600's two modes is plan step 5's (video.json).
+// Slots 8 and above make the Pocket fall back to the wrong height, which is
+// what a 292 line PAL mode did on hardware.
 wire [2:0] video_slot  = core_tia_mode ? (core_video_pal ? 3'd5 : 3'd2) :
-                         overscan      ? 3'd6 + {2'd0, hide_border} :
-                                         (core_video_pal ? 3'd3 : 3'd0) + {2'd0, hide_border};
+                                         (core_video_pal ? 3'd3 : 3'd0);
 
 always @(posedge clk_sys) begin
     vid_de   <= 1'b0;
@@ -1072,7 +1020,7 @@ assign video_hs   = vid_hs;
 // Stereo Mix, as on MiSTer: 25% / 50% / 100% blends each side with 1/8,
 // 1/4 and 1/2 of the other (100% is mono). Only matters with Stereo TIA or
 // a stereo cart (two POKEYs, YM2151).
-    wire    [1:0]   stmix = set_s2[19:18];
+    wire    [1:0]   stmix = s_stmix;
     reg     [15:0]  mix_l = 16'd0, mix_r = 16'd0;
 always @(posedge clk_sys) begin
     case (stmix)

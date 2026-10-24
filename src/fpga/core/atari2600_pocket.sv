@@ -33,13 +33,11 @@ module atari2600_pocket
 	input  wire        pll_busy,        // clk_74a: PLL retune (PAL/NTSC) in progress
 	input  wire        reset_in,        // host reset / menu reset, clk_sys
 
-	// Download stream (clk_sys, one clk_sys cycle per byte)
+	// Download stream (clk_sys, one clk_sys cycle per byte). The 7800 core's
+	// 7800 BIOS, HSC firmware and BupChip firmware slots are gone.
 	input  wire        cart_download,
-	input  wire        bios_download,
-	input  wire        hscfw_download,  // high score cart firmware (4 KiB, optional A78 header)
 	input  wire        arfw_download,   // Supercharger BIOS (2 KiB)
 `ifdef POCKET_BUPCHIP
-	input  wire        bupfw_download,  // BupChip firmware, bupchip.bin (up to 16 KiB)
 	input  wire        ioctl_wr_any,    // every loader byte, whatever slot flag is up (BupChip)
 	input  wire  [2:0] ioctl_hi,        // bits 27:25 of its bridge address (BupChip)
 `endif
@@ -50,19 +48,18 @@ module atari2600_pocket
 	// Settings
 	input  wire  [1:0] region_setting,  // 0 auto, 1 NTSC, 2 PAL
 	input  wire  [1:0] palette_temp,    // 0 warm, 1 cool, 2 hot
-	input  wire  [1:0] hsc_setting,     // 0 auto, 1 on, 2 off
 	input  wire        show_overscan,
 	input  wire        hide_border,
 	input  wire        stereo_tia,
 	input  wire        swap_joysticks,
 	input  wire        diff_left_b,     // 1 = B (novice)
 	input  wire        diff_right_b,
-	input  wire        skip_bios,
+	input  wire        bw_setting,      // Colour/B&W menu item: 1 = B&W (see bw_mode)
 	input  wire        flicker_blend,   // 2600 only
 	input  wire        pokey_irq,
 	input  wire        clear_random,    // fill RAM with random values at reset (MiSTer "Clear Memory")
 	input  wire        decomb,          // 2600 de-comb
-	input  wire  [4:0] bs_override,     // 2600 bankswitching: 0 auto, else MiSTer's mapper number       // let POKEY timer IRQs reach the CPU (MiSTer "Pokey IRQ Enabled")
+	input  wire  [4:0] bs_override,     // 2600 bankswitching: 0 auto, else MiSTer's mapper number
 	input  wire        pause_core,      // Pocket menu open
 
 	// Controllers, MiSTer joystick bit layout:
@@ -98,17 +95,10 @@ module atari2600_pocket
 	output wire [15:0] AUDIO_L,
 	output wire [15:0] AUDIO_R,
 
-	// High score cartridge RAM, second port for the save slot (clk_74a)
 	input  wire        clk_74a,
-	input  wire  [8:0] hsc_bridge_addr, // 32 bit word address
-	input  wire        hsc_bridge_wr,
-	input  wire        hsc_bridge_rd,   // APF read strobe for this region
-	input  wire [31:0] hsc_bridge_din,  // big endian: [31:24] is the lowest byte
-	output wire [31:0] hsc_bridge_dout, // word latched at the last read strobe
-	output wire        hsc_active,      // keep the shared HSC save (always)
 
 	// SaveKey EEPROM (24LC256) RAM, second port for its save slot (clk_74a)
-	input  wire  [1:0] savekey_setting, // 0 auto (A78 header), 1 on, 2 off
+	input  wire  [1:0] savekey_setting, // 1 on; anything else off (the 7800 core's 0, Auto, was off for every 2600 image)
 	input  wire  [1:0] atarivox_setting, // AtariVox voice: 0 off, 1 quiet, 2 normal, 3 loud
 	input  wire [12:0] sk_bridge_addr,  // 32 bit word address
 	input  wire        sk_bridge_wr,
@@ -168,11 +158,6 @@ reg old_cart_download = 1'b0;
 wire mapper_init_busy;
 reg reset;
 reg [1:0] pll_busy_s = 2'b00;
-`ifdef POCKET_BUPCHIP
-wire bupfw_dl = bupfw_download;
-`else
-wire bupfw_dl = 1'b0;
-`endif
 
 `ifdef POCKET_DARIA
 // DARIA (docs/daria_step7/plan.md P6, P20; the wires are under DARIA below).
@@ -214,123 +199,97 @@ always @(posedge clk_sys) begin
 	old_cart_download <= cart_download;
 	pll_busy_s <= {pll_busy_s[0], pll_busy};
 `ifdef POCKET_DARIA
-	reset <= reset_in | cart_download | bios_download | hscfw_download |
-		arfw_download | bupfw_dl | old_cart_download | mapper_init_busy | ~pll_locked |
-		pll_busy_s[1] | daria_hold | (daria_rt_hold & daria_arm) |
+	reset <= reset_in | cart_download | arfw_download | old_cart_download |
+		mapper_init_busy | ~pll_locked | pll_busy_s[1] | daria_hold | (daria_rt_hold & daria_arm) |
 		(daria_rt_pend & reset & daria_arm);
 `else
-	reset <= reset_in | cart_download | bios_download | hscfw_download |
-		arfw_download | bupfw_dl | old_cart_download | mapper_init_busy | ~pll_locked |
-		pll_busy_s[1];
+	reset <= reset_in | cart_download | arfw_download | old_cart_download |
+		mapper_init_busy | ~pll_locked | pll_busy_s[1];
 `endif
 end
 
 ////////////////////////////  CART HEADER  ////////////////////////////////
 
 reg  [39:0] cart_header;
-reg  [15:0] cart_flags;
-reg   [7:0] cart_region, cart_save, cart_xm, header_mapper, header_version;
+reg   [7:0] cart_region, cart_save;
 reg   [7:0] joy0_type, joy1_type;
 reg         cart_is_7800;
 reg         tia_mode;
+reg         a78_refused;
 reg         cart_loaded;
-reg  [14:0] bios_mask;
-reg         bios_loaded;
-reg         hscfw_loaded;
-reg         hscfw_hdr;
-// Offset into the HSC firmware payload. The ROM takes it modulo 4 KiB, so a
-// longer file leaves its last 4 KiB in the ROM. Header bytes land in the
-// ROM first and are overwritten by the payload.
-wire        hscfw_payload = ~hscfw_hdr | (ioctl_addr >= 25'd128);
-wire [24:0] hscfw_off = (hscfw_hdr && ioctl_addr >= 25'd128) ? ioctl_addr - 25'd128 : ioctl_addr;
 wire [31:0] cart_size;
 
 initial begin
 	cart_header = "ATARI";
-	cart_flags = 0;
 	cart_region = 0;
 	cart_save = 0;
-	cart_xm = 0;
-	header_mapper = 0;
-	header_version = 0;
 	joy0_type = 8'd1;
 	joy1_type = 8'd1;
 	tia_mode = 0;
+	a78_refused = 0;
 	cart_loaded = 0;
-	bios_mask = 0;
-	bios_loaded = 0;
-	hscfw_loaded = 0;
-	hscfw_hdr = 0;
 end
 
-// MiSTer picks 7800 vs 2600 from the file extension. The Pocket does not
-// tell the core which extension was chosen, so the decision is made the way
-// the MiSTer wrapper already makes it for headerless 7800 files: an image
-// whose bytes 1-5 read "ATARI" is an A78, anything else is a 2600 image.
+// The 7800 core's 7800 BIOS, HSC and BupChip firmware slots are gone: no
+// BIOS boots, there is no High Score Cart, and the BupChip's Souper profile
+// never runs (souper_profile, below).
+wire        use_bios = 1'b0;
+wire [14:0] bios_mask = 15'd0;
+wire        hsc_en = 1'b0;
+// tb_load still prints these two; plan step 6 ports the benches
+/* verilator lint_off UNUSEDSIGNAL */
+wire        bios_loaded = 1'b0;
+wire        hscfw_loaded = 1'b0;
+/* verilator lint_on UNUSEDSIGNAL */
+
+// An A78 is refused (plan D8). An image whose bytes 1-5 read "ATARI" is an
+// A78, as in the 7800 core, which takes it from the MiSTer wrapper's test
+// for headerless 7800 files; anything else is a 2600 image. A refused image
+// runs as a 2600 cartridge in the bad game screen's scheme (force_bs, below):
+// cart2600.sv's "unsupported" screen, the scheme ELF and BUS images get. No
+// save is written for it (fa2_on, use_sk), and nothing in its header
+// reaches the console or the region: tia_mode is set at the end of every
+// load, the header fields are cleared then, and the region logic treats it
+// as a 2600 image (region_pll_hold), so header byte 57 never retunes the PLL.
+// cart_is_7800 decides a78_refused and nothing else. Bytes 55-58 are still
+// taken during a download, as in the 7800 core, and cleared at its end:
+// until the system module loses MARIA (plan step 4), cart_region (MARIA's
+// PAL input), cart_save (cart.sv) and the port types reach the console,
+// held in reset, while a download runs, and the frame fingerprints of 2600
+// images stay those of 2.2.4's 2600 mode. The rest of the header (the
+// version, cart type, XM and mapper bytes) is no longer read.
 always @(posedge clk_sys) begin
 	cart_is_7800 <= (cart_header == "ATARI");
 
-	if (bios_download && ioctl_wr) begin
-		bios_mask <= ioctl_addr[14:0];
-		bios_loaded <= 1'b1;
-	end
-
-	// An hsc.a78 carries a 128 byte A78 header ("ATARI" at bytes 1-5).
-	if (hscfw_download && ioctl_wr)
-		case (ioctl_addr)
-			25'd0: hscfw_hdr <= 1'b0;
-			25'd1: hscfw_hdr <= ioctl_dout == "A";
-			25'd2: hscfw_hdr <= hscfw_hdr & (ioctl_dout == "T");
-			25'd3: hscfw_hdr <= hscfw_hdr & (ioctl_dout == "A");
-			25'd4: hscfw_hdr <= hscfw_hdr & (ioctl_dout == "R");
-			25'd5: hscfw_hdr <= hscfw_hdr & (ioctl_dout == "I");
-			default: ;
-		endcase
-
-	// The whole 4 KiB image has to arrive before the HSC can be offered.
-	if (hscfw_download && ioctl_wr && hscfw_off[11:0] == 12'hFFF && hscfw_payload)
-		hscfw_loaded <= 1'b1;
-
 	if (cart_download) begin
 		tia_mode <= 1'b0;
+		a78_refused <= 1'b0;
 		cart_loaded <= 1'b1;
 		case (ioctl_addr)
-			'd00: header_version <= ioctl_dout;
 			'd01: cart_header[39:32] <= ioctl_dout;
 			'd02: cart_header[31:24] <= ioctl_dout;
 			'd03: cart_header[23:16] <= ioctl_dout;
 			'd04: cart_header[15:8] <= ioctl_dout;
 			'd05: cart_header[7:0] <= ioctl_dout;
-			'd53: cart_flags[15:8] <= ioctl_dout;
-			'd54: cart_flags[7:0] <= ioctl_dout;
 			'd55: joy0_type <= ioctl_dout;   // 0=none, 1=joystick, 2=lightgun
 			'd56: joy1_type <= ioctl_dout;
 			'd57: cart_region <= ioctl_dout; // 0=ntsc, 1=pal
 			'd58: cart_save <= ioctl_dout;   // bit 0 = high score cart, bit 1 = savekey
-			'd63: cart_xm <= ioctl_dout;     // 1 = Has XM
-			'd64: header_mapper <= ioctl_dout;
 			default: ;
 		endcase
 	end else if (old_cart_download) begin
-		// End of the image: a non-A78 image is a 2600 cart, and none of the
-		// header fields apply to it.
-		tia_mode <= ~cart_is_7800;
-		if (~cart_is_7800) begin
-			joy0_type <= 8'd1;
-			joy1_type <= 8'd1;
-			cart_flags <= 0;
-			cart_region <= 0;
-			cart_save <= 0;
-			cart_xm <= 0;
-			header_version <= 0;
-			header_mapper <= 0;
-		end
+		// End of the image: every image runs as a 2600 cartridge, a refused
+		// A78 too, and none of the header fields apply.
+		tia_mode <= 1'b1;
+		a78_refused <= cart_is_7800;
+		joy0_type <= 8'd1;
+		joy1_type <= 8'd1;
+		cart_region <= 0;
+		cart_save <= 0;
 	end
 end
 
-// Only a v4 header defines the mapper byte.
-wire [7:0] cart_mapper = (cart_is_7800 && header_version >= 8'd4) ? header_mapper : 8'd0;
-
+// A 2600 image's size: a78_cart_extent with no A78 is a byte counter.
 a78_cart_extent cart_extent
 (
 	.clk           (clk_sys),
@@ -338,7 +297,7 @@ a78_cart_extent cart_extent
 	.ioctl_wr      (ioctl_wr),
 	.ioctl_addr    (ioctl_addr),
 	.ioctl_dout    (ioctl_dout),
-	.cart_is_7800  (cart_is_7800),
+	.cart_is_7800  (1'b0),
 	.tia_mode      (1'b0),
 	.cart_size     (cart_size)
 );
@@ -372,22 +331,28 @@ detect2600 detect2600
 	.arm_audio_size_addr
 );
 
+// The bankswitching the core runs (main's force_bs): the bad game screen's
+// scheme (ELF, bss_type 32) for a refused A78, else the Mapper menu's
+// override (1-31, bss_type's index; core_top.v), else detect2600's.
+localparam [5:0] BS_BAD_GAME = 6'd32;
+wire  [5:0] run_bs = a78_refused ? BS_BAD_GAME : (|bs_override ? {1'b0, bs_override} : force_bs);
+
 `ifdef POCKET_DARIA
 ////////////////////////////  DARIA  //////////////////////////////////////
 // The 2600 ARM cartridges (DPC+, CDF, CDFJ, CDFJ+) on the DARIA front end
 // (core/bupchip/daria_fe.sv, u_fe below) and the BupChip's CPU in its 2600
 // profile (bupchip, below). docs/DARIA_CORE.md; docs/daria_step7/plan.md 2.
 //
-// daria_fbs is the bankswitching the core runs (main's force_bs, below:
-// the menu's override, else detect2600's). The front end's scheme is it
-// only while tia_mode, a register, says a 2600 image is loaded, so an A78
-// with the override set never starts it (P5). The profile is the same
+// daria_fbs is the bankswitching the core runs (run_bs, above). The front
+// end's scheme is it only while tia_mode, a register, says an image is
+// loaded; a refused A78's scheme is the bad game screen's, so it never
+// starts the front end, the override set or not (P5). The profile is the same
 // condition registered; daria_ram32 is top.sv's mapper_ram_size == 32768.
 // bupchip's level inputs come from clk_sys registers, so that its first
 // clk_arm flops sample one register each (P21): daria_ram32_r, and
 // daria_mres_r for the mapper reset (top.sv's effective_reset, an OR of
 // two registers).
-wire  [5:0] daria_fbs    = |bs_override ? {1'b0, bs_override} : force_bs;
+wire  [5:0] daria_fbs    = run_bs;
 wire  [5:0] daria_scheme = tia_mode ? daria_fbs : 6'd0;
 wire        daria_ram32  = daria_fbs == 6'd23 && mapper_revision == 3'd3;
 assign      daria_arm    = daria_scheme == 6'd21 || daria_scheme == 6'd23;
@@ -448,10 +413,12 @@ wire  [7:0] cart_din;
 wire [15:0] bios_addr;
 wire  [7:0] bios_data;
 wire        RW;
-wire  [7:0] din;
+/* verilator lint_off UNUSEDSIGNAL */
+wire  [7:0] din;                    // the CPU's write byte: DARIA's d_in (the 7800 core's HSC RAM took it too)
+/* verilator lint_on UNUSEDSIGNAL */
 
-wire [24:0] cart_write_addr = (ioctl_addr >= 25'd128) && cart_is_7800 ?
-	(ioctl_addr - 25'd128) : ioctl_addr;
+// Every image, a refused A78 too, goes into the SDRAM as it is.
+wire [24:0] cart_write_addr = ioctl_addr;
 
 // The "no cartridge" image MiSTer boots into when nothing is loaded. The
 // Pocket's cartridge slot is required, so the core never runs without a
@@ -482,18 +449,11 @@ spram #(
 );
 `endif
 
-// The 7800 BIOS is 4 KiB (NTSC) or 16 KiB (PAL); the mask mirrors it.
-// POCKET_SRAM builds keep it in the SRAM (sram_ctrl, below).
+// No 7800 BIOS (its slot is gone): POCKET_SRAM builds still read the SRAM
+// for top.sv's BIOS strobe (sram_ctrl, below), which a 2600 image never
+// raises; the system module's BIOS read path leaves in plan step 4.
 `ifndef POCKET_SRAM
-spram #(.addr_width(14), .mem_name("BIOS")) bios
-(
-	.address (bios_download ? ioctl_addr[13:0] : (bios_addr[13:0] & bios_mask[13:0])),
-	.clock   (clk_sys),
-	.data    (ioctl_dout),
-	.wren    (ioctl_wr & bios_download),
-	.cs      (1'b1),
-	.q       (bios_data)
-);
+assign bios_data = 8'h00;
 `endif
 
 sdram sdram
@@ -521,59 +481,17 @@ sdram sdram
 	.ch0_busy   (cart_busy)
 );
 
-// High score cartridge RAM ($1000-$17FF). Port B belongs to the Pocket's
-// save slot, so the scores survive power-off.
-wire       hsc_ram_cs;
-wire [7:0] hsc_ram_dout;
-
-save_ram_dp #(.WORD_ADDR_BITS(9)) hsc_ram
-(
-	.clk_a  (clk_sys),
-	.addr_a (bios_addr[10:0]),
-	.din_a  (din),
-	.we_a   (~RW & hsc_ram_cs),
-	.dout_a (hsc_ram_dout),
-
-	.clk_b  (clk_74a),
-	.addr_b (hsc_bridge_addr),
-	.din_b  (hsc_bridge_din),
-	.we_b   (hsc_bridge_wr),
-	.rd_b   (hsc_bridge_rd),
-	.dout_b (hsc_bridge_dout)
-);
-
-// Auto follows the A78 header. Its save byte is a bitfield (bit 0 HSC,
-// bit 1 SaveKey/AtariVox), so a cart can ask for both: Triple Punch's is 3.
-// A port 2 controller type of 10 (AtariVox/SaveKey) also asks for a SaveKey.
-//
-// MiSTer turns the HSC off while a SaveKey is in use, because both share its
-// one save file. Here each has its own file, and on real hardware they are
-// independent (the HSC sits on the cart bus, the SaveKey on port 2), so both
-// can be on at once.
-wire use_sk = (savekey_setting == 2'd1) ||
-	(savekey_setting == 2'd0 && cart_is_7800 && (cart_save[1] || joy1_type == 8'd10));
-
-// The HSC firmware is not built in (it is Atari's code); it comes from the
-// user's highscor.rom. Without it there is no HSC, whatever the setting.
-wire hsc_en = hscfw_loaded &
-	((hsc_setting == 2'd0) ? (cart_save[0] || cart_xm[0]) : (hsc_setting == 2'd1));
-// The high score cart save is one shared file (hsc.sav) for every cart, like
-// the real HSC's single RAM. Its size in the data slot table is what the
-// Pocket reads to decide whether to write the file back, so it must be
-// 2 KiB for every cart, 2600 images included: a size of 0 could leave the
-// shared file overwritten or dropped after playing a game without the HSC.
-// It also cannot follow the High Score Cart setting, which reaches the core
-// after the Pocket has read the table.
-assign hsc_active = 1'b1;
-
 // SaveKey: a 24LC256 I2C EEPROM on controller port 2, SDA on PA2 and SCL on
 // PA3, as on MiSTer (EEPROM_24LC0X from the MiSTer core). Its 32 KiB live in
-// block RAM whose other port is the shared savekey.sav slot, through the same
-// save_ram_dp as the HSC, so it has the same APF read latch.
+// the SRAM (POCKET_SRAM) or in block RAM, whose other port is the shared
+// savekey.sav slot, through save_ram_dp and its APF read latch.
 //
-// Auto turns it on when an A78 header asks for one (see use_sk). A 2600
-// image has no header, so 2600 SaveKey games need the setting On.
-
+// The menu's SaveKey item is Off or On, Off by default (plan D6, the owner's
+// answer): there is no header to ask for it, and On takes port 2's PA2
+// (LEFT, paddle 3's button) and PA3 from every game. The 7800 core's Auto
+// (0) followed an A78 header only, so for a 2600 image it was Off, as 0 is
+// here. A refused A78 never has it.
+wire use_sk = (savekey_setting == 2'd1) && ~a78_refused;
 
 /* verilator lint_off UNUSEDSIGNAL */
 wire  [7:0] PAout;                  // [3:2] SaveKey, [0] AtariVox; the rest unused
@@ -641,19 +559,20 @@ save_ram_dp #(.WORD_ADDR_BITS(13), .BLANK(8'hFF)) sk_ram
 // fa2_nvram_* port, a byte per request/ready handshake. Upstream's
 // fa2_nvram_bridge.sv answers the handshake, as on MiSTer, from a save_ram_dp
 // whose other port is the fa2.sav save slot: one shared file for every FA2
-// game, like hsc.sav. A new file is blank as $FF, as an erased flash (the
+// game. A new file is blank as $FF, as an erased flash (the
 // unconnected port this replaces read $FF too). The Pocket writes the file in
 // before the core runs, so the bridge never waits for a load, and it writes
 // every save slot back itself, so the mapper's dirty pulse has no use here.
-// The port is on only in 2600 mode (fa2_on: tia_mode, set at the end of a
-// load that is no A78). detect2600.sv classifies every image, A78s too, and
+// The port is on only for a 2600 image (fa2_on: an image is loaded, tia_mode,
+// and it is no A78). detect2600.sv classifies every image, A78s too, and
 // takes some A78 payloads for FA2 (24 or 28 KiB, or 32 KiB with a zero
-// tail); cart2600.sv then runs mapper_fa2.sv, which in 7800 mode still sees
-// the bus, so a 7800 game's accesses to $x0FF and $xFF4 could start a save
-// and write junk over the shared file. With fa2_on low the bridge sees no
-// request and the mapper gets the answers of the unconnected port this
-// replaces (ready 1, $FF), so it finishes any copy without touching the slot.
-wire       fa2_on = tia_mode;
+// tail). A refused A78 runs the bad game screen's scheme, not mapper_fa2.sv,
+// so it asks for no save anyway; fa2_on keeps the slot out of reach all the
+// same, and during a download and before the first (tia_mode low), when
+// the 7800 core ran in 7800 mode. With fa2_on low the bridge sees no request
+// and the mapper gets the answers of the unconnected port this replaces
+// (ready 1, $FF), so it finishes any copy without touching the slot.
+wire       fa2_on = tia_mode & ~a78_refused;
 wire       fa2_req, fa2_we, fa2_rdy, fa2_ram_we;
 wire [7:0] fa2_addr, fa2_wdata, fa2_rdata, fa2_ram_addr, fa2_ram_d, fa2_ram_q;
 /* verilator lint_off UNUSEDSIGNAL */
@@ -742,13 +661,23 @@ reg   [3:0] idump;
 reg   [1:0] ilatch;
 reg   [7:0] pa_in_r;
 
-// 2600: the Pause button toggles Colour/B&W, as on MiSTer.
+// The TV Type switch (Colour/B&W, PB3). The menu's Colour/B&W item sets it,
+// and L (the 7800 core's Pause button) toggles it, as on MiSTer, until the
+// menu item changes or the next cartridge load, which both set it to the
+// item's value again (plan O6). With the item at Colour and L untouched it
+// is the 7800 core's switch, which only L moved.
 reg bw_mode = 1'b0;
 reg old_bw = 1'b0;
+/* verilator lint_off PROCASSINIT */
+reg bw_set_d = 1'b0;
+/* verilator lint_on PROCASSINIT */
 wire is_bw = (joya[6] | joyb[6]) & tia_en;
 always @(posedge clk_sys) begin
 	old_bw <= is_bw;
-	if (~old_bw & is_bw)
+	bw_set_d <= bw_setting;
+	if (cart_download || bw_setting != bw_set_d)
+		bw_mode <= bw_setting;
+	else if (~old_bw & is_bw)
 		bw_mode <= ~bw_mode;
 end
 
@@ -1066,14 +995,23 @@ wire region_select = (region_setting == 2'd0) ?
 // 57 during its download. A PAL game's own retune, whose reset outlasts it,
 // would then ask for NTSC, that retune's reset for PAL again, and so on
 // without end; and a load's end could start a retune to a stale byte 57's
-// region. An A78 is not held: its region follows its header. A Region
-// setting changed while a 2600 image's console is in reset reaches the PLL
-// when it is released. A register, so that is_pal_o leaves clk_sys without
-// glitches (pll_region samples it on clk_74a).
+// region. In the 7800 core an A78 was not held: its region followed its
+// header. A Region setting changed while a 2600 image's console is in reset
+// reaches the PLL when it is released. A register, so that is_pal_o leaves
+// clk_sys without glitches (pll_region samples it on clk_74a).
+//
+// openFPGA-2600: the region logic never sees an A78 (plan 4.1). rgn_a78 is
+// what it reads where the 7800 core read cart_is_7800, and it is 0, so a
+// refused A78 is held as a 2600 image is: its byte 57 never reaches the
+// PLL, and once released its region is the bad game screen's, measured by
+// the TIA. The A78 branches below are left as they are (tb_region, which
+// cuts this block out with sim/region_unit.py, drives rgn_a78 as the 7800
+// core's cart_is_7800 and still checks them); synthesis drops them.
+wire rgn_a78 = 1'b0;
 /* verilator lint_off PROCASSINIT */
 reg region_pll = 1'b0;
 /* verilator lint_on PROCASSINIT */
-wire region_pll_hold = ((cart_download | old_cart_download) & ~cart_is_7800) | (tia_mode & ~tia_en);
+wire region_pll_hold = ((cart_download | old_cart_download) & ~rgn_a78) | (tia_mode & ~tia_en);
 `ifdef POCKET_DARIA
 // DARIA (P20; the D review's finding 3). pll_region starts a retune only
 // while no load sequence is in progress (its loading input, core_top.v's
@@ -1131,11 +1069,11 @@ reg  daria_rgn = 1'b0;
 /* verilator lint_on PROCASSINIT */
 assign daria_rt_pend = region_pll != daria_rgn;
 wire daria_rgn_nx  = (!pll_busy_s[1] && daria_rt_cnt == 4'd15) ? region_pll : daria_rgn;
-wire daria_a78_hdr = cart_download & cart_is_7800 & (ioctl_addr < 25'd128);
+wire daria_a78_hdr = cart_download & rgn_a78 & (ioctl_addr < 25'd128);
 always @(posedge clk_sys) begin
 	daria_rgn <= daria_rgn_nx;
 	if (!pll_busy_s[1]) begin
-		if ((cart_download | old_cart_download) & ~cart_is_7800)
+		if ((cart_download | old_cart_download) & ~rgn_a78)
 			region_pll <= daria_rgn_nx;
 		else if (!region_pll_hold && (!daria_rt_pend || daria_a78_hdr) && !(daria_reset & daria_arm))
 			region_pll <= region_select;
@@ -1193,21 +1131,11 @@ always @(posedge clk_sys) rnd <= {rnd[14:0], rnd[15] ^ rnd[13] ^ rnd[12] ^ rnd[1
 wire VBlank_orig;
 wire [7:0] core_r, core_g, core_b;
 
-// The BIOS runs only when one is loaded and Skip BIOS is off, and then only
-// for a 7800 image or for an empty slot. A 2600 image always starts
-// directly, as with Skip BIOS on (docs/DARIA_CORE.md, decision 11). A
-// console's BIOS recognises a 2600 cartridge by a bus clash: the cartridge
-// decodes only A0-A12, so it also answers at $1BEA, and RAM written there
-// does not read back. The core does not model that clash, so the BIOS
-// decides from its later tests, and for some images (DPC+ revision 1,
-// CDFJ+) it never starts the 2600 game
-// (docs/daria_fe/lanes/G_step7_resets.md, 8.8). MiSTer's wrapper
-// (Atari7800.sv) is different: with Bypass Bios set to No it runs the BIOS
-// for 2600 images too, giving top.sv tia_mode 0 and bypass_bios 0.
-// tia_mode is 0 during a load and settles at its end while old_cart_download
-// still holds the core in reset, so bypass_bios and top.sv's tia_mode
-// change together, before the reset is released.
-wire use_bios = bios_loaded & ~skip_bios & ~tia_mode;
+// No BIOS boots (use_bios, above, is 0): top.sv gets bypass_bios 1 and the
+// wrapper's tia_mode, as the 7800 core gave it whenever no BIOS was loaded or
+// Skip BIOS was on. tia_mode is 0 during a load and settles at its end while
+// old_cart_download still holds the core in reset (plan O9 keeps that until
+// step 4).
 
 // SRAM side of the system module (POCKET_SRAM)
 wire [17:0] cartram_addr;
@@ -1226,28 +1154,29 @@ wire        fb_we, fb_active;
 wire  [7:0] fb_wdata, fb_q;
 
 `ifdef POCKET_BUPCHIP
-// The BupChip's side of the system module (POCKET_BUPCHIP; see BUPCHIP below)
-wire        bup_cmd_valid, souper_profile;
+// The BupChip's side of the system module (POCKET_BUPCHIP; see BUPCHIP below).
+// top.sv's souper_profile (an A78 header flag) is left open: the profile is
+// tied off at the BupChip.
+wire        bup_cmd_valid;
 wire  [7:0] bup_cmd_data;
 wire [15:0] bup_audio_l, bup_audio_r;
 `endif
 
 Atari7800 main
 (
-	// HSC firmware and Supercharger BIOS: built without them
-	// (EXTERNAL_FIRMWARE), loaded from the user's files instead. The HSC
-	// keeps the last 4 KiB of its payload; the Supercharger the first 2 KiB.
-	.fw_hsc_load  (hscfw_download),
+	// Supercharger BIOS: built without it (EXTERNAL_FIRMWARE), loaded from
+	// the user's file instead, its first 2 KiB. No HSC firmware.
+	.fw_hsc_load  (1'b0),
 	.fw_ar_load   (arfw_download),
-	.fw_wr        (ioctl_wr & (hscfw_download ? 1'b1 : ioctl_addr[24:11] == 0)),
-	.fw_addr      (hscfw_download ? hscfw_off[11:0] : ioctl_addr[11:0]),
+	.fw_wr        (ioctl_wr & (ioctl_addr[24:11] == 0)),
+	.fw_addr      (ioctl_addr[11:0]),
 	.fw_data      (ioctl_dout),
 	.clk_sys      (clk_sys),
 	.reset        (reset),
 `ifdef POCKET_DARIA
-	.loading      (cart_download || bios_download || mapper_init_busy || daria_hold),
+	.loading      (cart_download || mapper_init_busy || daria_hold),
 `else
-	.loading      (cart_download || bios_download || mapper_init_busy),
+	.loading      (cart_download || mapper_init_busy),
 `endif
 	.pause        (pause_core),
 
@@ -1278,13 +1207,15 @@ Atari7800 main
 	.pal_temp     (palette_temp),
 	.tia_mode     (tia_mode && ~use_bios),
 	.bypass_bios  (~use_bios),
-	.cart_present (~(use_bios & ~cart_loaded)), // empty slot only when booting the BIOS alone
+	.cart_present (~(use_bios & ~cart_loaded)), // 1: no BIOS boots an empty slot
 	.pokey_irq    (pokey_irq),
 	.minnie_en    (1'b1),
 	.minnie_alt   (1'b0),
 	.hsc_en       (hsc_en),
-	.hsc_ram_dout (hsc_ram_dout),
-	.hsc_ram_cs   (hsc_ram_cs),
+	.hsc_ram_dout (8'h00),
+	/* verilator lint_off PINCONNECTEMPTY */
+	.hsc_ram_cs   (),
+	/* verilator lint_on PINCONNECTEMPTY */
 `ifdef POCKET_DARIA
 	.cpu_ce       (daria_pclk1),
 `else
@@ -1305,11 +1236,12 @@ Atari7800 main
 	.cart_read    (cart_read),
 	.cart_size    (cart_size),
 	.cart_addr_out(cart_addr),
-	.cart_flags   (cart_is_7800 ? cart_flags : 16'd0),
-	.cart_mapper  (cart_mapper),
+	// No A78 header reaches the console (cart_save: see CART HEADER)
+	.cart_flags   (16'd0),
+	.cart_mapper  (8'd0),
 	.cart_save    (cart_save),
 	.cart_din     (cart_din),
-	.cart_xm      (cart_is_7800 ? cart_xm : 8'h0),
+	.cart_xm      (8'h0),
 	.ps2_key      (11'd0),
 
 `ifdef POCKET_SRAM
@@ -1344,7 +1276,9 @@ Atari7800 main
 	// The Pocket's BupChip (below) in place of upstream's
 	.bup_cmd_valid_o  (bup_cmd_valid),
 	.bup_cmd_data_o   (bup_cmd_data),
-	.souper_profile_o (souper_profile),
+	/* verilator lint_off PINCONNECTEMPTY */
+	.souper_profile_o (),
+	/* verilator lint_on PINCONNECTEMPTY */
 	.bup_audio_l_i    (bup_audio_l),
 	.bup_audio_r_i    (bup_audio_r),
 `endif
@@ -1417,7 +1351,7 @@ Atari7800 main
 
 	// 2600 cart flags from detect2600
 	// MiSTer's Bankswitching menu: its index is the mapper number.
-	.force_bs     (|bs_override ? {1'b0, bs_override} : force_bs),
+	.force_bs     (run_bs),
 	.mapper_revision,
 	.cdf_ldx,
 	.cdf_ldy,
@@ -1426,7 +1360,7 @@ Atari7800 main
 	.cdfj_entry,
 	.cdfj_stack,
 	.arm_audio_size_addr,
-	.sc           (sc),
+	.sc           (sc & ~a78_refused),
 	.clearval     (clear_random ? rnd[7:0] : 8'h00),
 	.random       (rnd[7:0]),
 	.decomb       (decomb),
@@ -1451,6 +1385,12 @@ Atari7800 main
 // serves it in the slot that starts there, and the bus takes the byte two
 // clk_sys later, as it does from SDRAM.
 wire bios_rd = mclk1 & bios_sel & RW;
+
+// sram_ctrl's download port wrote the 7800 BIOS into the SRAM; there is no
+// BIOS slot, so it never writes. tb_cartram's +inject forces this wire to
+// place another client's SRAM access in the 6507's cycle (the s19 sweep,
+// Fix B), which a constant on the port itself would not let it do.
+wire sram_dl_wr = 1'b0;
 
 sram_ctrl sram
 (
@@ -1485,7 +1425,7 @@ sram_ctrl sram
 	.sk_ack       (sk_ack),
 	.sk_rdata     (sk_ram_q),
 
-	.dl_wr        (ioctl_wr & bios_download),
+	.dl_wr        (sram_dl_wr),
 	.dl_addr      (ioctl_addr[13:0]),
 	.dl_data      (ioctl_dout),
 
@@ -1515,17 +1455,20 @@ assign SRAM_LB_N = 1'b1;
 
 `ifdef POCKET_BUPCHIP
 //////////////////////////////  BUPCHIP  //////////////////////////////////
-// The Souper cartridge's music co-processor: ARIA (core/bupchip/,
-// docs/BUPCHIP_CORE.md) on clk_arm, its firmware from the bupchip.bin slot,
-// its assets (the cartridge file's ARSC block) in PSRAM cram0 die 0. Inputs
-// come from clk_sys registers, except pll_locked and pll_busy, which the
-// wrapper synchronises. The console reset is not one of them, as on MiSTer:
-// the music survives a 7800 reset.
+// ARIA (core/bupchip/, docs/BUPCHIP_CORE.md) on clk_arm. In the 7800 core it
+// was also the Souper cartridge's music co-processor, with its firmware from
+// the bupchip.bin slot and its assets (an A78's ARSC block) in PSRAM cram0
+// die 0. Here that profile is tied off (souper_profile 0, fw_download 0: no
+// bupchip.bin slot), and the capture runs in image mode only (CAP_A78 0:
+// bup_capture.sv's A78 test is never true), so every file, a refused A78
+// too, is an image to it, as every 2600 image already was. Inputs come from
+// clk_sys registers, except pll_locked and pll_busy, which the wrapper
+// synchronises.
 //
-// With POCKET_DARIA the same CPU also runs the 2600 ARM cartridges' code,
-// in its 2600 profile (daria_profile), as the DARIA front end's call side
-// (u_fe, below): the call and return toggles, the cart RAM, front-end ROM
-// and state RAM ports, the capture's cartridge window and the sample port.
+// With POCKET_DARIA the CPU runs the 2600 ARM cartridges' code, in its 2600
+// profile (daria_profile), as the DARIA front end's call side (u_fe,
+// below): the call and return toggles, the cart RAM, front-end ROM and
+// state RAM ports, the capture's cartridge window and the sample port.
 // There the mapper reset (daria_mres_r) does reach it.
 wire        psr_bank, psr_we, psr_hi, psr_lo, psr_re, psr_avail, psr_busy;
 wire [21:0] psr_addr;
@@ -1535,14 +1478,14 @@ wire [31:0] bup_dbg_status, bup_dbg_halt_pc;
 wire [110:0] bup_dbg_load;
 `endif
 
-bupchip_pocket bupchip
+bupchip_pocket #(.CAP_A78(1'b0)) bupchip
 (
 	.clk_sys       (clk_sys),
 	.clk_arm       (clk_arm),
 	.clk_74a       (clk_74a),
 	.pll_locked    (pll_locked),
 	.pll_busy      (pll_busy),
-	.souper_profile(souper_profile),
+	.souper_profile(1'b0),
 	.pause         (pause_core),
 
 	.byte_valid    (ioctl_wr_any),
@@ -1551,7 +1494,7 @@ bupchip_pocket bupchip
 	.load_data     (ioctl_dout),
 	.load_start    (~old_cart_download && cart_download),
 	.load_end      (old_cart_download && ~cart_download),
-	.fw_download   (bupfw_download),
+	.fw_download   (1'b0),
 
 	.cmd_valid     (bup_cmd_valid),
 	.cmd_data      (bup_cmd_data),
@@ -1752,13 +1695,13 @@ daria_dbg_status u_dstat
 );
 `endif
 
-// Hardware test builds: the BupChip's status word over the picture's
-// top-left corner while a Souper cartridge is loaded, and DARIA's while a
-// 2600 ARM cartridge runs (bup_status_osd.sv).
+// Hardware test builds: DARIA's status over the picture's top-left corner
+// while a 2600 ARM cartridge runs (bup_status_osd.sv; its Souper status,
+// the 7800 core's, is never on).
 bup_status_osd bup_osd
 (
 	.clk     (clk_sys),
-	.en      (souper_profile),
+	.en      (1'b0),
 	.status  (bup_dbg_status),
 	.halt_pc (bup_dbg_halt_pc),
 	.load    (bup_dbg_load),

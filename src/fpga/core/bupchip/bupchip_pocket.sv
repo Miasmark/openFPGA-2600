@@ -142,7 +142,8 @@ module bupchip_pocket #(
 	parameter int BUP_THROTTLE = 16,    // BUP_DEBUG: clocks of every 16 that may start an instruction
 	parameter bit PREEMPT      = 1'b1,  // bup_asset_cache
 	parameter bit PREFETCH     = 1'b1,  // bup_asset_cache
-	parameter int WIN_KB       = 64     // POCKET_DARIA: the image window (decision 8; up to 128 for tests)
+	parameter int WIN_KB       = 64,    // POCKET_DARIA: the image window (decision 8; up to 128 for tests)
+	parameter bit CAP_A78      = 1'b1   // bup_capture's A78 (ARSC) mode; 0: image mode only (openFPGA-2600)
 ) (
 	input  wire        clk_sys,
 	input  wire        clk_arm,
@@ -281,7 +282,7 @@ module bupchip_pocket #(
 	wire        load_valid = byte_valid && byte_hi == 3'd0;
 	wire        fw_valid   = byte_valid && byte_hi == 3'd5;
 
-	bup_capture capture (
+	bup_capture #(.A78(CAP_A78)) capture (
 		.clk(clk_sys),
 		.load_start, .load_addr, .load_valid, .load_data, .load_end,
 		.fw_download, .fw_valid,

@@ -19,7 +19,8 @@
 //
 // +inject places another client's SRAM access at a chosen clk_sdram edge of
 // the 6507 cycle: a BIOS download write (sram_ctrl's dl client, bench-forced
-// on its dl_wr input, which is idle in these runs), so that dl_v is set at
+// on its dl_wr input through the wrapper's sram_dl_wr, which is idle: the
+// 2600 core has no BIOS slot), so that dl_v is set at
 // s(d-1) and the access starts at s(d) if the SRAM is free and no cartridge
 // or Flicker Blend access is waiting. +inject=D places it at s(D) of every
 // cycle (2 <= D <= 47); +inject=sweep moves it one edge further each time,
@@ -188,14 +189,14 @@ module tb_cartram;
 		automatic int set_k = (inj_d + 46) % 48;          // s(d-2)
 		automatic real target = inj_d >= 2 ? t_e0 : t_e0 + 48 * TSD;
 		if (inj_set) begin
-			release `CR_S.dl_wr;
+			release tb.dut.sram_dl_wr;
 			inj_set = 1'b0;
 			t_inj = $realtime + TSD / 2;                   // the access may start at the next edge
 			inj_last_target = inj_target;
 			inj_n++;
 			if (inj_mode == 48) inj_d = (inj_d + 1) % 48;
 		end else if (k == set_k && target > inj_last_target + TSD) begin
-			force `CR_S.dl_wr = 1'b1;
+			force tb.dut.sram_dl_wr = 1'b1;
 			inj_set = 1'b1;
 			inj_target = target;
 		end

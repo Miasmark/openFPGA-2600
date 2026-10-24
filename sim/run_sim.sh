@@ -274,10 +274,11 @@ sim ./obj_load/vtb +image=load_test.a26 +audf=14 $(fp load_a26) | grep -aE "LOAD
 # writes the file in before the run and reads the slot back afterwards with
 # the APF read protocol (+fa2save, +fa2expect, +fa2prog). Two A78 runs, each
 # with the file loaded, must leave it as it was: load_test.a78, which
-# detect2600.sv does not take for FA2 (mapper_fa2 stays in reset), and
-# fa2_test.py's a78 image, which it does take for FA2 (mapper 25) and which
-# issues a save command in 7800 mode; the wrapper's fa2_on keeps that save
-# off the slot (saves 1, slot RAM writes 0).
+# detect2600.sv does not take for FA2, and fa2_test.py's a78 image, which it
+# does take for FA2 (mapper 25) and which issued a save command in the 7800
+# core's 7800 mode. openFPGA-2600 refuses both (plan D8): they run the bad
+# game screen's scheme (mapper 32), so no copy starts (saves 0), and the
+# wrapper's fa2_on keeps the slot out of reach anyway.
 echo "-- FA2 flash save slot (fa2.sav): a synthetic FA2 cartridge loads, saves and reloads it through the mapper's port:"
 python3 "$HERE/fa2_test.py" image > fa2_test.a26
 python3 "$HERE/fa2_test.py" flash 256 > fa2_flash.bin
@@ -292,6 +293,34 @@ sim ./obj_load/vtb +image=load_test.a78 +audf=7 +fa2save=fa2_flash.bin $(fp fa2_
 python3 "$HERE/fa2_test.py" a78 > fa2_test.a78
 echo "  an A78 game taken for FA2 that issues a save command in 7800 mode, the file loaded (expect mapper 25, 0 bytes differ):"
 sim ./obj_load/vtb +image=fa2_test.a78 +fa2save=fa2_flash.bin $(fp fa2_a78fa2) | grep -aE "^ *FA2"
+
+# The A78 refusal (openFPGA-2600, plan D8 and 7.D.3). An image whose bytes
+# 1-5 read "ATARI" runs as a 2600 cartridge in the bad game screen's scheme
+# (cart2600.sv's "unsupported" screen, mapper 32): no hang, a steady NTSC
+# picture. Its header asks for everything a refused image must not get: PAL
+# (byte 57, with Region Auto: the PLL must never be asked for PAL, so
+# is_pal_o never changes), the HSC and a SaveKey (byte 58 = 3), a light gun
+# on port 1 and an AtariVox on port 2 (bytes 55-56), the Souper flag (type
+# bit 12). With SaveKey On and a save file in each slot, nothing may be
+# written: the SaveKey and FA2 slots read back as loaded, no EEPROM write, no
+# I2C clock, no FA2 copy. tb_load's +refuse prints the REFUSE lines.
+echo "-- A78 refusal (plan D8): an A78 runs the bad game screen, writes no save and asks for no retune:"
+python3 "$HERE/make_a78.py" 7 --region 1 --save 3 --ports 2,10 --type 0x1000 > refuse_test.a78
+python3 -c 'import random, sys; random.seed(2600); sys.stdout.buffer.write(bytes(random.randrange(256) for _ in range(32768)))' > refuse_sk.bin
+sim ./obj_load/vtb +image=refuse_test.a78 +audf=7 +sk_on +sksave=refuse_sk.bin +fa2save=fa2_flash.bin +refuse $(fp a78_refuse) > refuse.log
+grep -aE "^(LOAD|REFUSE|SAVEKEY|FA2|TONE)" refuse.log | sed 's/^/  /'
+rf_ok=1
+for p in "^LOAD 16512 bytes, header ATARI, cart_is_7800=1, cart_size=16512, tia_mode=1, payload mismatches=0$" \
+	"^REFUSE image: header ATARI, cart_is_7800 1, a78_refused 1, tia_mode 1, tia_en 1, 2600 mapper 32, bad game screen 1$" \
+	"^REFUSE devices: use_sk 0, fa2_on 0, hsc_en 0, gun_en 0, port types 1 1, daria_profile 0$" \
+	"^REFUSE region: is_pal_o 0, changed 0 times since power-up; header byte 57 1$" \
+	"^REFUSE frames: (1[0-9]|[2-9][0-9]) since the reset's release, the last (1[0-9]|[2-9][0-9]) with the same picture, the last 238944 clk_sys long$" \
+	"^REFUSE saves: SaveKey SCL edges 0, EEPROM bytes written 0; FA2 flash loads 0, saves 0, slot RAM writes 0$" \
+	"^SAVEKEY save after load, reset and running: 0 of 32768 bytes differ from the save file$" \
+	"^FA2 save slot after load, reset and 300 ms of running \(APF read protocol\): 0 of 256 bytes differ from the expected file$"; do
+	grep -aEq "$p" refuse.log || { echo "  MISSING: $p"; rf_ok=0; }
+done
+[ "$rf_ok" = 1 ] && echo "A78_REFUSAL pass" || echo "A78_REFUSAL FAIL"
 
 # The BIOS boot rule (docs/DARIA_CORE.md, decision 11). With a BIOS loaded
 # and Skip BIOS off, a 7800 image and an empty slot boot through the BIOS; a

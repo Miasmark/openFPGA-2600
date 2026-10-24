@@ -5,6 +5,8 @@
   make_a78.py --bin rom.bin [--type 0x0001]  any image; type = A78 cart type
                                               (0x0001 = POKEY at $4000,
                                                0x0040 = POKEY at $450)
+  --save, --region, --ports set header bytes 58, 57 and 55-56 (openFPGA-2600's
+  A78 refusal case asks for everything a refused image must not get).
 """
 import argparse, subprocess, sys
 
@@ -13,6 +15,8 @@ ap.add_argument("audf", nargs="?", default="7")
 ap.add_argument("--bin")
 ap.add_argument("--type", default="0")
 ap.add_argument("--save", default="0", help="header byte 58, a bitfield: 1 = HSC, 2 = SaveKey, 3 = both")
+ap.add_argument("--region", default="0", help="header byte 57: 0 = NTSC, 1 = PAL")
+ap.add_argument("--ports", default="1,1", help="header bytes 55,56: controller types (1 joystick, 2 light gun, 10 SaveKey/AtariVox)")
 a = ap.parse_args()
 here = __file__.rsplit("/", 1)[0] or "."
 if a.bin:
@@ -26,8 +30,8 @@ hdr[1:17] = b"ATARI7800".ljust(16, b"\0")
 hdr[17:49] = b"Pocket test".ljust(32, b"\0")
 hdr[49:53] = len(rom).to_bytes(4, "big")     # ROM size
 hdr[53:55] = int(a.type, 0).to_bytes(2, "big")
-hdr[55] = 1; hdr[56] = 1                     # joysticks
-hdr[57] = 0                                  # NTSC
+hdr[55], hdr[56] = (int(x, 0) for x in a.ports.split(","))   # joysticks by default
+hdr[57] = int(a.region, 0)                   # NTSC by default
 hdr[58] = int(a.save, 0)                     # save device
 hdr[100:128] = b"ACTUAL CART DATA STARTS HERE"
 sys.stdout.buffer.write(bytes(hdr) + rom)
