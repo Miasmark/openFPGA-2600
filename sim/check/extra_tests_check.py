@@ -341,7 +341,9 @@ def mapper_check(secs, bad, notes):
         spans = games_between_resets(probe_events(body))
         if not m or int(m[0].group(1)) in (29, 30, 31):
             bad.append(f"Mapper Auto: the scheme detected {m[0].group(1) if m else '?'} (a multicart scheme, or no OPTIONS line)")
-        elif len(spans) != 2 or not spans[0] or spans[1] != spans[0]:
+        elif len(spans) != 2 or not spans[0] or not spans[1] <= spans[0]:
+            # (+arprobe logs a change only: the same game after the reset
+            # writes nothing new)
             bad.append(f"Mapper Auto: {spans}: expected one game, the same before and after the reset")
         else:
             notes.append(f"Mapper: MC4K's image with Mapper Auto runs scheme {m[0].group(1)} and one game")
@@ -396,7 +398,7 @@ GRAY_RIGHT = "3102"
 
 def gray_dir(seq):
     """+1 when every step of the gray code sequence turns right, -1 when every
-    one turns left, 0 otherwise (or fewer than two steps)."""
+    one turns left, 0 otherwise (or no step at all)."""
     if len(seq) < 2 or not all(c in GRAY_RIGHT for c in seq):
         return 0
     steps = {(GRAY_RIGHT.index(b) - GRAY_RIGHT.index(a)) % 4 for a, b in zip(seq, seq[1:])}
@@ -404,16 +406,24 @@ def gray_dir(seq):
 
 
 def input_events(body):
+    # (tb_load prints SWCHA with %b, which Verilator does not zero-pad: a
+    # value below $80 has fewer than 8 digits)
+    # each drive line's codes since the line before it, led by the code that
+    # line ended on (the program's first reading is 3, both lines high), so
+    # one step is a direction too
     shows, drives, types = {}, {}, None
+    last = ["3", "3"]
     for x in body:
-        m = re.fullmatch(r"INPUT at (\d+) ms\s+paddles\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+gun line\s+(\d+)\s+SWCHA ([01]{8})\s+"
+        m = re.fullmatch(r"INPUT at (\d+) ms\s+paddles\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+gun line\s+(\d+)\s+SWCHA ([01]{1,8})\s+"
                          r"INPT4 ([01]) INPT5 ([01])\s+\(frame \d+\)", x)
         if m:
             g = m.groups()
-            shows[int(g[0])] = {"p": [int(v) for v in g[1:5]], "gun": int(g[5]), "swcha": g[6], "inpt4": g[7], "inpt5": g[8]}
+            shows[int(g[0])] = {"p": [int(v) for v in g[1:5]], "gun": int(g[5]), "swcha": g[6].zfill(8), "inpt4": g[7], "inpt5": g[8]}
         m = re.fullmatch(r"INPUT driving gray codes at (\d+) ms: port 1 ([0-3]+|-), port 2 ([0-3]+|-)", x)
         if m:
-            drives[int(m.group(1))] = (m.group(2).strip("-"), m.group(3).strip("-"))
+            got = (m.group(2).strip("-"), m.group(3).strip("-"))
+            drives[int(m.group(1))] = tuple(last[i] + got[i] if got[i] else "" for i in (0, 1))
+            last = [got[i][-1] if got[i] else last[i] for i in (0, 1)]
         m = re.fullmatch(r"INPUT port types: (.*)", x)
         if m:
             types = m.group(1)

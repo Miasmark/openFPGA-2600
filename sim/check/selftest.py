@@ -349,8 +349,9 @@ INPUT_FAULTS = {
     "inputs_types_swapped": in_case("Port 1 Paddles (2)", r"^(    INPUT port types: A )3, B 6", r"\g<1>6, B 3"),
     "inputs_port_value_0_not_joystick": in_case("Port 1 Joystick (0)", r"^(    INPUT port types: A )1,", r"\g<1>3,"),
     "inputs_paddle_still": in_case("Port 1 Paddles (2)", r"^(    INPUT at 560 ms\s+paddles\s+)\d+", r"\g<1>191"),
+    # (the first turn starts from 3: a 2 there is a turn to the left)
     "inputs_driving_reversed": in_case("Port 1 Driving (3)", r"^(    INPUT driving gray codes at 560 ms: port 1 )([0-3]+)",
-                                       lambda m: m.group(1) + m.group(2)[::-1]),
+                                       r"\g<1>2"),
     "inputs_gun_trigger": in_case("Port 1 Light Gun (4)", r"^(    INPUT at 360 ms.*SWCHA \d{3})1", r"\g<1>0"),
     "inputs_dual_stick_a": in_case("Port 1 Dual Stick (5)", r"^(    INPUT at 420 ms.*SWCHA )11110111", r"\g<1>11111111"),
     "inputs_booster_trigger": in_case("Port 1 Booster Grip (6)", r"^(    INPUT at 420 ms\s+paddles\s+192\s+)0\b", r"\g<1>192"),

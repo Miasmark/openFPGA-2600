@@ -42,8 +42,11 @@
 #                t_new) also the console-reset sweep (reset), the address
 #                compare (midswap) and the P2 assertion's forced coincidence
 #                (forcecoinc), and the mutants each must catch: nohold by the
-#                reset sweep's K = 0 runs and by forcecoinc c_rd, nocmp by
-#                midswap (CAUGHT); with POCKET_DARIA in the qsf also
+#                reset sweep's K = 0 runs (only where the wrapper drives
+#                sram_ctrl's 7800/BIOS port: openFPGA-2600 ties it idle, so
+#                the sweep cannot meet m_new) and by forcecoinc c_rd, nocmp
+#                by midswap (CAUGHT); with FP_REF, the matrix's and s19's
+#                fingerprints equal FP_REF's; with POCKET_DARIA in the qsf also
 #                on the plain build (DARIA=0), every run with its +fp
 #                fingerprint, all equal between the builds but the ARM
 #                image's (plan 7.5 row 5)
@@ -356,8 +359,17 @@ g_cartram() {
 		slot python3 "$HERE/cartram2600_test.py" reset --work "$w" || rc=1
 		slot python3 "$HERE/cartram2600_test.py" midswap --work "$w" || rc=1
 		slot python3 "$HERE/cartram2600_test.py" forcecoinc --work "$w" || rc=1
-		slot python3 "$HERE/cartram2600_test.py" reset --work "$w" --mutant nohold \
-			--only rst_hif8_rd_rst_k0,rst_hie7_wr_load_k0,rst_ar_rst_k0 || rc=1
+		# The reset sweep catches nohold only where the 7800/BIOS port (c_rd,
+		# c_wr) makes strobes, so that m_new can meet t_new: the 7800 core's
+		# reset-time reads through cart.sv and the BIOS. openFPGA-2600 ties
+		# that port idle (plan step 4(a)): m_new is a constant 0, nohold
+		# changes nothing there, and forcecoinc (which forces c_rd) catches it.
+		if sed 's,//.*,,' "$REPO/src/fpga/core/atari2600_pocket.sv" | tr '\n' ' ' | grep -qE '\.c_rd\s*\(\s*1.b0\s*\)\s*,\s*\.c_wr\s*\(\s*1.b0\s*\)'; then
+			echo "nohold by the reset sweep: not applicable (atari2600_pocket.sv ties sram_ctrl's c_rd and c_wr 0, so m_new is 0); forcecoinc below catches it"
+		else
+			slot python3 "$HERE/cartram2600_test.py" reset --work "$w" --mutant nohold \
+				--only rst_hif8_rd_rst_k0,rst_hie7_wr_load_k0,rst_ar_rst_k0 || rc=1
+		fi
 		slot python3 "$HERE/cartram2600_test.py" forcecoinc --work "$w" --mutant nohold --modes c_rd || rc=1
 		slot python3 "$HERE/cartram2600_test.py" midswap --work "$w" --mutant nocmp || rc=1
 	fi
