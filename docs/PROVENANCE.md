@@ -73,7 +73,8 @@ findings: none of them is a name from the private list.
   `564985b`) at its merge `4e5be35`, and `79de061` in the identity gate of
   the branch `step6-tests`. The other commits change only comments, timing
   constraints, the crossing tables, where a declaration sits, the tests or
-  the documents:
+  the documents, or remove sources nothing builds (`0799f8f`, also covered
+  by step 6's gate run):
 
 | Commit | What it does |
 |---|---|

@@ -154,7 +154,7 @@ The Pocket shows at most 16 settings; this core uses all 16.
 | *Palette* | Warm, Cool, Hot | |
 | *SaveKey (port 2)* | Off, On (default Off) | The SaveKey and the AtariVox; On takes port 2's LEFT |
 | *AtariVox Voice* | Off, Quiet, Normal, Loud (default Normal) | The voice's level, while the SaveKey is On |
-| *Audio* | Mono TIA, Stereo TIA, Stereo, 25% Blend, Stereo, 50% Blend, Full Mono | |
+| *Audio* | Mono TIA; Stereo TIA; Stereo, 25% Blend; Stereo, 50% Blend; Full Mono | |
 | *2600 Video* | Normal, Flicker Blend, De-comb, Blend + De-comb | |
 | *Mapper* | Auto, 2K, F8, F6, F4, F0, FA, FE, E0, E7, 3F, 3E, CV, UA, EF, SB | Forces a scheme for the cartridge you load next |
 | *Mapper (more)* | Auto, AR, DPC, DPC+, CDF / CDFJ / CDFJ+, FA2, WD, JANE, CTY, 0840, FC, DF / BF, Multicart 2K, 4K and 8K, 32-in-1 | The same, for the other schemes; *Mapper* wins when both are set |
@@ -204,13 +204,15 @@ by how far the stick is pushed. The next D-pad press takes over again.
 - **Booster Grip** (Omega Race, Thrust+): A fires, B is the grip's trigger
   and X its booster button. X also fires, as on a joystick.
 
-*Turbo (X/Y)* makes X repeat A's fire while held, at 15, 10 or 7.5
-presses a second (Fast / Medium / Slow; 12.5, 8.3 and 6.25 in PAL games).
-A stays a single press, and with *Turbo* Off X fires as A does. Y's half
-of the setting has no effect: it repeats B on the joystick's
-second-button line, which no mode of this core reads. The paddles,
-driving controller, light gun and Booster Grip take B (and A) directly,
-and in those modes Y moves fast (above); on the Dual Stick Y fires left.
+On the joystick and the Booster Grip, *Turbo (X/Y)* makes X repeat A's
+fire while held, at 15, 10 or 7.5 presses a second (Fast / Medium / Slow;
+12.5, 8.3 and 6.25 in PAL games). A stays a single press, and with *Turbo*
+Off X fires as A does. Y's half of the setting has no effect: it repeats B
+on the joystick's second-button line, which no mode of this core reads.
+The paddles, driving controller and light gun take A or B directly, X is
+their slow move and Y their fast one; the Booster Grip takes B directly and
+Y does nothing there; on the Dual Stick X fires up and Y fires left, with
+no repeat.
 
 Some paddle games read the second paddle of the pair for player 1 (Demons
 to Diamonds, for one; Stella keeps a "swap paddles" list for them). If a
@@ -357,7 +359,9 @@ In `docs/`, [DARIA_CORE.md](docs/DARIA_CORE.md),
 (`AGENT_RUNS.md`, `BUPCHIP.md`, `BUPCHIP_CORE.md`, `ENVIRONMENT.md`,
 `IMPROVEMENTS.md`, `SRAM_TIMING_REVIEW.md`, `daria_fe/`, `daria_step7/`,
 `daria_step10/`) are openFPGA-7800's working notes, kept as they were for
-the history and the line references between them.
+the history and the line references between them. In all of these, a
+`file:line` reference to `atari2600_pocket.sv` points at openFPGA-7800's
+`atari7800_pocket.sv` as it was when the note was written.
 
 ## Credits
 
