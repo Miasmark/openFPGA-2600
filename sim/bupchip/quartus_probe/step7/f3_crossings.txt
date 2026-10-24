@@ -70,7 +70,9 @@ s2a daria,q5 held  *|daria_smp:smp|addr[*]                         -
 a2s daria,q5 first *|bupchip_pocket:bupchip|ready_s[0]             *|bupchip_pocket:bupchip|ready_a
 a2s -        first *|bupchip_pocket:bupchip|halted_s[0]            -
 a2s daria,q5 first *|bupchip_pocket:bupchip|run_s[0]               *|bupchip_pocket:bupchip|cpu_run
-a2s daria,q5 first *|bupchip_pocket:bupchip|ftog_s[0]              *|bupchip_pocket:bupchip|frame_tog
+# ftog_s: absent in the 2600 core (the wrapper ties souper_profile 0, so audio_l/audio_r are held at 0
+# and synthesis removes the frame crossing); audio_l/audio_r below with it
+a2s -        first *|bupchip_pocket:bupchip|ftog_s[0]              *|bupchip_pocket:bupchip|frame_tog
 a2s daria,q5 reset *|daria_mmio:mmio|en_s[0]                       *|daria_mmio:mmio|tcr[0]
 a2s daria,q5 reset *|daria_mmio:mmio|w_s[0]                        *|daria_mmio:mmio|w_tog
 a2s daria,q5 first *|daria_fe_call:u_call|ret_s1                   *|daria_call:call|ret_q
@@ -79,9 +81,9 @@ a2s q5       first *|bup_dbg_snap:*|ak_s0                          *|bup_dbg_sna
 a2s daria,q5 guard *|daria_fe_guard:u_guard|pd_rx                  *|daria_fe_guard:u_guard|pd_tog
 
 # ---- clk_arm -> clk_sys: held buses ----------------------------------------------------------------------
-# the audio frame (frame_arm)
-a2s daria,q5 held  *|bupchip_pocket:bupchip|audio_l[*]             -
-a2s daria,q5 held  *|bupchip_pocket:bupchip|audio_r[*]             -
+# the audio frame (frame_arm): absent in the 2600 core (souper_profile tied 0, audio_l/audio_r constant)
+a2s -        held  *|bupchip_pocket:bupchip|audio_l[*]             -
+a2s -        held  *|bupchip_pocket:bupchip|audio_r[*]             -
 # daria_mmio's TC write (w_data, w_strb)
 a2s daria,q5 held  *|daria_mmio:mmio|tc[*]                         -
 # the sample byte (daria_smp's data)

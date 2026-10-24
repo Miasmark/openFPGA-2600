@@ -122,6 +122,8 @@ proc regs {label pattern {nodup 0}} {
 # the two). cap_err_a is absent from Q5 too: it feeds only the status
 # word's bit 11, which bup_status_osd.sv does not show (plan 2.7). cmd_s is
 # absent in the 2600 core: the wrapper ties cmd_valid 0 (no Souper profile).
+# ftog_s is absent too: with souper_profile tied 0 the audio frame it
+# carries is held at 0, so synthesis removes the chain.
 set ff_table {
 	{*|bupchip_pocket:bupchip|hold_a[0]} 1 1
 	{*|bupchip_pocket:bupchip|pause_a[0]} 0 0
@@ -138,7 +140,7 @@ set ff_table {
 	{*|bupchip_pocket:bupchip|ready_s[0]} 1 1
 	{*|bupchip_pocket:bupchip|halted_s[0]} 0 0
 	{*|bupchip_pocket:bupchip|run_s[0]} 1 1
-	{*|bupchip_pocket:bupchip|ftog_s[0]} 1 1
+	{*|bupchip_pocket:bupchip|ftog_s[0]} 0 0
 	{*|daria_mmio:mmio|en_s[0]} 1 1
 	{*|daria_mmio:mmio|w_s[0]} 1 1
 	{*|daria_fe_call:u_call|ret_s1} 1 1

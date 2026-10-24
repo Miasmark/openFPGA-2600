@@ -438,7 +438,7 @@ echo "     $(kline)"
 checker "FAIL: k'" daria "run_s[0] (class first) gated by a register of its own clock" "run_s[0]=own:1"
 checker "FAIL: k'" daria "en_s[0] (class reset) with two registers of its own clock" "en_s[0]=own:2"
 checker "FAIL: k'" daria "the guard's pd_rx with a register of its own clock" "pd_rx=own:1"
-checker "FAIL: k'" daria "ftog_s[0] with no timed path into it" "ftog_s[0]=nopath"
+checker "FAIL: k'" daria "ack_s1 with no timed path into it" "ack_s1=nopath"
 echo "   (a), (l), (h) by the divider (plan 5.4 as amended 2026-10-14)"
 fline() {	# EXPECT: the "rules as first written:" line of the last case
 	local got
@@ -500,11 +500,11 @@ has c.cells "the report script, by the table it ran with: FAIL"
 fline PASS
 checker "FAIL: c.cells" q5 "Q5 with cap_err_a[0] found once (absent by the table)" t:div=19 "ff:cap_err_a[0]=1"
 has c.cells "cap_err_a[0] PRESENT (expected absent, found 1)"
-checker "FAIL: c.cells" daria "Build B with ftog_s[0] not found" "ff:ftog_s[0]=0"
-has c.cells "ftog_s[0] MISSING (expected present, found 0)"
-checker "FAIL: c.cells" daria "Build B with ftog_s[0] found twice" "ff:ftog_s[0]=2"
+checker "FAIL: c.cells" daria "Build B with ack_s1 not found" "ff:ack_s1=0"
+has c.cells "ack_s1 MISSING (expected present, found 0)"
+checker "FAIL: c.cells" daria "Build B with ack_s1 found twice" "ff:ack_s1=2"
 checker "FAIL: c.cells" daria "the report script said (c.cells) PASS on counts that fail by its own table (a misread)" \
-	"ff:ftog_s[0]=0" t:tcl_cells=PASS
+	"ff:ack_s1=0" t:tcl_cells=PASS
 has c.cells "misread"
 checker "FAIL: c.cells" daria "Build B with no firstflops.tsv" noff
 has c.cells "firstflops.tsv missing"
@@ -627,10 +627,10 @@ if cmp -s "$HERE/step7_report.tcl" "$T/ff_q5.tcl"; then bad "tables: could not p
 elif tables "$T/ff_q5.tcl" "$HERE/f3_crossings.txt"; then bad "tables: ff_table with cap_err_a[0] in Q5 passed: $(cat "$T/tables.out")"
 else grep -q "cap_err_a\[0\]" "$T/tables.out" && ok "tables: ff_table with cap_err_a[0] in Q5 is caught: $(cut -c1-200 "$T/tables.out")" \
 	|| bad "tables: caught, but not on cap_err_a[0]: $(cat "$T/tables.out")"; fi
-grep -v 'ftog_s\[0\]' "$HERE/f3_crossings.txt" > "$T/f3_noftog.txt"
-if tables "$HERE/step7_report.tcl" "$T/f3_noftog.txt"; then bad "tables: f3_crossings.txt without ftog_s[0] passed: $(cat "$T/tables.out")"
-else grep -q "ftog_s\[0\] only in ff_table" "$T/tables.out" && ok "tables: f3_crossings.txt without ftog_s[0] is caught: $(cut -c1-200 "$T/tables.out")" \
-	|| bad "tables: caught, but not as ftog_s[0] missing: $(cat "$T/tables.out")"; fi
+grep -v 'ack_s1' "$HERE/f3_crossings.txt" > "$T/f3_noack.txt"
+if tables "$HERE/step7_report.tcl" "$T/f3_noack.txt"; then bad "tables: f3_crossings.txt without ack_s1 passed: $(cat "$T/tables.out")"
+else grep -q "ack_s1 only in ff_table" "$T/tables.out" && ok "tables: f3_crossings.txt without ack_s1 is caught: $(cut -c1-200 "$T/tables.out")" \
+	|| bad "tables: caught, but not as ack_s1 missing: $(cat "$T/tables.out")"; fi
 
 # ---- 3. run_step7.sh's refusals ------------------------------------------------------------------------------
 echo "-- 3. run_step7.sh: protected directories, existing run directories, the lock (a stand-in docker)"

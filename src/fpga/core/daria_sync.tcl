@@ -65,7 +65,11 @@ set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|bup_asse
 set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|bupchip_pocket:*|ready_s\[0\]"
 # bupchip/bupchip_pocket.sv: cpu_run, for daria_mmio's clk_sys reset
 set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|bupchip_pocket:*|run_s\[0\]"
-# bupchip/bupchip_pocket.sv: the audio frame toggle (frame_arm held)
+# bupchip/bupchip_pocket.sv: the audio frame toggle (frame_arm held). No chain
+# in the 2600 core: the wrapper ties souper_profile 0, so the frame is held at
+# 0 and synthesis removes it; f3_crossings.txt and step7_report.tcl's ff_table
+# expect ftog_s[0] absent. Kept because smoke/run_smoke.sh counts 13 marks and
+# its q5_mut case removes this line; drop it with the smoke test's chain.
 set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|bupchip_pocket:*|ftog_s\[0\]"
 # bupchip/daria_mmio.sv: TCR bit 0, and the TC write toggle (w_data, w_strb held)
 set_instance_assignment -name SYNCHRONIZER_IDENTIFICATION FORCED -to "*|daria_mmio:*|en_s\[0\]"
