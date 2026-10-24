@@ -786,9 +786,13 @@ module Atari7800 (
 	assign arm_ddr_timeout = 1'b0;
 `endif
 
+	// Declared outside the ifndef: the EXTERNAL_CARTRAM branch below ties it
+	// to 0, and it reaches cart2600 either way. (In the 7800 core it was an
+	// implicit net there, which only compiled because a POKEY or Minnie file
+	// analysed earlier ended by setting default_nettype back to wire.)
+	logic [31:0] cartram_word_data_tdp;
 `ifndef EXTERNAL_CARTRAM
 	logic [7:0] cartram_data_tdp;
-	logic [31:0] cartram_word_data_tdp;
 	// The 7800 path shares this RAM, so it stays in the core. cart2600 already
 	// arbitrated its writeback against the ARM, and hands over one port.
 	cart_ram_tdp cart_ram
