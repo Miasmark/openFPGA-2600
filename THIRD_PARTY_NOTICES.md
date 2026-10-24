@@ -2,7 +2,7 @@
 
 This core combines code from several authors under several licenses. The
 tables list every third-party part in the repository, its license, and
-whether it goes into the bitstream (`atari7800.rbf_r`) that releases ship.
+whether it goes into the bitstream (`atari2600.rbf_r`) that releases ship.
 "Built" means synthesised into the bitstream; "repo only" means the file is
 vendored with the upstream source but the Pocket build leaves it out.
 
@@ -60,14 +60,15 @@ built-in contents.
 
 ## Platform files
 
-`dist/Platforms/7800.json` and `dist/Platforms/_images/7800.bin` come from
-Spiritualized's 2022 Pocket 7800 core, which this core replaces.
-`dist/Cores/Miasmark.7800/icon.bin` is the placeholder from Analogue's core
-template.
+| File | Source | Note |
+|---|---|---|
+| `dist/Platforms/_images/2600.bin` | The platform image of Spiritualized's Pocket 2600 core, release 1.0.0 (https://github.com/spiritualized1997/openFPGA-2600/releases/tag/1.0.0, `Spiritualized_2600_1.0.0_2022_11_08.zip`, `Platforms/_images/2600.bin`, MD5 `151911282233b7f35a2ce650400b5a1c`), unchanged | Used, with credit to Spiritualized, so that the two 2600 cores show the same picture in the Pocket's library; the release states no license |
+| `dist/Platforms/2600.json` | The same release's `Platforms/2600.json`, byte for byte (MD5 `8e6c9cee02fa7569100e5fee57c0d4c8`) | The platform "2600" is shared with that core, so the file is kept identical |
+| `dist/Cores/Miasmark.2600/icon.bin` | The placeholder from Analogue's core template | as in openFPGA-7800 |
 
 ## Notices shipped with releases
 
-`tools/package.sh` puts these in `Cores/Miasmark.7800/licenses/` in every
+`tools/package.sh` puts these in `Cores/Miasmark.2600/licenses/` in every
 release zip: this project's `LICENSE`, this file, `GPL-3.0.txt`, the MiSTer
 core's `LICENSE`, analogue-pocket-utils' `LICENSE`, and Analogue's APF
 Software License Agreement (`Analogue-APF-Software-License.txt`), copied

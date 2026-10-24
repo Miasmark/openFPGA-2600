@@ -7,7 +7,7 @@ src/fpga/*.qws
 src/fpga/*_assignment_defaults.qdf
 # Packaging / simulation
 release/
-dist/Cores/Miasmark.7800/*.rbf_r
+dist/Cores/Miasmark.2600/*.rbf_r
 sim/work*
 sim/atarivox/work/
 # BupChip firmware: user-supplied, never committed (docs/BUPCHIP.md). A local
@@ -30,17 +30,12 @@ bupchip.mif
 *.[sS][mM][pP]
 *.[iI][nN][sS]
 *.[tT][rR][kK]
-# The package's own images (not game data)
-!dist/Cores/Miasmark.7800/icon.bin
-!dist/Platforms/_images/7800.bin
-dist/Cores/Miasmark.7800/licenses/
-# Python bytecode
-__pycache__/
-# openFPGA-2600 (added at the import; the lines above are openFPGA-7800's):
-# the 2600 package's build output and images, and save files, which are
-# user data like the game images
-dist/Cores/Miasmark.2600/*.rbf_r
+# The package's own images (not game data): the core's icon and the
+# platform image (Spiritualized's 2600 platform image, THIRD_PARTY_NOTICES.md)
 !dist/Cores/Miasmark.2600/icon.bin
 !dist/Platforms/_images/2600.bin
 dist/Cores/Miasmark.2600/licenses/
+# Python bytecode
+__pycache__/
+# Save files are user data, like the game images
 *.[sS][aA][vV]

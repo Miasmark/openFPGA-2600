@@ -2,7 +2,7 @@ name: Build Pocket core
 
 on:
   push:
-    branches: [ main, Mister-Pocket-Port ]
+    branches: [ main, dev ]
   pull_request:
   workflow_dispatch:
 
@@ -34,5 +34,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Atari7800_Pocket
+          name: M_Atari2600_Pocket
           path: release/*.zip

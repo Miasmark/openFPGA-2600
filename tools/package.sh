@@ -1,28 +1,30 @@
 #!/bin/bash
 # Assemble the SD card layout from a finished Quartus build:
-#   dist/ + output_files/ap_core.rbf -> release/Atari7800_<version>.zip
+#   dist/ + output_files/ap_core.rbf -> release/M_Atari2600_Pocket_<version>.zip
+# Environment (optional): RBF=FILE packages another bitstream (a dry run can
+# pass any file); OUT_DIR=DIR writes the zip there instead of release/.
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-RBF="$ROOT/src/fpga/output_files/ap_core.rbf"
-CORE="$ROOT/dist/Cores/Miasmark.7800"
-VERSION=$(python3 -c "import json;print(json.load(open('$CORE/core.json'))['core']['metadata']['version'])")
+RBF="${RBF:-$ROOT/src/fpga/output_files/ap_core.rbf}"
+CORE="$ROOT/dist/Cores/Miasmark.2600"
+VERSION=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['core']['metadata']['version'])" "$CORE/core.json")
 
 [ -f "$RBF" ] || { echo "missing $RBF - build first"; exit 1; }
-python3 "$ROOT/tools/reverse_bits.py" "$RBF" "$CORE/atari7800.rbf_r"
+python3 "$ROOT/tools/reverse_bits.py" "$RBF" "$CORE/atari2600.rbf_r"
 
-mkdir -p "$ROOT/release"
-OUT="$ROOT/release/Atari7800_Pocket_${VERSION}.zip"
+OUT_DIR="${OUT_DIR:-$ROOT/release}"
+mkdir -p "$OUT_DIR"
+OUT="$(cd "$OUT_DIR" && pwd)/M_Atari2600_Pocket_${VERSION}.zip"
 rm -f "$OUT"
 # License texts and notices travel with the bitstream.
 LIC="$CORE/licenses"
+rm -rf "$LIC"
 mkdir -p "$LIC"
-cp "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES.md" "$ROOT/LICENSES/GPL-3.0.txt" "$LIC/"
+cp "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES.md" "$ROOT/LICENSES/"*.txt "$LIC/"
 cp "$ROOT/src/fpga/mister/LICENSE" "$LIC/MiSTer-Atari7800-LICENSE.txt"
 cp "$ROOT/src/fpga/pocket_utils/LICENSE" "$LIC/analogue-pocket-utils-LICENSE.txt"
 # A notice that lives only in source headers, copied word for word:
-# Analogue's APF license. (Mark Watson's POKEY notice went with his POKEY
-# up to 2.0.20; the bitstream no longer contains it.)
-rm -f "$LIC/PokeyWatson-NOTICE.txt"
+# Analogue's APF license.
 awk '{ sub(/\r$/, "") } /^$/ { print; next } /^\/\/ *$/ || !/^\/\// { exit } { sub(/^\/\/ ?/, ""); print }' \
 	"$ROOT/src/fpga/apf/apf_top.v" > "$LIC/Analogue-APF-Software-License.txt"
 if command -v zip >/dev/null; then

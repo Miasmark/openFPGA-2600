@@ -98,10 +98,6 @@
         "options": [
           {
             "value": 0,
-            "name": "Auto"
-          },
-          {
-            "value": 1,
             "name": "Joystick"
           },
           {
@@ -139,10 +135,6 @@
         "options": [
           {
             "value": 0,
-            "name": "Auto"
-          },
-          {
-            "value": 1,
             "name": "Joystick"
           },
           {
