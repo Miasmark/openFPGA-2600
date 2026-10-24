@@ -1,0 +1,5 @@
+# Added lines that hygiene.sh's names check lets through: PATH:SHA1 of the
+# line's exact text (without its newline). Editing the line changes its hash.
+# The owner's own sentence about how the port was made (README.md line 3),
+# kept as the owner wrote it in openFPGA-7800.
+README.md:1f6bc80d4f156744b5737be3ee1133cba820e306
