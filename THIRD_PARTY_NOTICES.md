@@ -16,7 +16,7 @@ https://github.com/Miasmark/openFPGA-2600
 |---|---|---|---|---|
 | Atari 2600 system from the MiSTer Atari7800 core (TIA, RIOT, Sally 6507, 2600 mappers and their detection, MARIA's clock and 2600 decode, video and palette mux, paddles, the ARM mapper sources) | `src/fpga/mister/rtl/` | Jamie Blanks and contributors | MIT (`src/fpga/mister/LICENSE`) | Built |
 | Comments quoting Stella's cartridge detection (`CartDetector::isProbably*`, kept as upstream has them) | `src/fpga/mister/rtl/detect2600.sv` | Bradford W. Mott, Stephen Anthony and the Stella Team | GPL-2.0-or-later (`LICENSES/GPL-2.0.txt`) | Comments only: no logic |
-| CRC-32 function (`nextCRC32_D8`, used by the cartridge detection) | `src/fpga/mister/rtl/detect2600.sv`, end of file | Easics NV | Easics' notice in the file: use and distribution without restriction, keeping the notice and its disclaimer | Built |
+| CRC-32 function (`nextCRC32_D8`, used by the cartridge detection) | `src/fpga/mister/rtl/detect2600.sv`, end of file | Easics NV | Easics' notice, quoted in full below | Built |
 | SDRAM controller | `src/fpga/mister/rtl/sdram.sv` | Sorgelig | GPL-3.0-or-later (`LICENSES/GPL-3.0.txt`) | Built |
 | 24LC0x EEPROM (SaveKey) | `src/fpga/mister/rtl/EEPROM_24LC256.sv` | GreyRogue, from NES_MiSTer; adapted upstream | GPL-3.0 (NES_MiSTer's license, `LICENSES/GPL-3.0.txt`) | Built |
 | Paddle timing, light gun | `src/fpga/mister/rtl/paddles.sv`, `lightgun.sv` | Jamie Blanks (`paddles.sv`); `lightgun.sv` has no header and matches the light-gun module in Sorgelig's MiSTer cores | MIT with the rest of the MiSTer 7800 repository; `lightgun.sv` may also be under those cores' GPL (`LICENSES/GPL-3.0.txt`) | Built |
@@ -29,10 +29,31 @@ https://github.com/Miasmark/openFPGA-2600
 | Video mixer | `src/fpga/mister/rtl/video_mixer_plus.sv` | Alexey Melnikov (Sorgelig) | GPL | Repo only |
 | ARM7TDMI core | `src/fpga/mister/rtl/arm7tdmi/arm7tdmi_core.sv` | Robert Peip and the GBA_MiSTer contributors | GPL-2.0-only (`LICENSES/GPL-2.0.txt`) | Repo only (the simulation reference DARIA was checked against) |
 | T65 | `src/fpga/mister/rtl/t65/` | Daniel Wallner, Mike Johnson, Wolfgang Scherr, Morten Leikvoll | BSD-style (file headers) | Repo only |
+| PS/2 keyboard and mouse decoder (module `ps2`; the file's header names it `ps2.v`) | `src/fpga/mister/rtl/mouse_st.sv` | Not stated: no author or license in the file. It came with the MiSTer Atari7800 core's `rtl/` sources into openFPGA-7800 | None stated in the file; the MiSTer repository's `LICENSE` is MIT | Repo only (listed in `core.qip` and parsed, but nothing instantiates it) |
+| Dual-clock RAM wrapper (entity `dpram_dc`) around Intel's `altera_mf` `altsyncram` | `src/fpga/mister/rtl/dpram.vhd` | Not stated: no header. It came with the MiSTer Atari7800 core's `rtl/` sources | None stated in the file; the MiSTer repository's `LICENSE` is MIT | Repo only (listed in `core.qip` and parsed, but nothing instantiates it) |
 
 The bitstream is MIT and GPL-3.0 code with Analogue's and Intel's parts.
 Stella's code appears only as comments in `detect2600.sv`; GPL-2.0-or-later
 code may be combined with the GPL-3.0 parts.
+
+### Easics CRC-32 notice
+
+The CRC-32 function at the end of `src/fpga/mister/rtl/detect2600.sv` is
+built into the bitstream. Its notice asks that any derivative work contain
+the original copyright notice and the associated disclaimer. They are, word
+for word as in the file:
+
+```
+Copyright (C) 1999-2008 Easics NV.
+This source file may be used and distributed without restriction
+provided that this copyright statement is not removed from the file
+and that any derivative work contains the original copyright notice
+and the associated disclaimer.
+
+THIS SOURCE FILE IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS
+OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+```
 
 ## Embedded ROM images
 

@@ -10,8 +10,8 @@ Firmware (optional, in /Assets/2600/common/):
   supercharger.bin  Starpath Supercharger BIOS (2 KiB). Without it the
                     core loads Supercharger games itself.
 
-Controls: A fire, B fire 2, X/Y the same with Turbo, L colour/B&W,
-Select, Start = Reset. Port 1 and 2 Input: joystick, paddles, driving,
+Controls: A fire, X fire (repeats with Turbo), B the paddle button or
+trigger (a joystick has none), L colour/B&W, Select, Start = Reset. Port 1 and 2 Input: joystick, paddles, driving,
 light gun; port 1 also dual stick and Booster Grip. Set by hand per game.
 
 Saves: one shared file each for all games: savekey.sav (SaveKey on

@@ -67,20 +67,25 @@ findings: none of them is a name from the private list.
   `sim/check/hygiene.sh` to let that one exact line through
   (`--allow-line`; the entry is in `sim/check/hygiene_allow_lines.txt`).
   It reached `dev` in the merge `aa4bc2f`.
-- **The cuts**, one commit each, every one checked against 2.2.4's
-  fingerprints before it was made:
+- **The cuts**, one commit each. Every commit that changed what the
+  simulated RTL does was checked against 2.2.4's fingerprints: the cuts
+  `271becf` to `73fd755` each in its own step, the packaging (`015de7f`,
+  `564985b`) at its merge `4e5be35`, and `79de061` in the identity gate of
+  the branch `step6-tests`. The other commits change only comments, timing
+  constraints, the crossing tables, where a declaration sits, the tests or
+  the documents:
 
 | Commit | What it does |
 |---|---|
 | `271becf` | renames the wrapper `atari7800_pocket.sv` to `atari2600_pocket.sv`, instance names kept |
-| `3291616` | ties off the wrapper's 7800 parts (7800 BIOS, high score cart, BupChip firmware slot, Souper profile) and refuses A78 images |
+| `3291616` | ties off the wrapper's 7800 parts (7800 BIOS, high score cart, BupChip firmware slot, Souper profile), refuses A78 images, and makes the menu (Mapper and Mapper (more), Left and Right Difficulty, TV Type, SaveKey Off/On) |
 | `6e3b6b3` | removes the 7800 cartridge (`cart.sv`), its RAM and BIOS path, and the 7800 sound chips (`jt51/`, `SN76489/`, `Minnie/`, `souper.v`, `ps2_to_pokey.v`) |
 | `3fd7f17` | replaces INPTCTRL with one register |
 | `73fd755` | reduces MARIA to its clock and 2600 decode (`DMA.sv`, `control.sv`, `line_ram.sv`, `video_sync.sv` removed) |
-| `015de7f`, `564985b` | package the core as `Miasmark.2600` (2600 platform, menu, data slots); merged in `4e5be35` |
+| `015de7f`, `564985b` | package the core as `Miasmark.2600` (2600 platform, scaler modes, the APF file checks); merged in `4e5be35` |
 | `01fb35b` | comments and the DARIA crossing tables after the cuts |
 | `21a5d5d`, `834596d`, `329a08b` | the SaveKey read byte's hold exception, a declaration fix and the crossing tables for the first 2600 fits |
-| `79de061`, `c14802f`, `0799f8f`, `12f41eb` | (branch `step6-tests`) the tests ported to the 2600 core; `0799f8f` removes the 7800-only tests, `Pokey/`, `PokeyWatson/` and `pokey_adapter_watson.sv` |
+| `79de061`, `c14802f`, `0799f8f`, `12f41eb` | (branch `step6-tests`) `79de061` maps Port Input 0 straight to the joystick; the tests ported to the 2600 core; `0799f8f` removes the 7800-only tests, `Pokey/`, `PokeyWatson/` and `pokey_adapter_watson.sv` |
 
 - **The documents** (branch `step8-docs`): the README, THIRD_PARTY_NOTICES
   and this section written for the 2600 core, `LICENSES/GPL-2.0.txt` added,

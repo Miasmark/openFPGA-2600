@@ -22,7 +22,7 @@ exception (see *Verification*).
   14,639 (79%) for the 7800 core, and the menu has room for settings the
   7800 core had no room for:
   - **a Mapper setting**, which the 7800 core had wired but not shown. It
-    also reaches the multicart schemes, which auto-detection never picks;
+    also reaches the multicart schemes, which auto-detection misses;
   - **both difficulty switches and the TV Type switch** as settings of
     their own.
 - **The Pocket's library.** The core uses the platform `2600`, as
@@ -33,17 +33,20 @@ exception (see *Verification*).
 
 - **2600 cartridges** (`.a26`, `.bin`) with MiSTer's bankswitch
   auto-detection, from the image's size and code signatures:
-  - the standard schemes: 2K, 4K, F8 (8K), F6 (16K), F4 (32K) and F0 (64K),
-    with or without Superchip RAM;
+  - the standard schemes: 2K, 4K, F8 (8K), F6 (16K), F4 (32K) and F0 (64K).
+    4K, F8, F6 and F4 come with or without Superchip RAM; 2K and F0 never
+    get it;
   - FA (CBS RAM+), FE (Activision), E0 (Parker Bros.), E7 (M Network),
     3F (Tigervision), 3E, CV (Commavid), UA (UA Ltd.), EF, SB, WD (Pink
-    Panther), JANE (Tarzan), CTY (Chetiry), 0840, FC (Power Play), DF and BF,
-    and 32-in-1 multicarts;
+    Panther), JANE (Tarzan), CTY (Chetiry), 0840, FC (Power Play), DF and BF
+    (EF, DF and BF also in their Superchip forms: EFSC, DFSC, BFSC);
   - DPC (Pitfall II), FA2 (Star Castle Arcade, with its flash saves), AR
     (the Starpath Supercharger), and the ARM schemes DPC+, CDF, CDFJ and
     CDFJ+ (next item).
   - The multicart schemes MC2K, MC4K and MC8K are reached through the
-    *Mapper (more)* setting only.
+    *Mapper (more)* setting only. So is 32-in-1 for a real 32-in-1 image:
+    it is 64 KB, and detection takes a 64 KB image as F0 (or EF). It picks
+    32-in-1 only for an image between 32 and 64 KB long.
 - **2600 ARM cartridges**: DPC+ and the CDF family (CDF, CDFJ and CDFJ+),
   the Harmony and Melody games such as the Champ Games releases. MiSTer runs
   them on a soft ARM7TDMI that doesn't fit the Pocket; this core runs them on
@@ -55,7 +58,8 @@ exception (see *Verification*).
   MiSTer's core is late on. Images up to 512 KB (CDFJ+'s largest) load; the
   largest game tested is 128 KB (Turbo). The first 64 KB of an image are in
   block RAM and the rest is read through a cache over the Pocket's PSRAM.
-  ARM code beyond the first 64 KB halts the CPU; no known game has any there
+  ARM code beyond the first 64 KB, or an LDM from there, halts the CPU; in
+  every tested image the code ends below $B30A, about 45 KB in
   ([open item 5](docs/DARIA_CORE.md#open-items)). The ARM chip's peripherals
   beyond its timer and memory accelerator, such as a Melody board's
   optional EEPROM, read as zero
@@ -74,9 +78,10 @@ exception (see *Verification*).
   `savekey.sav` for all games, like the real device. A new file starts blank
   ($FF), as a real SaveKey does. *SaveKey (port 2)* is Off by default: turn
   it On for games that save to a SaveKey or speak through an AtariVox. With
-  it On, port 2's LEFT (also the button of paddle 3) reads the SaveKey
-  instead, so a two-player or four-paddle game loses it. A 2600 image has
-  no header to ask for a SaveKey, so there is no Auto setting.
+  it On, port 2's LEFT (also the button of the second paddle on port 2,
+  controller 4) reads the SaveKey instead, so a two-player or four-paddle
+  game loses it. A 2600 image has no header to ask for a SaveKey, so there
+  is no Auto setting.
 - **AtariVox voice** (the SpeakJet speech chip on port 2). The voice is
   there whenever the SaveKey is On, and *AtariVox Voice* sets its level in
   the mix (Off, Quiet, Normal, Loud: x4, x8 and x16; Normal is the default,
@@ -102,11 +107,11 @@ exception (see *Verification*).
   Auto the core measures the game's frame length; when it finds a PAL game
   it retunes the PLL, which holds the core in reset for a moment, and the
   game restarts once. PAL frames show 288 lines, NTSC ones 240, and the
-  Pocket's display mode follows.
+  Pocket's scaler mode follows (160x288 or 160x240).
 - **PAL60 games** (PAL releases that draw 262-line, 60 Hz frames, such as
   Stay Frosty 2's PAL build) look like NTSC games to *Region* Auto, so they
   run with the NTSC clock and NTSC colours. *Region* PAL gives them the PAL
-  clock and colours, but the 288-line display mode for a 262-line picture.
+  clock and colours, but the scaler mode (160x288) for a 262-line picture.
 - **Video**: *Palette* (warm, cool or hot: the MiSTer 7800 core's palettes,
   by Robert Tuccitto, which the TIA's colours index), *2600 Video* (Flicker
   Blend, and De-comb, which smooths the comb pattern some games draw by
@@ -144,12 +149,12 @@ The Pocket shows at most 16 settings; this core uses all 16.
 | *Swap Controllers* | on, off | Swaps ports 1 and 2 |
 | *Port 1 Input* | Joystick, Paddles, Driving, Light Gun, Dual Stick, Booster Grip | The controller on port 1 (see *Controls*) |
 | *Port 2 Input* | Joystick, Paddles, Driving, Light Gun | The controller on port 2 |
-| *Turbo (X/Y)* | Off, Fast, Medium, Slow | X and Y repeat fire while held |
+| *Turbo (X/Y)* | Off, Fast, Medium, Slow | X repeats fire while held; Y's half does nothing in this core (see *Controls*) |
 | *Region* | Auto, NTSC, PAL | Auto follows the game's frame length (see *PAL games*) |
 | *Palette* | Warm, Cool, Hot | |
 | *SaveKey (port 2)* | Off, On (default Off) | The SaveKey and the AtariVox; On takes port 2's LEFT |
 | *AtariVox Voice* | Off, Quiet, Normal, Loud (default Normal) | The voice's level, while the SaveKey is On |
-| *Audio* | Mono TIA, Stereo TIA, Stereo 25% Blend, Stereo 50% Blend, Full Mono | |
+| *Audio* | Mono TIA, Stereo TIA, Stereo, 25% Blend, Stereo, 50% Blend, Full Mono | |
 | *2600 Video* | Normal, Flicker Blend, De-comb, Blend + De-comb | |
 | *Mapper* | Auto, 2K, F8, F6, F4, F0, FA, FE, E0, E7, 3F, 3E, CV, UA, EF, SB | Forces a scheme for the cartridge you load next |
 | *Mapper (more)* | Auto, AR, DPC, DPC+, CDF / CDFJ / CDFJ+, FA2, WD, JANE, CTY, 0840, FC, DF / BF, Multicart 2K, 4K and 8K, 32-in-1 | The same, for the other schemes; *Mapper* wins when both are set |
@@ -165,7 +170,7 @@ unsupported-cartridge screen), and neither can ELF.
 |---|---|
 | D-pad | Joystick |
 | A / X | Fire; X repeats with *Turbo (X/Y)* on |
-| B / Y | Second button, read on the pot line (INPT1 or INPT3) as a two-button pad gives it; Y repeats with *Turbo (X/Y)* on |
+| B / Y | Nothing: the 2600 joystick has one button. B is the button of the other controllers (below) |
 | L | Colour / B&W (toggles *TV Type*) |
 | Select | Select |
 | Start | Reset |
@@ -197,12 +202,15 @@ by how far the stick is pushed. The next D-pad press takes over again.
   (X and B, or Y and A) the one pressed last wins, since a real joystick
   can't point both ways.
 - **Booster Grip** (Omega Race, Thrust+): A fires, B is the grip's trigger
-  and X its booster button.
+  and X its booster button. X also fires, as on a joystick.
 
-*Turbo (X/Y)* makes X repeat A's fire and Y repeat B's button while held
-(each sits next to the button it copies on the diamond), at
-15, 10 or 7.5 presses a second (Fast / Medium / Slow; 12.5, 8.3 and 6.25
-in PAL games). A and B stay single presses.
+*Turbo (X/Y)* makes X repeat A's fire while held, at 15, 10 or 7.5
+presses a second (Fast / Medium / Slow; 12.5, 8.3 and 6.25 in PAL games).
+A stays a single press, and with *Turbo* Off X fires as A does. Y's half
+of the setting has no effect: it repeats B on the joystick's
+second-button line, which no mode of this core reads. The paddles,
+driving controller, light gun and Booster Grip take B (and A) directly,
+and in those modes Y moves fast (above); on the Dual Stick Y fires left.
 
 Some paddle games read the second paddle of the pair for player 1 (Demons
 to Diamonds, for one; Stella keeps a "swap paddles" list for them). If a
@@ -260,7 +268,7 @@ frame length, RIOT RAM, picture, audio, the CPU's bus and the reset times
 | Check | Result |
 |---|---|
 | The import, unchanged | Every `sim/run_sim.sh` case gives 2.2.4's fingerprints byte for byte: 32 cases with DARIA, 29 in the build without it |
-| `sim/run_sim.sh` after the cuts | Every 2600 case, in both builds, gives 2.2.4's fingerprints in every column. The cases that differ test 7800 features this core no longer has (7800 mode, the BIOS, A78 images, the BupChip, POKEY). In one case, a 2600 image loaded after an A78, the frames after the load end 4 clocks earlier than in 2.2.4: in 2.2.4 the first image ran in 7800 mode and left MARIA's processor clock divider elsewhere. With a 2600-only history the two cores agree on every column |
+| `sim/run_sim.sh` after the cuts | Every 2600 case, in both builds, gives 2.2.4's fingerprints in every column. The cases that differ test 7800 features this core no longer has (7800 mode, the BIOS, A78 images, the BupChip, POKEY). In one case, a 2600 image loaded after an A78, the frames after the load end 4 clocks earlier than in 2.2.4, and the RIOT RAM column, sampled at that moment, differs with them: in 2.2.4 the first image ran in 7800 mode and left MARIA's processor clock divider elsewhere. With a 2600-only history the two cores agree on every column |
 | 2600 cartridge RAM | The matrix of cartridge-RAM cases and its s19 sweep: 21 fingerprints in each build, byte for byte 2.2.4's |
 | 2600 ARM cartridges | The 15 Champ Games demos and Stratovox, 1,500 frames each (frames 1-1,499 compared): frame length, RIOT RAM, picture and audio on every frame, and every ARM call's timing and instruction count, identical to 2.2.4 |
 | TIA pitch | Pure tone, AUDF 0 / 14: 15,700.0 / 1,045 Hz against the TIA's 15,699.8 / 1,046.7 Hz, as in 2.2.4 (the same fingerprints) |
@@ -278,7 +286,8 @@ the worse slow corner: +3.159 ns on clk_sdram (against a release gate of
 the one path of DARIA's front end that is timed on its own (its phase
 detector, bounded at 8.0 / 0.5 ns), whose hold slack is +0.313 ns. Worst
 hold slack +0.125 ns. Seeds 1 and 3 pass every check too, with +2.525 and
-+3.025 ns on clk_sdram; seed 2 has the most clk_sdram margin, which decides,
++3.025 ns on clk_sdram (seed 1 on the tree just before `329a08b`, the
+crossing-table update); seed 2 has the most clk_sdram margin, which decides,
 as for 2.2.4. The debug build (with DARIA's status overlay) passes on seeds
 1, 2 and 3.
 
@@ -428,6 +437,9 @@ bitstream.
   Stella's GPL-2.0-or-later. The ARM7TDMI core, kept for simulation and not
   built, is GPL-2.0-only. The text is in
   [LICENSES/GPL-2.0.txt](LICENSES/GPL-2.0.txt).
+- The CRC-32 function at the end of `detect2600.sv` is Easics NV's, under
+  its own notice; THIRD_PARTY_NOTICES.md quotes the notice and its
+  disclaimer in full.
 - `src/fpga/apf/`, `core_top.v` and `core_bridge_cmd.v` are Analogue's
   framework and template, under Analogue's terms.
 - The platform files in `dist/Platforms/` are Spiritualized's (above).
