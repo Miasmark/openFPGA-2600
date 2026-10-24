@@ -1,9 +1,9 @@
-# Developing the Atari 7800 Pocket core
+# Developing the Atari 2600 Pocket core
 
-This guide is for anyone who wants to change the core or update the parts
-it's built from. It covers where things live, how to build and test, how to
-make the common changes, and the mistakes this port has already made so you
-don't repeat them.
+This guide comes from openFPGA-7800 and is not yet rewritten for the 2600
+core. Its layout, tools, recipes and pitfalls apply here; its parts on the
+7800-only hardware (MARIA, POKEY, the BIOS, the high score cart, the BupChip's
+music) describe the 7800 core, whose repository still has them.
 
 Related documents:
 
@@ -293,7 +293,7 @@ port has already had:
    `bridge_rd_data` a few cycles after setting the address, then pulses
    `bridge_rd`, and expects the word latched at the previous pulse. Answering
    with the current address rotates the saved file by 4 bytes (2.0.2–2.0.3
-   HSC saves; `tools/fix_hsc_save.py` repairs them).
+   HSC saves; openFPGA-7800's `tools/fix_hsc_save.py` repairs them).
 2. Report the slot's size in the data slot table (`core_top.v`, the
    `dt_sel` rotation, address `index * 2 + 1`), as a **constant**. The Pocket
    reads the size before it writes the settings, so a size that depends on a

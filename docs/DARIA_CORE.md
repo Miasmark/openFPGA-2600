@@ -149,7 +149,7 @@ Thirteen more demo images, published by Champ Games but written by others, joine
   - Collisions: 2 for upstream and none for DARIA in 113.7 M console-side cart RAM reads.
 
   Step 6's mode-A shadow adds the nine to its set.
-- **FA2 aside.** The Pocket build runs FA2, but its NVRAM bridge is not connected (`atari7800_pocket.sv:1002-1008`: reads give `$FF`), so Star Castle Arcade's saves do not persist. That is outside DARIA.
+- **FA2 aside.** When this was written, the Pocket build ran FA2 without its NVRAM bridge (reads gave `$FF`), so Star Castle Arcade's saves did not persist. From openFPGA-7800 2.2.4 the bridge is connected to the shared `fa2.sav` slot, and Star Castle Arcade keeps its high scores on hardware; this core keeps that. It is outside DARIA.
 
 ### Packaging
 

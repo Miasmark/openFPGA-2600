@@ -60,6 +60,35 @@ files kept as openFPGA-7800 has them; they are allowed by path
 A second run without any `--allow` shows that these are the only
 findings: none of them is a name from the private list.
 
+## After the import
+
+- **README line 3.** The import replaced it (above). `b7e5405` put the
+  owner's own sentence back, byte for byte as in openFPGA-7800, and taught
+  `sim/check/hygiene.sh` to let that one exact line through
+  (`--allow-line`; the entry is in `sim/check/hygiene_allow_lines.txt`).
+  It reached `dev` in the merge `aa4bc2f`.
+- **The cuts**, one commit each, every one checked against 2.2.4's
+  fingerprints before it was made:
+
+| Commit | What it does |
+|---|---|
+| `271becf` | renames the wrapper `atari7800_pocket.sv` to `atari2600_pocket.sv`, instance names kept |
+| `3291616` | ties off the wrapper's 7800 parts (7800 BIOS, high score cart, BupChip firmware slot, Souper profile) and refuses A78 images |
+| `6e3b6b3` | removes the 7800 cartridge (`cart.sv`), its RAM and BIOS path, and the 7800 sound chips (`jt51/`, `SN76489/`, `Minnie/`, `souper.v`, `ps2_to_pokey.v`) |
+| `3fd7f17` | replaces INPTCTRL with one register |
+| `73fd755` | reduces MARIA to its clock and 2600 decode (`DMA.sv`, `control.sv`, `line_ram.sv`, `video_sync.sv` removed) |
+| `015de7f`, `564985b` | package the core as `Miasmark.2600` (2600 platform, menu, data slots); merged in `4e5be35` |
+| `01fb35b` | comments and the DARIA crossing tables after the cuts |
+| `21a5d5d`, `834596d`, `329a08b` | the SaveKey read byte's hold exception, a declaration fix and the crossing tables for the first 2600 fits |
+| `79de061`, `c14802f`, `0799f8f`, `12f41eb` | (branch `step6-tests`) the tests ported to the 2600 core; `0799f8f` removes the 7800-only tests, `Pokey/`, `PokeyWatson/` and `pokey_adapter_watson.sv` |
+
+- **The documents** (branch `step8-docs`): the README, THIRD_PARTY_NOTICES
+  and this section written for the 2600 core, `LICENSES/GPL-2.0.txt` added,
+  `tools/fix_hsc_save.py` (a 7800 high score cart tool) removed, and the
+  CI's game-data check (`sim/check/game_data.py`) added.
+
+The files removed by these commits stay in the history, from the import on.
+
 ## Imported files
 
 Each file's path in openFPGA-7800 (the same path here) and its blob at `3c7041c`;
