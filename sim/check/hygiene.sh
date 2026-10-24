@@ -26,9 +26,15 @@
 #     Without the list, or with a list that holds no name (empty, or only
 #     comment lines, which start with #), the run fails: the check did not
 #     happen.
+#     --allow-line PATH:SHA1 lets one added line of PATH through the names
+#     check only: the line whose text (without its newline) has that SHA-1.
+#     Any edit to the line changes its hash, and the check applies again.
+#     It is for the owner's own sentence in README.md, kept as written.
+#     The repository's own entries are in sim/check/hygiene_allow_lines.txt
+#     (PATH:SHA1, # comments), which is always read.
 # Commit messages are not files and are not checked here.
 #   sim/check/hygiene.sh [--base REV] [--names FILE] [--allow PATH]... [--limit BYTES]
-#                        [--repo DIR]
+#                        [--allow-line PATH:SHA1]... [--repo DIR]
 # --repo checks another checkout (default: the one this script is in).
 # Exit status 0 when nothing is found, 1 otherwise, 2 on a usage error.
 # SPDX-License-Identifier: MIT
@@ -39,21 +45,28 @@ BASE=aeee6d2
 NAMES="${HYGIENE_NAMES:-}"
 LIMIT=262144
 ALLOW=()
+ALLOW_LINE=()
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--base) BASE="$2"; shift 2 ;;
 		--names) NAMES="$2"; shift 2 ;;
 		--allow) ALLOW+=("$2"); shift 2 ;;
+		--allow-line) ALLOW_LINE+=("$2"); shift 2 ;;
 		--limit) LIMIT="$2"; shift 2 ;;
 		--repo) REPO="$(git -C "$2" rev-parse --show-toplevel)" || exit 2; shift 2 ;;
 		*) echo "hygiene.sh: unknown argument $1" >&2; exit 2 ;;
 	esac
 done
 git -C "$REPO" rev-parse --verify -q "$BASE^{commit}" > /dev/null || { echo "hygiene.sh: no commit $BASE" >&2; exit 2; }
-python3 - "$REPO" "$BASE" "$NAMES" "$LIMIT" "${ALLOW[@]}" <<'PY'
-import os, re, subprocess, sys
+ALLOW_LINES="$(printf '%s\n' "${ALLOW_LINE[@]}")" python3 - "$REPO" "$BASE" "$NAMES" "$LIMIT" "${ALLOW[@]}" <<'PY'
+import hashlib, os, re, subprocess, sys
 repo, base, names, limit = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
 allow = set(sys.argv[5:])
+al = os.environ.get("ALLOW_LINES", "").splitlines()
+alf = os.path.join(repo, "sim", "check", "hygiene_allow_lines.txt")
+if os.path.exists(alf):
+    al += [l.split("#", 1)[0].strip() for l in open(alf)]
+allow_line = {tuple(a.rsplit(":", 1)) for a in al if ":" in a}
 
 def git(*a):
     return subprocess.run(["git", "-C", repo] + list(a), capture_output=True, text=True, errors="replace", check=True).stdout
@@ -146,6 +159,8 @@ else:
                 re.compile(r"(?<![A-Za-z0-9])" + re.escape(w) + r"(?![A-Za-z0-9])", re.I) for w in words]
         hits = 0
         for f, t in added:
+            if (f, hashlib.sha1(t.encode()).hexdigest()) in allow_line:
+                continue
             for w, p in zip(words, pats):
                 if p.search(t):
                     hits += 1

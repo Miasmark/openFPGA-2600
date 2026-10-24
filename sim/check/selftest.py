@@ -134,6 +134,7 @@ the input-dependent groups below that did not run for want of their input
 SPDX-License-Identifier: MIT
 """
 import argparse
+import hashlib
 import os
 import random
 import re
@@ -773,6 +774,15 @@ def hygiene_cases(w):
         ("listed name inside a camelCase identifier", lambda: write(d, "docs/x.md", "QuuxbotHelper wrote it\n"), False, ["--names", names]),
         ("listed name inside a snake_case identifier", lambda: write(d, "sim/x.py", "quuxbot_x = 1\n"), False, ["--names", names]),
         ("listed name in a file name", lambda: write(d, "docs/Quuxbot-notes.md", "x\n"), False, ["--names", names]),
+        # --allow-line: only the line with that exact text, and only in that file
+        ("listed name in a line given by --allow-line", lambda: write(d, "README", "test\nwritten with quuxbot\n"), True,
+         ["--names", names, "--allow-line", "README:" + hashlib.sha1(b"written with quuxbot").hexdigest()]),
+        ("--allow-line, the line edited", lambda: write(d, "README", "test\nwritten with quuxbot!\n"), False,
+         ["--names", names, "--allow-line", "README:" + hashlib.sha1(b"written with quuxbot").hexdigest()]),
+        ("--allow-line, another listed line beside it", lambda: write(d, "README", "test\nwritten with quuxbot\nquuxbot again\n"),
+         False, ["--names", names, "--allow-line", "README:" + hashlib.sha1(b"written with quuxbot").hexdigest()]),
+        ("--allow-line, the same line in another file", lambda: write(d, "docs/x.md", "written with quuxbot\n"), False,
+         ["--names", names, "--allow-line", "README:" + hashlib.sha1(b"written with quuxbot").hexdigest()]),
     ]
     for name, fn, want, extra in cases:
         g("checkout", "-q", "-f", "base")

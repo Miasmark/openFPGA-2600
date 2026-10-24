@@ -1,6 +1,6 @@
 # Atari 7800 for Analogue Pocket
 
-To be clear and upfront, this port was assisted by an AI coding assistant. I wanted it to exist and tested
+To be clear and upfront, this port was assisted by Claude. I wanted it to exist and tested
 functionality as best I could.
 
 An Atari 7800 ProSystem core for the Analogue Pocket (openFPGA), ported from
