@@ -2,13 +2,13 @@
   "core": {
     "magic": "APF_VER_1",
     "metadata": {
-      "platform_ids": ["7800"],
-      "shortname": "7800",
-      "description": "Atari 7800 ProSystem, ported from the MiSTer Atari7800 core by Jamie Blanks (Kitrinx).",
+      "platform_ids": ["2600"],
+      "shortname": "2600",
+      "description": "Atari 2600 (VCS), from the MiSTer Atari7800 core by Kitrinx",
       "author": "Miasmark",
-      "url": "https://github.com/Miasmark/openFPGA-7800",
-      "version": "2.2.4",
-      "date_release": "2026-10-23"
+      "url": "https://github.com/Miasmark/openFPGA-2600",
+      "version": "1.0.1",
+      "date_release": "2026-10-24"
     },
     "framework": {
       "target_product": "Analogue Pocket",
@@ -27,7 +27,7 @@
       {
         "name": "default",
         "id": 0,
-        "filename": "atari7800.rbf_r"
+        "filename": "atari2600.rbf_r"
       }
     ]
   }

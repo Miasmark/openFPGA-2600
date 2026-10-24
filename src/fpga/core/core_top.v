@@ -375,7 +375,7 @@ localparam [15:0] SLOT_ARFW = 16'h0107;
     reg     [4:0]   set_bs        = 5'd0;   // Mapper: 0 auto, else forced (bss_type index)
     reg     [4:0]   set_bs_more   = 5'd0;   // Mapper (more): the same, the second list
     reg             set_bw        = 1'b0;   // Colour/B&W: 0 colour, 1 B&W
-    reg     [2:0]   set_port1     = 3'd0;   // 0 auto, 1 joystick, 2 paddles, 3 driving, 4 light gun
+    reg     [2:0]   set_port1     = 3'd0;   // 0 joystick (the wrapper's auto), 2 paddles, 3 driving, 4 light gun, 5 dual stick, 6 Booster Grip
     reg     [2:0]   set_port2     = 3'd0;
     reg     [1:0]   set_turbo     = 2'd0;   // X / Y turbo: off, fast, medium, slow
     reg     [1:0]   set_atarivox  = 2'd2;   // AtariVox voice: off, quiet, normal, loud
@@ -815,7 +815,10 @@ end
 
     wire    [7:0]   core_r, core_g, core_b;
     wire            core_hs, core_vs, core_hb, core_vb, core_ce;
+    // tia_mode_o no longer picks a scaler slot (two slots, by video_pal_o)
+    /* verilator lint_off UNUSEDSIGNAL */
     wire            core_tia_mode;
+    /* verilator lint_on UNUSEDSIGNAL */
     wire            core_is_pal;
     wire            core_video_pal;
     wire    [15:0]  audio_l, audio_r;
@@ -952,18 +955,16 @@ assign dram_dqm = {dram_dqmh, dram_dqml};
 
 wire core_de = ~(core_hb | core_vb);
 
-// Scaler slots (video.json). The height must match what MARIA or the TIA
-// actually sends, or the Pocket shows the top of the frame and cuts the rest.
-//        with border  no border  2600
-//   NTSC      0 372x224  1 320x224  2 160x240
-//   PAL       3 372x274  4 320x274  5 160x288
-// The 7800 core's Show Overscan slots (6 372x242, 7 320x242) and No Border
-// are gone with the Picture item; MARIA (no cartridge loaded yet) uses 0 or
-// 3. The renumbering to the 2600's two modes is plan step 5's (video.json).
-// Slots 8 and above make the Pocket fall back to the wrong height, which is
-// what a 292 line PAL mode did on hardware.
-wire [2:0] video_slot  = core_tia_mode ? (core_video_pal ? 3'd5 : 3'd2) :
-                                         (core_video_pal ? 3'd3 : 3'd0);
+// Scaler slots (video.json). The height must match what the TIA actually
+// sends, or the Pocket shows the top of the frame and cuts the rest:
+//   0  NTSC  160x240
+//   1  PAL   160x288
+// The 7800 core's six MARIA slots are gone (plan step 5); its 2600 slots
+// were 2 and 5. A slot past the list makes the Pocket fall back to the
+// wrong height, which is what a 292 line PAL mode did on hardware. MARIA's
+// picture is gone from the system module (plan step 4): the TIA is the only
+// source, before the first cartridge and while one loads as well.
+wire [2:0] video_slot  = core_video_pal ? 3'd1 : 3'd0;
 
 always @(posedge clk_sys) begin
     vid_de   <= 1'b0;

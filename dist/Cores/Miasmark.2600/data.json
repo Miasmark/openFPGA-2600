@@ -15,7 +15,7 @@
         "address": "0x00000000"
       },
       {
-        "name": "Supercharger BIOS",
+        "name": "Supercharger",
         "id": "0x107",
         "required": false,
         "filename": "supercharger.bin",
