@@ -1,0 +1,421 @@
+{
+  "interact": {
+    "magic": "APF_VER_1",
+    "variables": [
+      {
+        "name": "Reset",
+        "id": 1,
+        "type": "action",
+        "enabled": true,
+        "address": "0x10000200",
+        "value": 1
+      },
+      {
+        "name": "Difficulty",
+        "id": 23,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x100002B0",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFC",
+        "options": [
+          {
+            "value": 3,
+            "name": "Left B, Right B"
+          },
+          {
+            "value": 2,
+            "name": "Left A, Right B"
+          },
+          {
+            "value": 1,
+            "name": "Left B, Right A"
+          },
+          {
+            "value": 0,
+            "name": "Left A, Right A"
+          }
+        ]
+      },
+      {
+        "name": "Swap Controllers",
+        "id": 3,
+        "type": "check",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x10000260",
+        "defaultval": 0,
+        "value": 1,
+        "mask": "0xFFFFFFFE"
+      },
+      {
+        "name": "Port 1 Input",
+        "id": 20,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x100002A4",
+        "defaultval": 0,
+        "mask": "0xFFFFFFF8",
+        "options": [
+          {
+            "value": 0,
+            "name": "Auto"
+          },
+          {
+            "value": 1,
+            "name": "Joystick"
+          },
+          {
+            "value": 2,
+            "name": "Paddles"
+          },
+          {
+            "value": 3,
+            "name": "Driving"
+          },
+          {
+            "value": 4,
+            "name": "Light Gun"
+          },
+          {
+            "value": 5,
+            "name": "Dual Stick"
+          },
+          {
+            "value": 6,
+            "name": "Booster Grip"
+          }
+        ]
+      },
+      {
+        "name": "Port 2 Input",
+        "id": 21,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x100002A8",
+        "defaultval": 0,
+        "mask": "0xFFFFFFF8",
+        "options": [
+          {
+            "value": 0,
+            "name": "Auto"
+          },
+          {
+            "value": 1,
+            "name": "Joystick"
+          },
+          {
+            "value": 2,
+            "name": "Paddles"
+          },
+          {
+            "value": 3,
+            "name": "Driving"
+          },
+          {
+            "value": 4,
+            "name": "Light Gun"
+          }
+        ]
+      },
+      {
+        "name": "Turbo (X/Y)",
+        "id": 22,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x100002AC",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFC",
+        "options": [
+          {
+            "value": 0,
+            "name": "Off"
+          },
+          {
+            "value": 1,
+            "name": "Fast"
+          },
+          {
+            "value": 2,
+            "name": "Medium"
+          },
+          {
+            "value": 3,
+            "name": "Slow"
+          }
+        ]
+      },
+      {
+        "name": "Region",
+        "id": 6,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x1000026C",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFC",
+        "options": [
+          {
+            "value": 0,
+            "name": "Auto"
+          },
+          {
+            "value": 1,
+            "name": "NTSC"
+          },
+          {
+            "value": 2,
+            "name": "PAL"
+          }
+        ]
+      },
+      {
+        "name": "Palette",
+        "id": 7,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x10000270",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFC",
+        "options": [
+          {
+            "value": 0,
+            "name": "Warm"
+          },
+          {
+            "value": 1,
+            "name": "Cool"
+          },
+          {
+            "value": 2,
+            "name": "Hot"
+          }
+        ]
+      },
+      {
+        "name": "High Score Cart",
+        "id": 8,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x10000274",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFC",
+        "options": [
+          {
+            "value": 0,
+            "name": "Auto"
+          },
+          {
+            "value": 1,
+            "name": "On"
+          },
+          {
+            "value": 2,
+            "name": "Off"
+          }
+        ]
+      },
+      {
+        "name": "SaveKey (port 2)",
+        "id": 15,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x10000290",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFC",
+        "options": [
+          {
+            "value": 0,
+            "name": "Auto"
+          },
+          {
+            "value": 1,
+            "name": "On"
+          },
+          {
+            "value": 2,
+            "name": "Off"
+          }
+        ]
+      },
+      {
+        "name": "AtariVox Voice",
+        "id": 28,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x100002C4",
+        "defaultval": 2,
+        "mask": "0xFFFFFFFC",
+        "options": [
+          {
+            "value": 0,
+            "name": "Off"
+          },
+          {
+            "value": 1,
+            "name": "Quiet"
+          },
+          {
+            "value": 2,
+            "name": "Normal"
+          },
+          {
+            "value": 3,
+            "name": "Loud"
+          }
+        ]
+      },
+      {
+        "name": "Skip BIOS",
+        "id": 12,
+        "type": "check",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x10000284",
+        "defaultval": 1,
+        "value": 1,
+        "mask": "0xFFFFFFFE"
+      },
+      {
+        "name": "Picture",
+        "id": 24,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x100002B4",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFC",
+        "options": [
+          {
+            "value": 0,
+            "name": "Normal"
+          },
+          {
+            "value": 1,
+            "name": "No Border"
+          },
+          {
+            "value": 2,
+            "name": "Overscan"
+          },
+          {
+            "value": 3,
+            "name": "Overscan, No Border"
+          }
+        ]
+      },
+      {
+        "name": "Audio",
+        "id": 25,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x100002B8",
+        "defaultval": 0,
+        "mask": "0xFFFFFFF8",
+        "options": [
+          {
+            "value": 0,
+            "name": "Mono TIA"
+          },
+          {
+            "value": 4,
+            "name": "Stereo TIA"
+          },
+          {
+            "value": 5,
+            "name": "Stereo, 25% Blend"
+          },
+          {
+            "value": 6,
+            "name": "Stereo, 50% Blend"
+          },
+          {
+            "value": 3,
+            "name": "Full Mono"
+          }
+        ]
+      },
+      {
+        "name": "2600 Video",
+        "id": 26,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x100002BC",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFC",
+        "options": [
+          {
+            "value": 0,
+            "name": "Normal"
+          },
+          {
+            "value": 1,
+            "name": "Flicker Blend"
+          },
+          {
+            "value": 2,
+            "name": "De-comb"
+          },
+          {
+            "value": 3,
+            "name": "Blend + De-comb"
+          }
+        ]
+      },
+      {
+        "name": "Compatibility",
+        "id": 27,
+        "type": "list",
+        "enabled": true,
+        "persist": true,
+        "writeonly": true,
+        "address": "0x100002C0",
+        "defaultval": 0,
+        "mask": "0xFFFFFFFC",
+        "options": [
+          {
+            "value": 0,
+            "name": "Default"
+          },
+          {
+            "value": 1,
+            "name": "POKEY IRQ"
+          },
+          {
+            "value": 2,
+            "name": "Random RAM"
+          },
+          {
+            "value": 3,
+            "name": "POKEY IRQ + Random RAM"
+          }
+        ]
+      }
+    ],
+    "messages": []
+  }
+}
