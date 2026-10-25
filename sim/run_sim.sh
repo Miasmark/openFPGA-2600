@@ -1,15 +1,16 @@
 #!/bin/bash
 # Build and run the whole-core simulation (tested with Verilator 5.040;
 # point VERILATOR at the binary if it is not the one on PATH).
-#   ./run_sim.sh [AUDF...]     default: 0 7 14 31
+#   ./run_sim.sh
+# openFPGA-2600 (plan step 6): the 2600 cases of the 7800 core's run_sim.sh,
+# without its 7800 sections (the 7800-mode tones and MARIA's geometry, the
+# BIOS boot rule, the BupChip end to end, the POKEY reads), and two reloads.
 # Environment (all optional; without them the runs are as they always were):
 #   WORK=DIR       work directory (default sim/work)
 #   VERILATOR=BIN  the Verilator to use (5.040; PATH's otherwise)
 #   VL_JOBS=N      build parallelism (default 4)
 #   DARIA=0|1      POCKET_DARIA off or on; default: as ap_core.qsf sets it
 #   BUP_DEBUG=0|1, BUPCHIP=0, SRAM=0: as below
-#   BIOS=FILE      the 7800 BIOS for the BIOS boot tests (below)
-#   BUPFW=FILE     the BupChip firmware (default src/fpga/mister/rtl/bupchip.hex)
 #   FP=1           every run also writes its per-frame fingerprint (tb_load's
 #                  and tb_system's +fp) to $WORK/fp/<case>.csv, for comparing
 #                  two builds frame by frame (sim/check/frame_gate.py --strict)
@@ -31,9 +32,6 @@
 #                  a scratch tree (sim/bupchip/dstat/run_ovl.sh); its log is
 #                  checked with run_sim_check.py --only daria, as it is no
 #                  whole run
-#   ONLY=pokey     the same for the POKEY read section (below), e.g. on a
-#                  scratch tree with the read fix undone; run_sim_check.py
-#                  --only pokey
 # The checker sim/check/run_sim_check.py turns this script's output into one
 # exit code.
 set -e
@@ -178,8 +176,7 @@ case "${ONLY:-}" in
 	"") ;;
 	daria) [ "$DARIA_ON" = 1 ] || { echo "run_sim.sh: ONLY=daria needs the DARIA build (DARIA=1)" >&2; exit 1; }
 		echo "-- run_sim.sh ONLY=daria: tb_load and the DARIA section alone, not a whole run" ;;
-	pokey) echo "-- run_sim.sh ONLY=pokey: tb_load and the POKEY read section alone, not a whole run" ;;
-	*) echo "run_sim.sh: ONLY=$ONLY: daria and pokey are the sections that run alone" >&2; exit 1 ;;
+	*) echo "run_sim.sh: ONLY=$ONLY: daria is the section that runs alone" >&2; exit 1 ;;
 esac
 if [ -n "${BUILD_TOP:-}" ]; then
 	case "$BUILD_TOP" in
@@ -214,36 +211,26 @@ fi
 cd "$WORK"
 # (ONLY=daria: from here to the DARIA section, every case is left out)
 if [ -z "${ONLY:-}" ]; then
-for audf in ${@:-0 7 14 31}; do
-	rm -f rtl/mem0.hex   # may be a link to the upstream file: never write through it
-	python3 "$HERE/tone_test.py" "$audf" > rtl/mem0.hex
-	out=$(sim ./obj/vtb +audf="$audf" $(fp tone_$audf))
-	echo "$out" | grep TONE; echo "$out" | grep FRAME | tail -1
-done
-echo "-- border hidden:"
-sim ./obj/vtb +audf=0 +hide_border $(fp border) | grep FRAME | tail -1
+# tb_system runs its program from rtl/mem0.hex (KEEP_NOCART_ROM), with no
+# cartridge loaded. The 7800 core's 7800-mode tones and MARIA's border and
+# geometry cases are gone with MARIA (plan step 4).
 echo "-- 2600 mode (TIA video, stabilised):"
 for audf in 0 14; do
-	rm -f rtl/mem0.hex
+	rm -f rtl/mem0.hex   # may be a link to the upstream file: never write through it
 	python3 "$HERE/tone_test.py" "$audf" 2600 > rtl/mem0.hex
 	out=$(sim ./obj/vtb +audf="$audf" +mode2600 $(fp mode2600_$audf))
 	echo "$out" | grep TONE; echo "$out" | grep FRAME | tail -1
 done
 
-echo "-- PAL and overscan geometry (expect 274 / 242 / 274 lines: PAL ignores overscan; video PAL flag set for PAL):"
-rm -f rtl/mem0.hex; python3 "$HERE/tone_test.py" 7 > rtl/mem0.hex
-for opt in "+pal" "+overscan" "+overscan +pal"; do
-	echo "  $opt: $(sim ./obj/vtb +audf=7 $opt $(fp geom_$(echo $opt | tr -d '+ ')) | grep FRAME | tail -1 | sed 's/^FRAME [0-9]*: //')"
-done
 echo "-- PAL 2600 frame, after region detection (expect 288 lines, video PAL 1):"
 rm -f rtl/mem0.hex; python3 "$HERE/tone_test.py" 14 2600 pal > rtl/mem0.hex
 sim ./obj/vtb +audf=14 +mode2600 +long $(fp pal2600) | grep FRAME | tail -1
 rm -f rtl/mem0.hex
 
-echo "-- load an A78 through the APF data loader:"
+echo "-- load an A78 through the APF data loader (refused, plan D8: the bad game screen, silent):"
 ln -sfn "$RTL/mem0.hex" rtl/mem0.hex     # upstream's built-in image: no tone
 python3 "$HERE/make_a78.py" 7 > load_test.a78
-sim ./obj_load/vtb +image=load_test.a78 +audf=7 $(fp load_a78) | grep -E "LOAD|TONE|HSC"
+sim ./obj_load/vtb +image=load_test.a78 +audf=7 $(fp load_a78) | grep -E "LOAD|TONE"
 
 echo "-- load a headerless 2600 image (4 KiB):"
 python3 "$HERE/tone_test.py" 14 2600 | head -4096 | python3 -c "import sys;sys.stdout.buffer.write(bytes(int(l,16) for l in sys.stdin))" > load_test.a26
@@ -271,10 +258,10 @@ echo "  a saved flash file (expect 2 loads, 1 save, 256 slot RAM writes; 0 bytes
 sim ./obj_load/vtb +image=fa2_test.a26 +fa2save=fa2_flash.bin +fa2expect=fa2_flash_expect.bin +fa2prog $(fp fa2_file) | grep -aE "^ *FA2"
 echo "  no file, a blank flash read as \$FF (expect the same counts; 0 bytes differ):"
 sim ./obj_load/vtb +image=fa2_test.a26 +fa2expect=fa2_blank_expect.bin +fa2prog $(fp fa2_blank) | grep -aE "^ *FA2"
-echo "  an A78 game with the file loaded, not taken for FA2 (expect 0 bytes differ):"
+echo "  an A78 game with the file loaded, not taken for FA2 (refused: expect mapper 32, 0 bytes differ):"
 sim ./obj_load/vtb +image=load_test.a78 +audf=7 +fa2save=fa2_flash.bin $(fp fa2_a78) | grep -aE "^ *FA2"
 python3 "$HERE/fa2_test.py" a78 > fa2_test.a78
-echo "  an A78 game taken for FA2 that issues a save command in 7800 mode, the file loaded (expect mapper 25, 0 bytes differ):"
+echo "  an A78 game that detect2600 takes for FA2 and that issues a save command, the file loaded (refused: expect mapper 32, 0 bytes differ):"
 sim ./obj_load/vtb +image=fa2_test.a78 +fa2save=fa2_flash.bin $(fp fa2_a78fa2) | grep -aE "^ *FA2"
 
 # The A78 refusal (openFPGA-2600, plan D8 and 7.D.3). An image whose bytes
@@ -305,176 +292,21 @@ for p in "^LOAD 16512 bytes, header ATARI, cart_is_7800=1, cart_size=16512, tia_
 done
 [ "$rf_ok" = 1 ] && echo "A78_REFUSAL pass" || echo "A78_REFUSAL FAIL"
 
-# The BIOS boot rule (docs/DARIA_CORE.md, decision 11). With a BIOS loaded
-# and Skip BIOS off, a 7800 image and an empty slot boot through the BIOS; a
-# 2600 image starts directly, as with Skip BIOS on, whatever the load order.
-# tb_load.sv's BOOT lines give, at each reset release, what the core was
-# told (use_bios, bypass_bios, tia_mode, cart_present), where the 6502's
-# reset vector and first opcode came from (the BIOS ROM or the cartridge
-# slot), and its reads from the BIOS ROM over the next 50 ms. Needs a 7800
-# BIOS image: BIOS=FILE, by default the 7800 OpenBIOS built locally at
-# work/bupchip/bios/7800openbios.bin (docs/daria_fe/lanes/G_step7_resets.md,
-# 8.1). The image is not in this repository and must never be committed.
-# Skipped without it.
-BIOS="${BIOS:-$HERE/work/bupchip/bios/7800openbios.bin}"
-if [ -f "$BIOS" ]; then
-	echo "-- 7800 BIOS loaded ($(basename "$BIOS")): 2600 images start directly, 7800 images and an empty slot boot through it:"
-	BD="$WORK/bios_boot"
-	mkdir -p "$BD"; ln -sfn "$WORK/rtl" "$BD/rtl"
-	cp load_test.a78 load_test.a26 "$BD/"
-	# The BIOS takes a cart as a 7800 one only if $FFF9's low nibble is 3 or 7
-	# (its high nibble: where the ROM starts). load_test.a78 has $FF there, so
-	# the BIOS would start it in 2600 mode; this copy has $C7.
-	python3 -c "import sys; d = bytearray(open(sys.argv[1], 'rb').read()); d[-7] = 0xC7; open(sys.argv[2], 'wb').write(d)" \
-		load_test.a78 "$BD/load_test_c7.a78"
-	bios_ok=1
-	# bios_case <log> <title> <plusargs...>; the regexes its log must match
-	# come on stdin, one per line.
-	bios_case() {
-		local log="$1" title="$2" pat; shift 2
-		echo "  $title:"
-		(cd "$BD" && sim ./../obj_load/vtb "$@" $(fp bios_$log) < /dev/null > "$log.log")
-		grep -E "^(BOOT|TONE|IMAGE2)" "$BD/$log.log" | sed 's/^/    /'
-		while read -r pat; do
-			grep -Eq "$pat" "$BD/$log.log" || { echo "    MISSING: $pat"; bios_ok=0; }
-		done
-	}
-	TONE_OK='^TONE .* ratio (0\.99[0-9]|1\.00[0-9])$'
-	bios_case a26 "2600 image, Skip BIOS off (expect bypass_bios 1, tia_mode 1, the cart's vector \$F000, no BIOS ROM read, its tone)" \
-		+image=load_test.a26 +audf=14 +bios="$BIOS" +skipbios=0 <<-EOF
-		^BOOT 1 at [0-9]+ ms: use_bios 0, bypass_bios 1, tia_mode 1, cart_present 1$
-		^BOOT 1 vector: \\\$f000 from the cartridge slot, first opcode fetch at \\\$f000 from the cartridge slot$
-		^BOOT 1 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 1$
-		$TONE_OK
-		EOF
-	bios_case a26_bioslast "the same, the BIOS loaded after the cartridge" \
-		+image=load_test.a26 +audf=14 +bios="$BIOS" +bioslast +skipbios=0 <<-EOF
-		^BOOT 1 at [0-9]+ ms: use_bios 0, bypass_bios 1, tia_mode 1, cart_present 1$
-		^BOOT 1 vector: \\\$f000 from the cartridge slot, first opcode fetch at \\\$f000 from the cartridge slot$
-		^BOOT 1 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 1$
-		$TONE_OK
-		EOF
-	bios_case a78 "7800 image, Skip BIOS off (expect bypass_bios 0, the vector and first opcode from the BIOS ROM)" \
-		+image=load_test_c7.a78 +audf=7 +bios="$BIOS" +skipbios=0 <<-EOF
-		^BOOT 1 at [0-9]+ ms: use_bios 1, bypass_bios 0, tia_mode 0, cart_present 1$
-		^BOOT 1 vector: \\\$[0-9a-f]{4} from the BIOS ROM, first opcode fetch at \\\$[0-9a-f]{4} from the BIOS ROM$
-		^BOOT 1 after 50 ms: [1-9][0-9]* CPU reads from the BIOS ROM, tia_en 0$
-		EOF
-	bios_case nocart "no cartridge, Skip BIOS off (expect the BIOS alone: cart_present 0, the BIOS ROM)" \
-		+nocart +bios="$BIOS" +skipbios=0 <<-EOF
-		^BOOT 1 at [0-9]+ ms: use_bios 1, bypass_bios 0, tia_mode 0, cart_present 0$
-		^BOOT 1 vector: \\\$[0-9a-f]{4} from the BIOS ROM, first opcode fetch at \\\$[0-9a-f]{4} from the BIOS ROM$
-		^BOOT 1 after 50 ms: [1-9][0-9]* CPU reads from the BIOS ROM, tia_en 0$
-		EOF
-	bios_case a78_then_a26 "7800 image, then a 2600 image at 150 ms (expect the BIOS, then the 2600 image directly)" \
-		+image=load_test_c7.a78 +bios="$BIOS" +skipbios=0 +wav=300 +image2=load_test.a26 +image2at=150 <<-EOF
-		^BOOT 1 at [0-9]+ ms: use_bios 1, bypass_bios 0, tia_mode 0, cart_present 1$
-		^BOOT 1 vector: \\\$[0-9a-f]{4} from the BIOS ROM, first opcode fetch at \\\$[0-9a-f]{4} from the BIOS ROM$
-		^BOOT 1 after 50 ms: [1-9][0-9]* CPU reads from the BIOS ROM, tia_en 0$
-		^BOOT 2 at [0-9]+ ms: use_bios 0, bypass_bios 1, tia_mode 1, cart_present 1$
-		^BOOT 2 vector: \\\$f000 from the cartridge slot, first opcode fetch at \\\$f000 from the cartridge slot$
-		^BOOT 2 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 1$
-		EOF
-	bios_case a26_then_a78 "2600 image, then a 7800 image at 150 ms (expect the 2600 image directly, then the BIOS)" \
-		+image=load_test.a26 +bios="$BIOS" +skipbios=0 +wav=300 +image2=load_test_c7.a78 +image2at=150 <<-EOF
-		^BOOT 1 at [0-9]+ ms: use_bios 0, bypass_bios 1, tia_mode 1, cart_present 1$
-		^BOOT 1 vector: \\\$f000 from the cartridge slot, first opcode fetch at \\\$f000 from the cartridge slot$
-		^BOOT 1 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 1$
-		^BOOT 2 at [0-9]+ ms: use_bios 1, bypass_bios 0, tia_mode 0, cart_present 1$
-		^BOOT 2 vector: \\\$[0-9a-f]{4} from the BIOS ROM, first opcode fetch at \\\$[0-9a-f]{4} from the BIOS ROM$
-		^BOOT 2 after 50 ms: [1-9][0-9]* CPU reads from the BIOS ROM, tia_en 0$
-		EOF
-	for img in a26 a78; do
-		[ $img = a26 ] && { what=2600; audf=14; tia=1; vec=f000; } || { what=7800; audf=7; tia=0; vec=c000; }
-		bios_case skip_$img "$what image, Skip BIOS on (expect no BIOS: bypass_bios 1, the cart's vector \$$vec, its tone)" \
-			+image=load_test.$img +audf=$audf +bios="$BIOS" +skipbios=1 <<-EOF
-			^BOOT 1 at [0-9]+ ms: use_bios 0, bypass_bios 1, tia_mode $tia, cart_present 1$
-			^BOOT 1 vector: \\\$$vec from the cartridge slot, first opcode fetch at \\\$$vec from the cartridge slot$
-			^BOOT 1 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en $tia$
-			$TONE_OK
-			EOF
-	done
-	[ "$bios_ok" = 1 ] && echo "BIOS_BOOT pass" || echo "BIOS_BOOT FAIL"
-else
-	echo "-- 7800 BIOS boot rule: skipped (no BIOS image at $BIOS; set BIOS=FILE)"
-fi
-
-# The BupChip end to end in the whole core: its firmware through the
-# bupchip.bin data slot (after the cartridge, in data.json's order, as the
-# Pocket loads them), a Souper cartridge (souper_test.py: a 6502 program
-# that sends command $80 through $8007 after 30 ms) with the synthetic ARSC
-# block appended, the PSRAM model on cram0. The song's PCM, as the firmware
-# pushes it and as it returns to clk_sys, must equal the Python model's
-# (sim/bupchip/model/armemu.py), and its audio must reach top.sv's mixer.
-# Without the firmware, the same cartridge must leave the BupChip held and
-# silent. Needs the user's firmware, src/fpga/mister/rtl/bupchip.hex or
-# BUPFW=FILE (docs/BUPCHIP.md); skipped without it. BUPMS sets the run (ms
-# after reset).
-BUPFW="${BUPFW:-$RTL/bupchip.hex}"
-if [ "${BUPCHIP:-1}" = 1 ]; then
-	if [ -f "$BUPFW" ]; then
-		echo "-- BupChip end to end: firmware slot, Souper cartridge with an ARSC block, \$8007 command, PSRAM:"
-		B="$WORK/bupchip_e2e"
-		mkdir -p "$B"; ln -sfn "$WORK/rtl" "$B/rtl"
-		python3 "$HERE/../tools/hex2bin.py" "$BUPFW" > "$B/bupchip.bin"
-		python3 "$HERE/bupchip/verif/make_synth_arsc.py" "$B/synth.a78" --arsc "$B/synth.arsc" > /dev/null
-		python3 "$HERE/souper_test.py" "$B/souper.a78" --arsc "$B/synth.arsc" > /dev/null
-		# The model reads the firmware from armdec.HEX, the tree's own
-		# bupchip.hex; point it at BUPFW, so that a tree without the firmware
-		# (a clean clone, another worktree) runs this section too.
-		[ -s "$B/song0_model.pcm" ] && [ "$B/song0_model.pcm" -nt "$B/synth.arsc" ] || \
-			(cd "$HERE/bupchip/model" && BUPFW="$BUPFW" python3 -c 'import os, runpy, sys, armdec
-armdec.HEX = os.environ["BUPFW"]
-sys.argv = ["armemu.py"] + sys.argv[1:]
-runpy.run_path("armemu.py", run_name="__main__")' "$B/synth.arsc" --song 0 --secs 1 --pcm "$B/song0_model.pcm" > "$B/armemu.log")
-		(cd "$B" && sim ./../obj_load/vtb +image=souper.a78 +bupfw=bupchip.bin +bupfwlast +bupms="${BUPMS:-250}" +bupout=e2e $(fp bupchip_e2e) > e2e.log)
-		grep -E "^(LOAD|BUPCHIP)" "$B/e2e.log"
-		PS="$(sed -n 's/^BUPCHIP song start: pushed \([0-9-]*\), output \([0-9-]*\)$/\1/p' "$B/e2e.log")"
-		OS="$(sed -n 's/^BUPCHIP song start: pushed \([0-9-]*\), output \([0-9-]*\)$/\2/p' "$B/e2e.log")"
-		e2e_ok=1
-		grep -Eq "^BUPCHIP firmware slot: [0-9]+ byte file, 0 of 4096 ROM words differ from it, fw_loaded=1$" "$B/e2e.log" || e2e_ok=0
-		grep -Eq "^BUPCHIP ARSC: [0-9]+ bytes in the PSRAM, 0 differ from the file; asset_size [0-9]+, asset_ready 1$" "$B/e2e.log" || e2e_ok=0
-		grep -Eq "^BUPCHIP result: fw_loaded=1 asset_ready=1 cpu_run=1 halted=0 halt_code=0 halt_pc=[0-9a-f]+ fault=00 muted=0 pushed=[0-9]+ pops=[0-9]+ under=0 over=0 minlev=[0-9]+ out=[0-9]+ out_nz=[1-9][0-9]* mix_nz=[1-9][0-9]* arsc_bad=0 psram_viol=0$" "$B/e2e.log" || e2e_ok=0
-		for k in pcm out.pcm; do
-			[ "$k" = pcm ] && { st="$PS"; echo "  pushed frames against the model:"; } \
-				|| { st="$OS"; echo "  frames returned to clk_sys against the model:"; }
-			python3 "$HERE/bupchip/s1/pcm_check.py" "$B/e2e.$k" "$B/song0_model.pcm" --song-start "${st:--1}" \
-				> "$B/check_$k.log" 2>&1 || e2e_ok=0
-			sed 's/^/    /' "$B/check_$k.log"
-			grep -q "^PCM IDENTICAL" "$B/check_$k.log" || e2e_ok=0
-		done
-		echo "  the same cartridge without the firmware (expect fw_loaded=0 cpu_run=0 pushed=0 out_nz=0 mix_nz=0):"
-		(cd "$B" && sim ./../obj_load/vtb +image=souper.a78 +bupms=40 $(fp bupchip_nofw) > nofw.log)
-		grep "^BUPCHIP result" "$B/nofw.log" | sed 's/^/    /'
-		grep -Eq "^BUPCHIP result: fw_loaded=0 asset_ready=1 cpu_run=0 halted=0 .* pushed=0 pops=0 under=0 over=0 .* out_nz=0 mix_nz=0 arsc_bad=0 psram_viol=0$" "$B/nofw.log" || e2e_ok=0
-		[ "$e2e_ok" = 1 ] && echo "BUPCHIP_E2E pass" || echo "BUPCHIP_E2E FAIL"
-	else
-		echo "-- BupChip end to end: skipped (no firmware at $BUPFW; set BUPFW=FILE; see docs/BUPCHIP.md)"
-	fi
-fi
+# Reloads: a second image loaded 150 ms into the run, as picking another
+# game on the Pocket does (tb_load's +image2, no reset_in), after a 2600
+# image and after a refused A78. tb_load's BOOT lines give, at each reset
+# release, where the 6507's reset vector and first opcode came from (the
+# cartridge slot: no BIOS in this core); IMAGE2 the second load.
+# reload_a26_a26 is plan step 4's r26_26 (load_test.a26, then
+# load_test2.a26). The 7800 core's BIOS cases that loaded a 2600 image are
+# these without the BIOS, which this core has no slot for.
+echo "-- reloads: a second image at 150 ms, after a 2600 image and after a refused A78:"
+python3 "$HERE/tone_test.py" 7 2600 | head -4096 | python3 -c "import sys;sys.stdout.buffer.write(bytes(int(l,16) for l in sys.stdin))" > load_test2.a26
+echo "  2600 image, then another 2600 image (expect both from the cartridge slot at \$f000):"
+sim ./obj_load/vtb +image=load_test.a26 +audf=14 +wav=300 +image2=load_test2.a26 +image2at=150 $(fp reload_a26_a26) | grep -aE "^(BOOT|IMAGE2)" | sed 's/^/    /'
+echo "  a refused A78, then a 2600 image (expect the bad game screen, then the 2600 image from \$f000):"
+sim ./obj_load/vtb +image=load_test.a78 +audf=7 +wav=300 +image2=load_test.a26 +image2at=150 $(fp reload_a78_a26) | grep -aE "^(BOOT|IMAGE2)" | sed 's/^/    /'
 fi   # ONLY
-
-# POKEY reads (2.2.2's read fix): sim/pokey_read_test.py's game-free
-# cartridge reads RANDOM 40 times and IRQST three times (idle, timer 1's
-# interrupt fired, cleared) through POKEY at $450 (A78 type 0x0040) and at
-# $4000 (type 0x0001), and stores what the CPU got in RAM; tb_load's
-# +pokeyrd prints that RAM 20 ms after the reset. With the read fix undone
-# (Pokey/pokey_adapter.sv's READ_WHOLE_CYCLE 0) every read is $FF.
-# sim/check/run_sim_check.py judges the lines: the program done, at most 4
-# of the 40 RANDOM reads $FF and at least 24 distinct values, IRQST's bit 0
-# 1, 0 and 1. ONLY=pokey runs this section alone.
-if [ -z "${ONLY:-}" ] || [ "$ONLY" = pokey ]; then
-	echo "-- POKEY reads: RANDOM and IRQST as the CPU gets them (pokey_read_test.py):"
-	PR="$WORK/pokey_read"
-	mkdir -p "$PR"; ln -sfn "$WORK/rtl" "$PR/rtl"
-	for base in 450 4000; do
-		python3 "$HERE/pokey_read_test.py" "$PR/pokey_$base.a78" --base "$base"
-		echo "  POKEY at \$$base:"
-		(cd "$PR" && sim ./../obj_load/vtb +image="pokey_$base.a78" +pokeyrd=20 $(fp "pokey_read_$base") < /dev/null > "pokey_$base.log")
-		l="$(grep -E "^POKEYRD" "$PR/pokey_$base.log" || true)"
-		if [ -n "$l" ]; then sed 's/^/    /' <<< "$l"; else echo "    no POKEYRD lines: see $PR/pokey_$base.log"; fi
-	done
-fi
 
 # DARIA in the whole core (docs/daria_step7/plan.md 3.6), game-free: tb_load
 # runs fe_dir's synthetic ARM images (sim/bupchip/daria/fe_dir/mkimg.py: a
@@ -514,9 +346,7 @@ fi
 # requirement OVL gives it.
 # Only in the DARIA build; without POCKET_DARIA the section is inactive,
 # which is not a pass (run_sim_check.py).
-if [ "${ONLY:-}" = pokey ]; then
-	:   # ONLY=pokey: not the DARIA section
-elif [ "$DARIA_ON" = 1 ]; then
+if [ "$DARIA_ON" = 1 ]; then
 	echo "-- DARIA: synthetic ARM images in the whole core (fe_dir/mkimg.py):"
 	DR="$WORK/daria"
 	mkdir -p "$DR"; ln -sfn "$WORK/rtl" "$DR/rtl"

@@ -97,6 +97,16 @@ module tb_load;
 	initial void'($value$plusargs("bs=%d", bs_ovr));
 	logic blend_on = 1'b0;                                // +blend: 2600 Flicker Blend
 	initial blend_on = $test$plusargs("blend");
+	// The console switches as the menu sets them (openFPGA-2600's Left and
+	// Right Difficulty and TV Type items): B, B and Colour unless +ldiffa,
+	// +rdiffa (A) or +bw (B&W) say otherwise from the start; +joyscript's
+	// ldiff=, rdiff= and bw= words change them later.
+	logic ldiff_b = 1'b1, rdiff_b = 1'b1, bw_set = 1'b0;
+	initial begin
+		if ($test$plusargs("ldiffa")) ldiff_b = 1'b0;
+		if ($test$plusargs("rdiffa")) rdiff_b = 1'b0;
+		if ($test$plusargs("bw")) bw_set = 1'b1;
+	end
 	logic [15:0] joy0 = 16'd0, joy1 = 16'd0, joy2 = 16'd0, joy3 = 16'd0;
 	logic [15:0] ana0 = 16'h8080;
 	logic [2:0] port1_in = 3'd0, port2_in = 3'd0;   // +port1=N, +port2=N
@@ -178,8 +188,8 @@ module tb_load;
 		.cart_download(cart_download), .arfw_download(arfw_download),
 		.ioctl_wr(ioctl_wr_r & (cart_download | arfw_download)), .ioctl_addr(ioctl_addr_r), .ioctl_dout(ioctl_dout_r),
 		.region_setting(region_tb), .palette_temp(2'd0),
-		.stereo_tia(1'b0), .swap_joysticks(1'b0), .diff_left_b(1'b1),
-		.diff_right_b(1'b1), .bw_setting(1'b0), .flicker_blend(blend_on), .pause_core(1'b0),
+		.stereo_tia(1'b0), .swap_joysticks(1'b0), .diff_left_b(ldiff_b),
+		.diff_right_b(rdiff_b), .bw_setting(bw_set), .flicker_blend(blend_on), .pause_core(1'b0),
 		.decomb(1'b0), .bs_override(bs_ovr),
 		.joy0(joy0), .joy1(joy1), .joy2(joy2), .joy3(joy3),
 		.analog0(ana0), .analog1(16'h8080), .analog2(16'h8080), .analog3(16'h8080),
@@ -888,81 +898,6 @@ module tb_load;
 		end
 	end
 
-`ifdef POKEY_SHADOW
-	// The bus over the last 64 clk, dumped at the first two wrong arrivals.
-	typedef struct packed { logic p1, p0, rw, cs, halt_n; logic [15:0] a; logic [7:0] d; logic [15:0] awr; } bus_t;
-	bus_t sh_ring [64]; int sh_ri = 0, sh_dumps = 0;
-	always @(posedge clk_sys) begin
-		sh_ring[sh_ri] <= '{dut.main.cart.pclk1, dut.main.cart.pclk0, dut.main.cart.rw, dut.main.cart.pokey_cs,
-			dut.main.cart.halt_n, dut.main.cart.address_in, dut.main.cart.din, dut.main.cart.shadow_pokey.u_pokey.addr_wr};
-		sh_ri <= (sh_ri + 1) % 64;
-	end
-	task automatic dump_ring();
-		if (sh_dumps >= 2) return;
-		sh_dumps++;
-		$display("BUS dump, oldest first: clk p1 p0 rw cs halt_n addr  data  shadow_strobes");
-		for (int k = 0; k < 64; k++) begin
-			automatic bus_t e = sh_ring[(sh_ri + k) % 64];
-			$display("BUS %3d  %b  %b  %b  %b  %b    %04x  %02x    %04x", k - 63, e.p1, e.p0, e.rw, e.cs, e.halt_n, e.a, e.d, e.awr);
-		end
-	endtask
-
-	// ---------------- shadow POKEY write check ----------------
-	// Every CPU write to the POKEY (pokey_cs and a write at phase 2) must
-	// show up inside the shadow as that register's write strobe, carrying the
-	// written byte. Reports writes that never arrive, arrive wrong, or arrive
-	// unasked, with the phase 1 -> phase 2 spacing of the CPU cycle.
-	`define SHP dut.main.cart.shadow_pokey.u_pokey
-	longint sh_clk = 0, sh_last_p1 = 0, sh_ok = 0, sh_bad = 0, sh_lost = 0, sh_extra = 0;
-	logic [15:0] sh_wr_d = 0;
-	logic        sh_pend = 0; logic [3:0] sh_reg; logic [7:0] sh_val; longint sh_at = 0, sh_sp = 0;
-	int sh_shown = 0;
-	always @(posedge clk_sys) begin
-		sh_clk <= sh_clk + 1;
-		if (dut.main.cart.pclk1) sh_last_p1 <= sh_clk;
-		sh_wr_d <= `SHP.addr_wr;
-		// a strobe rising in the shadow
-		// (the adapter's own SKCTL writes around reset are expected)
-		for (int i = 0; i < 16; i++) if (`SHP.addr_wr[i] && !sh_wr_d[i] && !dut.main.cart.shadow_pokey.boot_wr) begin
-			if (sh_pend && i == sh_reg && `SHP.write_data == sh_val) begin sh_ok++; sh_pend = 0; end
-			else begin
-				if (sh_pend) begin sh_bad++; dump_ring(); if (sh_shown < 30) begin sh_shown++;
-					$display("SHADOW %0d ms: CPU wrote %x <- %02x (p1->p2 %0d clk), shadow strobed %x <- %02x",
-						$time / 1000000, sh_reg, sh_val, sh_sp, i, `SHP.write_data); end
-					sh_pend = 0; end
-				else begin sh_extra++; if (sh_shown < 30) begin sh_shown++;
-					$display("SHADOW %0d ms: unasked strobe %x <- %02x", $time / 1000000, i, `SHP.write_data); end end
-			end
-		end
-		// a CPU write cycle to the POKEY, at its phase 2
-		if (dut.main.cart.pclk0 && dut.main.cart.pokey_cs && !dut.main.cart.rw) begin
-			if (sh_pend) begin sh_lost++; if (sh_shown < 30) begin sh_shown++;
-				$display("SHADOW %0d ms: write %x <- %02x never reached the shadow (p1->p2 %0d clk)",
-					$time / 1000000, sh_reg, sh_val, sh_sp); end end
-			sh_pend = 1; sh_reg = dut.main.cart.address_in[3:0]; sh_val = dut.main.cart.din;
-			sh_at = sh_clk; sh_sp = sh_clk - sh_last_p1;
-		end
-		if (sh_pend && sh_clk - sh_at > 48) begin
-			sh_lost++; if (sh_shown < 30) begin sh_shown++;
-			$display("SHADOW %0d ms: write %x <- %02x never reached the shadow (p1->p2 %0d clk)",
-				$time / 1000000, sh_reg, sh_val, sh_sp); end
-			sh_pend = 0;
-		end
-	end
-	final $display("SHADOW writes: %0d arrived, %0d arrived wrong, %0d lost, %0d unasked", sh_ok, sh_bad, sh_lost, sh_extra);
-
-
-	// ---------------- POKEY shadow (run_pokey_shadow.sh) ----------------
-	// The AUD node of the Watson POKEY the core plays and of upstream's new
-	// POKEY shadowing it, sampled together at the WAV rate.
-	int pk_w = 0, pk_n = 0;
-	always @(posedge clk_sys) if (recording && rec_div == 0) begin
-		if (pk_w == 0) begin pk_w = $fopen("pokey_watson.pcm", "wb"); pk_n = $fopen("pokey_new.pcm", "wb"); end
-		$fwrite(pk_w, "%c%c", dut.main.cart.pokey_aud[7:0], dut.main.cart.pokey_aud[15:8]);
-		$fwrite(pk_n, "%c%c", dut.main.cart.shadow_aud[7:0], dut.main.cart.shadow_aud[15:8]);
-	end
-`endif
-
 	// ---------------- bus probe for dli_pokey_test ----------------
 	// NMI count (DLIs), and writes to $41 (the test cart's main loop counter)
 	// and $4000 (POKEY AUDF1, the siren sweep).
@@ -1274,14 +1209,22 @@ module tb_load;
 		repeat (longint'(14318) * ms) @(posedge clk_sys);
 	endtask
 	task automatic show(string what);
-		$display("INPUT %-34s paddles %3d %3d %3d %3d  gun line %3d  SWCHA %08b  INPT4 %b INPT5 %b  (frame %0d)",
+		$display("INPUT %-34s paddles %3d %3d %3d %3d  gun line %3d  SWCHA %b  INPT4 %b INPT5 %b  (frame %0d)",
 			what, inres[0], inres[1], inres[2], inres[3], inres[4], inres[5], inres[6][7], inres[7][7], in_frames);
 	endtask
 	// Driving: log each change of port 1's gray code while turning.
+	// (from the second frame: input_test.py's RAM clear writes $98 once
+	// before its first frame, with $95 still 0)
 	logic [1:0] drv_last = 2'b11; string drv_seq = "";
-	always @(posedge clk_sys) if (in_frames > 0 && inres[5][5:4] != drv_last) begin
+	always @(posedge clk_sys) if (in_frames > 1 && inres[5][5:4] != drv_last) begin
 		drv_last <= inres[5][5:4];
 		if (drv_seq.len() < 60) drv_seq = {drv_seq, $sformatf("%0d", inres[5][5:4])};
+	end
+	// port 2's ($95 bits 1:0), for +joyscript's drive word
+	logic [1:0] drv_last_b = 2'b11; string drv_seq_b = "";
+	always @(posedge clk_sys) if (in_frames > 1 && inres[5][1:0] != drv_last_b) begin
+		drv_last_b <= inres[5][1:0];
+		if (drv_seq_b.len() < 60) drv_seq_b = {drv_seq_b, $sformatf("%0d", inres[5][1:0])};
 	end
 
 	// Turbo: count INPT4 changes (read live once a frame) while counting is on.
@@ -1334,12 +1277,25 @@ module tb_load;
 	// ---------------- joystick script (+joyscript=FILE) ----------------
 	// Drives joy0 from reset on. Each line "MS HEX" sets joy0 to HEX from MS
 	// ms after reset (atari2600_pocket.sv's bits: 0 right, 1 left, 2 down,
-	// 3 up, 9 A, 10 B); "MS dump" writes the next whole frame as
+	// 3 up, 4 fire 1, 5 fire 2, 6 L (Colour/B&W), 7 select, 8 reset switch,
+	// 9 A, 10 B, 11 X, 12 Y); "MS dump" writes the next whole frame as
 	// frame_NNN.ppm (numbered from 0 in script order). # starts a comment.
+	// openFPGA-2600's console and controller tests add the words
+	//   joy0=HEX .. joy3=HEX  controller 1-4 (joy0=HEX is HEX alone)
+	//   ana0=HEX           controller 1's left stick {y, x} (8080 centred)
+	//   ldiff=A|B, rdiff=A|B, bw=0|1   the Difficulty and TV Type items
+	//   reset              a 10 ms console reset (the Pocket's Reset), as
+	//                      +resetat does, and a "RESET at N ms" line
+	//   show               an INPUT line: what input_test.py's image read
+	//   types              an INPUT line: the wrapper's port types
+	//   drive              an INPUT line: each port's driving gray codes since
+	//                      the last one (input_test.py's $95, bits 5:4 and
+	//                      1:0; "-" for none)
+	// and print each switch change as "SWITCH at N ms: ...".
 	longint t_run = 0;
 	initial begin
-		automatic string jpath, line, word;
-		automatic int jf, ms, at = 0;
+		automatic string jpath, line, word, key, val;
+		automatic int jf, ms, at = 0, eq;
 		wait (reset_in == 1'b0);
 		t_run = $time;
 		if ($value$plusargs("joyscript=%s", jpath)) begin
@@ -1349,8 +1305,40 @@ module tb_load;
 			while ($fgets(line, jf) > 0) begin
 				if ($sscanf(line, "%d %s", ms, word) != 2 || word.substr(0, 0) == "#") continue;
 				for (; at < ms; at++) repeat (14318) @(posedge clk_sys);
+				eq = -1;
+				for (int i = 0; i < word.len(); i++) if (word[i] == "=") begin eq = i; break; end
+				key = eq < 0 ? word : word.substr(0, eq - 1);
+				val = eq < 0 ? "" : word.substr(eq + 1, word.len() - 1);
 				if (word == "dump") dump_frames = dumped + 1;
-				else joy0 = 16'(word.atohex());
+				else if (word == "show") show($sformatf("at %0d ms", ms));
+				else if (word == "drive") begin
+					$display("INPUT driving gray codes at %0d ms: port 1 %0s, port 2 %0s", ms,
+						drv_seq == "" ? "-" : drv_seq, drv_seq_b == "" ? "-" : drv_seq_b);
+					drv_seq = ""; drv_seq_b = "";
+				end
+				else if (word == "types") $display("INPUT port types: A %0d, B %0d; gun_en %0d on port %0d, paddle_en %b, dual_stick %0d",
+					dut.porta_type, dut.portb_type, dut.gun_en, dut.gun_port + 1, dut.paddle_en, dut.dual_stick);
+				else if (word == "reset") begin
+					reset_in = 1'b1;
+					$display("RESET at %0d ms", $time / 1000000);
+					repeat (14318 * 10) @(posedge clk_sys);
+					reset_in = 1'b0;
+					at += 10;
+				end
+				else if (key == "joy0") joy0 = 16'(val.atohex());
+				else if (key == "joy1") joy1 = 16'(val.atohex());
+				else if (key == "joy2") joy2 = 16'(val.atohex());
+				else if (key == "joy3") joy3 = 16'(val.atohex());
+				else if (key == "ana0") ana0 = 16'(val.atohex());
+				else if (key == "ldiff" || key == "rdiff" || key == "bw") begin
+					if (key == "ldiff") ldiff_b = (val == "B");
+					if (key == "rdiff") rdiff_b = (val == "B");
+					if (key == "bw") bw_set = (val == "1");
+					$display("SWITCH at %0d ms: %0s (left %0s, right %0s, TV type item %0s)", ms, word,
+						ldiff_b ? "B" : "A", rdiff_b ? "B" : "A", bw_set ? "B&W" : "Colour");
+				end
+				else if (eq < 0) joy0 = 16'(word.atohex());
+				else begin $display("joyscript: unknown word %s", word); $fatal(1, "joyscript"); end
 			end
 			$fclose(jf);
 		end
@@ -1685,8 +1673,8 @@ module tb_load;
 					if ((slot == 0 ? 8'h00
 					               : dut.main.cart2600.mapper_AR.ar_rom.u_ram.mem_q[i[10:0]])
 					    !== fw_expect(slot, i)) mismatches++;
-				$display("FIRMWARE %0s: %0d byte file, %0d ROM bytes differ from it, hscfw_loaded=%0d",
-					slot == 0 ? "HSC" : "Supercharger", fw_img.size(), mismatches, dut.hscfw_loaded);
+				$display("FIRMWARE %0s: %0d byte file, %0d ROM bytes differ from it",
+					slot == 0 ? "HSC" : "Supercharger", fw_img.size(), mismatches);
 			end
 `ifdef POCKET_BUPCHIP
 		if (!$test$plusargs("bupfwlast")) load_bupfw();

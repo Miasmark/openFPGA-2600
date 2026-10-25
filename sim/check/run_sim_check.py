@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
-"""Verdict of a run_sim.sh log, as one exit code (DARIA step 7, plan 1.2 row 3).
+"""Verdict of a run_sim.sh log, as one exit code (DARIA step 7, plan 1.2 row 3;
+openFPGA-2600 plan step 6: the 2600 cases alone).
 
-  run_sim_check.py LOG [--build plain|daria|auto] [--audf 0,7,14,31]
-                       [--ref REF_LOG] [--only daria|pokey]
+  run_sim_check.py LOG [--build plain|daria|auto] [--ref REF_LOG] [--only daria]
 
-run_sim.sh prints measurements and a few verdicts (BIOS_BOOT, BUPCHIP_E2E,
-PLL_REGION, DARIA) and exits 0 whatever they say. This checks every case
-against its expected lines and fails on:
-  - a section that is missing, or says "skipped" (no BIOS image, no
-    firmware): a skipped section is not a pass;
+run_sim.sh prints measurements and a few verdicts (A78_REFUSAL, PLL_REGION,
+DARIA) and exits 0 whatever they say. This checks every case against its
+expected lines and fails on:
+  - a section that is missing, or says "skipped": a skipped section is not a
+    pass;
   - any FAIL verdict, a MISSING pattern, a simulator error;
-  - a TONE ratio outside 0.990-1.010 where the case must play its tone. The
-    BIOS cases that boot a 7800 image or an empty slot through the BIOS
-    legitimately print ratio 0.000 (the BIOS is still running when the tone
-    window closes); there only the BOOT lines count;
+  - a TONE ratio outside 0.990-1.010 where the case must play its tone;
   - video geometry other than the documented frame (lines, pixels, PAL flag,
     frame length in clk_sys) for each case, and a last FRAME line other than
     the run's own (FRAME 17 at 300 ms; FRAME 75 for the PAL 2600 case's
@@ -22,22 +19,17 @@ against its expected lines and fails on:
   - a "SIMULATOR EXIT N" line: a bench that exited non-zero, e.g. on a
     $fatal, in a case whose output run_sim.sh pipes through grep (which
     drops the "%Fatal" line);
-  - the load, PLL retune, audio filter and virtual axis lines other than
-    expected;
+  - the loads (an A78 refused: stored whole, the bad game screen, silent; a
+    headerless 2600 image and its tone), the A78 refusal's verdict, the
+    reloads' BOOT and IMAGE2 lines (each reset release's vector and first
+    opcode from the cartridge slot; the second image loaded, a 2600 image
+    after a refused A78 too), the PLL retune, audio filter and virtual axis
+    lines other than expected;
   - the FA2 flash save slot's lines (fa2.sav, sim/fa2_test.py's program)
     other than expected: each FA2 program run done with 2 flash loads, 1
     save and 256 writes into the slot's RAM, 0 bytes wrong in the work RAM
-    after the reload and in the slot read back, and both A78 runs leaving
-    the file as it was: load_test.a78 (not taken for FA2) and fa2_test.py's
-    a78 image (taken for FA2, mapper 25, its save done with no write into
-    the slot's RAM);
-  - the POKEY read section (2.2.2's read fix; sim/pokey_read_test.py's
-    cartridge, POKEY at $450 and at $4000) other than: the program done
-    (marker $a5); of the 40 RANDOM reads at most POKEY_MAX_FF $FF and at
-    least POKEY_MIN_DISTINCT distinct values, counted here from the bytes
-    the line lists (and the bench's own counts equal to them); IRQST's bit 0
-    1 idle, 0 once timer 1's interrupt fired and 1 once IRQEN cleared it.
-    With the fix undone every read is $FF;
+    after the reload and in the slot read back, and both A78 runs (refused:
+    the bad game screen's scheme, 32) leaving the file as it was;
   - tb_vaxis5 (sim/run_vaxis5.sh) other than its four seeds of 10^7 clocks
     with 0 mismatches each, the planted fault caught and "VAXIS5 pass";
   - tb_region (sim/run_region.sh) other than its lines for the DARIA and
@@ -47,6 +39,10 @@ against its expected lines and fails on:
     variants caught, the sketch by its hazard in C (a retune back to back
     or daria_rgn wrong), and "REGION pass";
   - "exit N" with N != 0 when the log records the script's exit status.
+The 7800 core's sections (its 7800-mode tones and MARIA's border and
+geometry, the BIOS boot rule, the BupChip end to end, the POKEY reads) are
+gone with that hardware: a log that still holds one of them fails ("a 7800
+section"), as a 7800 core's log is not this core's.
 DARIA section: in the DARIA build (--build daria, or auto from run_sim.sh's
 "POCKET_DARIA 1" line) "DARIA pass" is required. In the plain build the
 section prints that it is inactive; that is reported, and is not a pass of
@@ -65,8 +61,6 @@ a build without BUP_DEBUG.
 --only daria checks a run_sim.sh ONLY=daria log (tb_load and the DARIA
 section alone): the global rules and the DARIA section only. A log that
 says ONLY=daria fails without it, and one that does not fails with it.
---only pokey does the same for a run_sim.sh ONLY=pokey log and the POKEY
-read section.
 --ref REF_LOG also compares every measurement and verdict line with another
 log (e.g. the same tree before a bench change): any difference fails.
 Exit status: 0 pass, 1 fail, 2 usage.
@@ -76,27 +70,32 @@ import argparse
 import re
 import sys
 
-NTSC78 = r"238804 clk_sys \(59\.958 Hz\), active lines 224, active pixels/line 372, video PAL 0"
 TONE = re.compile(r"^\s*TONE (?:AUDC0=4|from loaded cart) AUDF0=(\d+): measured ([0-9.]+) Hz, "
                   r"TIA reference ([0-9.]+) Hz, ratio ([0-9.]+)$")
 # (frame_ and overlay: lines of BUP_DEBUG builds only, so a reference log of
 # a build without BUP_DEBUG compares as before)
-VERDICT_LINE = re.compile(r"^\s*(TONE|FRAME|\+|LOAD|HSC|BOOT|IMAGE2|BIOS_BOOT|BUPCHIP|PCM|ours|song|reference|"
+VERDICT_LINE = re.compile(r"^\s*(TONE|FRAME|\+|LOAD|BOOT|IMAGE2|A78_REFUSAL|REFUSE|"
                           r"NTSC|PAL ->|PLL_REGION|AUDIO|AXIS|DARIA|smoke_|digital_|frame_|overlay)")
-# The POKEY read section: each mapping run_sim.sh tries, and the RANDOM rule.
-# A read that returns the precharged bus is $FF. The 40 RANDOM reads are not
-# independent: they are samples of one 17-bit LFSR (pokey_poly.sv), 16 of its
-# shifts apart in this bench. A model of it checked every phase of its period
-# (131,071) at strides 12, 16 and 20: the worst case is 4 $FF and 24 distinct
-# values, so a timing change that keeps the reads right does not trip these.
-# With the fix undone every read is $FF (1 distinct value). The rules are
-# tuned to rtl/Pokey, the release POKEY. POKEY=watson passes them too
-# (ONLY=pokey, 2026-10-23): the same LFSR sequence offset by two reads, 0 $FF
-# and 34 distinct, IRQST $f7 $f6 $f7. POKEYRD lines are not in VERDICT_LINE,
-# so a --ref log from before the section still compares.
-POKEY_BASES = ("450", "4000")
-POKEY_MAX_FF = 4
-POKEY_MIN_DISTINCT = 24
+# the 7800 core's sections: a log with one of them is not this core's
+SECTIONS_7800 = ("-- border hidden", "-- PAL and overscan geometry", "-- 7800 BIOS", "-- BupChip end to end",
+                 "-- POKEY reads")
+# the reloads (run_sim.sh's "-- reloads"): each case's title and the lines
+# it must hold. A reset release takes its vector and first opcode from the
+# cartridge slot at $f000: the 2600 images', and the refused A78's (its 16
+# KiB payload's last 4 KiB as the bad game screen's scheme sees them).
+BOOT_SLOT = (r"BOOT {n} vector: \$f000 from the cartridge slot, first opcode fetch at \$f000 from the cartridge slot")
+BOOT_AT = r"BOOT {n} at \d+ ms: use_bios 0, bypass_bios 1, tia_mode 1, cart_present 1"
+BOOT_ROM = r"BOOT {n} after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 1"
+RELOADS = [
+    ("2600 image, then another 2600 image", [
+        BOOT_AT.format(n=1), BOOT_SLOT.format(n=1), BOOT_ROM.format(n=1),
+        r"IMAGE2 load_test2\.a26 loaded at \d+ ms: 4096 bytes, tia_mode=0, mapper 0",
+        BOOT_AT.format(n=2), BOOT_SLOT.format(n=2), BOOT_ROM.format(n=2)]),
+    ("a refused A78, then a 2600 image", [
+        BOOT_AT.format(n=1), BOOT_SLOT.format(n=1), BOOT_ROM.format(n=1),
+        r"IMAGE2 load_test\.a26 loaded at \d+ ms: 4096 bytes, tia_mode=0, mapper 0",
+        BOOT_AT.format(n=2), BOOT_SLOT.format(n=2), BOOT_ROM.format(n=2)]),
+]
 OVL_RUNS = ("smoke_dpc", "smoke_cdf", "digital_cdfj", "frame_cdfj", "frame_cdfj_pattern", "frame_cdfj_retune")
 # What each run's overlay line must say it required and checked (run_sim.sh's
 # OVL table): a line that passes on a smaller requirement fails here.
@@ -154,10 +153,10 @@ REGION = [
 ] + [r"REGION verdict %s: planted, caught" % v for v in ("old", "rtl2", "rtl1", "sketch")] + [r"REGION pass"]
 # The FA2 flash save slot (fa2.sav): each pattern and how many times the
 # section must hold it (the two FA2 program runs, then the two A78 runs; mapper
-# 25 is detect2600.sv's BANKFA2). The second A78 run is the one that can fail:
-# an A78 taken for FA2 whose save command, in 7800 mode, must not reach the
-# slot (before the wrapper's fa2_on gate it wrote 255 of 256 bytes). FA2 lines
-# are not in VERDICT_LINE, so a --ref log from before the slot still compares.
+# 25 is detect2600.sv's BANKFA2). The second A78 run is one detect2600.sv
+# takes for FA2, with a save command (in the 7800 core's 7800 mode it reached
+# the slot until the wrapper's fa2_on gate): refused here, it runs the bad game
+# screen's scheme. FA2 lines are not in VERDICT_LINE.
 FA2 = [
     (r"FA2 program: mapper 25, done after \d+ ms; flash loads 2, saves 1, slot RAM writes 256", 2),
     (r"FA2 work RAM after the reload: 0 of 255 bytes differ from the expected file", 2),
@@ -167,49 +166,6 @@ FA2 = [
     (r"FA2 image: 2600 mapper 32, cart_is_7800 1, tia_mode 1; flash loads 0, saves 0, slot RAM writes 0", 2),
     (r"FA2 save slot after load, reset and 300 ms of running \(APF read protocol\): "
      r"0 of 256 bytes differ from the expected file", 2),
-]
-# BIOS cases: title prefix -> (required patterns, does its TONE line have to pass)
-BIOS_CASES = [
-    ("2600 image, Skip BIOS off", [
-        r"BOOT 1 at \d+ ms: use_bios 0, bypass_bios 1, tia_mode 1, cart_present 1",
-        r"BOOT 1 vector: \$f000 from the cartridge slot, first opcode fetch at \$f000 from the cartridge slot",
-        r"BOOT 1 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 1"], True),
-    ("the same, the BIOS loaded after the cartridge", [
-        r"BOOT 1 at \d+ ms: use_bios 0, bypass_bios 1, tia_mode 1, cart_present 1",
-        r"BOOT 1 vector: \$f000 from the cartridge slot, first opcode fetch at \$f000 from the cartridge slot",
-        r"BOOT 1 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 1"], True),
-    ("7800 image, Skip BIOS off", [
-        r"BOOT 1 at \d+ ms: use_bios 1, bypass_bios 0, tia_mode 0, cart_present 1",
-        r"BOOT 1 vector: \$[0-9a-f]{4} from the BIOS ROM, first opcode fetch at \$[0-9a-f]{4} from the BIOS ROM",
-        r"BOOT 1 after 50 ms: [1-9][0-9]* CPU reads from the BIOS ROM, tia_en 0"], False),
-    ("no cartridge, Skip BIOS off", [
-        r"BOOT 1 at \d+ ms: use_bios 1, bypass_bios 0, tia_mode 0, cart_present 0",
-        r"BOOT 1 vector: \$[0-9a-f]{4} from the BIOS ROM, first opcode fetch at \$[0-9a-f]{4} from the BIOS ROM",
-        r"BOOT 1 after 50 ms: [1-9][0-9]* CPU reads from the BIOS ROM, tia_en 0"], False),
-    ("7800 image, then a 2600 image", [
-        r"BOOT 1 at \d+ ms: use_bios 1, bypass_bios 0, tia_mode 0, cart_present 1",
-        r"BOOT 1 vector: \$[0-9a-f]{4} from the BIOS ROM, first opcode fetch at \$[0-9a-f]{4} from the BIOS ROM",
-        r"BOOT 1 after 50 ms: [1-9][0-9]* CPU reads from the BIOS ROM, tia_en 0",
-        r"IMAGE2 load_test\.a26 loaded at \d+ ms: 4096 bytes, tia_mode=0, mapper 0",
-        r"BOOT 2 at \d+ ms: use_bios 0, bypass_bios 1, tia_mode 1, cart_present 1",
-        r"BOOT 2 vector: \$f000 from the cartridge slot, first opcode fetch at \$f000 from the cartridge slot",
-        r"BOOT 2 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 1"], None),
-    ("2600 image, then a 7800 image", [
-        r"BOOT 1 at \d+ ms: use_bios 0, bypass_bios 1, tia_mode 1, cart_present 1",
-        r"BOOT 1 vector: \$f000 from the cartridge slot, first opcode fetch at \$f000 from the cartridge slot",
-        r"BOOT 1 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 1",
-        r"IMAGE2 load_test_c7\.a78 loaded at \d+ ms: 16512 bytes, tia_mode=0, mapper 0",
-        r"BOOT 2 at \d+ ms: use_bios 1, bypass_bios 0, tia_mode 0, cart_present 1",
-        r"BOOT 2 vector: \$[0-9a-f]{4} from the BIOS ROM, first opcode fetch at \$[0-9a-f]{4} from the BIOS ROM",
-        r"BOOT 2 after 50 ms: [1-9][0-9]* CPU reads from the BIOS ROM, tia_en 0"], None),
-    ("2600 image, Skip BIOS on", [
-        r"BOOT 1 at \d+ ms: use_bios 0, bypass_bios 1, tia_mode 1, cart_present 1",
-        r"BOOT 1 vector: \$f000 from the cartridge slot, first opcode fetch at \$f000 from the cartridge slot",
-        r"BOOT 1 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 1"], True),
-    ("7800 image, Skip BIOS on", [
-        r"BOOT 1 at \d+ ms: use_bios 0, bypass_bios 1, tia_mode 0, cart_present 1",
-        r"BOOT 1 vector: \$c000 from the cartridge slot, first opcode fetch at \$c000 from the cartridge slot",
-        r"BOOT 1 after 50 ms: 0 CPU reads from the BIOS ROM, tia_en 0"], True),
 ]
 
 
@@ -281,60 +237,7 @@ def overlay_check(body, debug, bad, notes):
         notes.append("DARIA status overlay: " + agg[0])
 
 
-def pokey_check(L, bad, notes):
-    """The POKEY read section: one case per POKEY_BASES mapping."""
-    h, b = L.section("-- POKEY reads")
-    if b is None:
-        bad.append("POKEY reads: section missing")
-        return
-    cases, cur = {}, None
-    for x in b:
-        m = re.fullmatch(r"  POKEY at \$([0-9A-Fa-f]+):", x.rstrip())
-        if m:
-            cur = cases.setdefault(m.group(1), [])
-            cur.append(None)            # counts the case's title lines
-        elif cur is not None:
-            cur.append(x.strip())
-    for base in POKEY_BASES:
-        c = cases.get(base)
-        what = f"POKEY reads, POKEY at ${base}"
-        if c is None or c.count(None) != 1:
-            bad.append(f"{what}: {0 if c is None else c.count(None)} cases, expected 1")
-            continue
-        c = [x for x in c if x is not None]
-        mk = [x for x in c if x.startswith("POKEYRD marker")]
-        if len(mk) != 1 or not re.fullmatch(r"POKEYRD marker \$a5 after \d+ ms", mk[0]):
-            bad.append(f"{what}: the program did not finish (marker line {mk[:1] or 'missing'})")
-        rl = [x for x in c if x.startswith("POKEYRD RANDOM")]
-        m = re.fullmatch(r"POKEYRD RANDOM 40 reads, (\d+) of them \$FF, (\d+) distinct:((?: [0-9a-f]{2}){40})", rl[0]) \
-            if len(rl) == 1 else None
-        if not m:
-            bad.append(f"{what}: no RANDOM line with 40 values ({rl[:1] or 'missing'})")
-            nff = nd = None
-        else:
-            v = [int(x, 16) for x in m.group(3).split()]
-            nff, nd = v.count(0xFF), len(set(v))
-            if (nff, nd) != (int(m.group(1)), int(m.group(2))):
-                bad.append(f"{what}: the bench counts {m.group(1)} $FF and {m.group(2)} distinct, the values {nff} and {nd}")
-            if nff > POKEY_MAX_FF:
-                bad.append(f"{what}: {nff} of the 40 RANDOM reads are $FF (at most {POKEY_MAX_FF})")
-            if nd < POKEY_MIN_DISTINCT:
-                bad.append(f"{what}: {nd} distinct RANDOM values of 40 (at least {POKEY_MIN_DISTINCT})")
-        il = [x for x in c if x.startswith("POKEYRD IRQST")]
-        m = re.fullmatch(r"POKEYRD IRQST idle \$([0-9a-f]{2}), timer 1 fired \$([0-9a-f]{2}), IRQEN cleared \$([0-9a-f]{2})",
-                         il[0]) if len(il) == 1 else None
-        if not m:
-            bad.append(f"{what}: no IRQST line ({il[:1] or 'missing'})")
-        else:
-            idle, fired, clr = (int(x, 16) for x in m.groups())
-            if (idle & 1, fired & 1, clr & 1) != (1, 0, 1):
-                bad.append(f"{what}: IRQST ${idle:02x} ${fired:02x} ${clr:02x}: bit 0 must be 1, 0, 1 "
-                           "(idle, timer 1 fired, IRQEN cleared)")
-            elif nff is not None:
-                notes.append(f"{what}: RANDOM {nff} $FF and {nd} distinct of 40; IRQST ${idle:02x} ${fired:02x} ${clr:02x}")
-
-
-def check(log, build, audfs, only=None):
+def check(log, build, only=None):
     L = Log(log)
     bad, notes = [], []
 
@@ -365,9 +268,6 @@ def check(log, build, audfs, only=None):
     if said_only != only:
         bad.append(f"the log is a run_sim.sh ONLY={said_only} run: check it with --only {said_only}" if said_only
                    else f"--only {only}, but the log is not a run_sim.sh ONLY={only} run")
-    if only == "pokey":
-        pokey_check(L, bad, notes)
-        return bad, notes, build
     if only == "daria":
         h, b = L.section("-- DARIA")
         if build != "daria" or h is None or "inactive" in h:
@@ -380,20 +280,9 @@ def check(log, build, audfs, only=None):
             overlay_check(b, debug, bad, notes)
         return bad, notes, build
 
-    # 7800 tones: the lines before "-- border hidden:"
-    body = []
-    for h, b in L.sections:
-        if h.startswith("-- border hidden"):
-            break
-        body += b
-    for a in audfs:
-        if not any(tone_ok(x, a) for x in body):
-            bad.append(f"7800 tone AUDF0={a}: no TONE line with ratio 0.990-1.010")
-    n78 = sum(1 for x in body if re.fullmatch(r"FRAME 17: " + NTSC78, x.strip()))
-    if n78 != len(audfs):
-        bad.append(f"7800 tone frames: {n78} of {len(audfs)} FRAME lines are FRAME 17, the NTSC 7800 frame")
-    h, b = L.section("-- border hidden")
-    need(b, r"FRAME 17: 238804 clk_sys \(59\.958 Hz\), active lines 224, active pixels/line 320, video PAL 0", "border hidden")
+    for x in SECTIONS_7800:
+        if L.section(x)[0] is not None:
+            bad.append(f"a 7800 section, not this core's: {L.section(x)[0]}")
     h, b = L.section("-- 2600 mode")
     for a in (0, 14):
         if not b or not any(tone_ok(x, a) for x in b):
@@ -401,16 +290,11 @@ def check(log, build, audfs, only=None):
     if not b or sum(1 for x in b if re.fullmatch(
             r"FRAME 17: 238944 clk_sys \(59\.923 Hz\), active lines 240, active pixels/line 160, video PAL 0", x.strip())) != 2:
         bad.append("2600 frames: expected two FRAME 17 lines, 240-line 160-pixel NTSC frames")
-    h, b = L.section("-- PAL and overscan geometry")
-    need(b, r"\+pal: 284204 clk_sys \(50\.380 Hz\), active lines 274, active pixels/line 372, video PAL 1", "+pal")
-    need(b, r"\+overscan: 238804 clk_sys \(59\.958 Hz\), active lines 242, active pixels/line 372, video PAL 0", "+overscan")
-    need(b, r"\+overscan \+pal: 284204 clk_sys \(50\.380 Hz\), active lines 274, active pixels/line 372, video PAL 1", "+overscan +pal")
     h, b = L.section("-- PAL 2600 frame")
     need(b, r"FRAME 75: 284544 clk_sys \(50\.320 Hz\), active lines 288, active pixels/line 160, video PAL 1", "PAL 2600 frame")
     # openFPGA-2600: the A78 is refused (plan D8): stored whole, run as a 2600
     # image in the bad game screen, silent (its TONE line reads 0 Hz)
     h, b = L.section("-- load an A78")
-    need(b, r"HSC_EN 0 \(setting 0, firmware loaded 0\)", "A78 load")
     need(b, r"LOAD 16512 bytes, header ATARI, cart_is_7800=1, cart_size=16512, tia_mode=1, payload mismatches=0", "A78 load")
     need(b, r"TONE from loaded cart AUDF0=7: measured 0\.0 Hz, TIA reference 1962\.5 Hz, ratio 0\.000", "A78 load")
     h, b = L.section("-- A78 refusal")
@@ -435,14 +319,11 @@ def check(log, build, audfs, only=None):
         if any(x.strip().startswith("FA2 byte") for x in b):
             bad.append("FA2 save slot: bytes differ ('FA2 byte' lines)")
 
-    # BIOS boot rule
-    h, b = L.section("-- 7800 BIOS")
+    # the reloads
+    h, b = L.section("-- reloads")
     if b is None:
-        bad.append("BIOS boot rule: section missing")
+        bad.append("reloads: section missing")
     else:
-        if "BIOS_BOOT pass" not in [x.strip() for x in b]:
-            bad.append("BIOS boot rule: no 'BIOS_BOOT pass'")
-        # split into cases at the "  title:" lines
         cases, cur = [], None
         for x in b:
             if re.match(r"^  \S.*:$", x):
@@ -450,36 +331,16 @@ def check(log, build, audfs, only=None):
                 cases.append(cur)
             elif cur:
                 cur[1].append(x.strip())
-        for title, pats, tone in BIOS_CASES:
+        for title, pats in RELOADS:
             hit = [c for c in cases if c[0].startswith(title)]
             if len(hit) != 1:
-                bad.append(f"BIOS case '{title}': {len(hit)} found")
+                bad.append(f"reload '{title}': {len(hit)} found")
                 continue
             for p in pats:
                 if not any(re.fullmatch(p, x) for x in hit[0][1]):
-                    bad.append(f"BIOS case '{title}': missing /{p}/")
-            tl = [x for x in hit[0][1] if x.startswith("TONE")]
-            if tone is True and not any(tone_ok(x) for x in tl):
-                bad.append(f"BIOS case '{title}': its tone must play (ratio 0.990-1.010): {tl}")
-            if tone is False and len(tl) != 1:
-                bad.append(f"BIOS case '{title}': expected one TONE line (any ratio: the BIOS is running)")
-
-    # BupChip end to end
-    h, b = L.section("-- BupChip end to end")
-    if b is None:
-        bad.append("BupChip end to end: section missing")
-    else:
-        s = [x.strip() for x in b]
-        if "BUPCHIP_E2E pass" not in s:
-            bad.append("BupChip end to end: no 'BUPCHIP_E2E pass'")
-        if sum(1 for x in s if x.startswith("PCM IDENTICAL")) != 2:
-            bad.append("BupChip end to end: expected two 'PCM IDENTICAL' lines")
-        if not any(re.match(r"BUPCHIP result: fw_loaded=1 asset_ready=1 cpu_run=1 halted=0 halt_code=0 .* under=0 over=0 "
-                            r".*arsc_bad=0 psram_viol=0$", x) for x in s):
-            bad.append("BupChip end to end: the result line with the firmware is not clean")
-
-    # POKEY reads
-    pokey_check(L, bad, notes)
+                    bad.append(f"reload '{title}': missing /{p}/")
+            if sum(1 for x in hit[0][1] if x.startswith("BOOT") and " at " in x and "ms:" in x) != 2:
+                bad.append(f"reload '{title}': expected two reset releases (BOOT 1, BOOT 2)")
 
     # DARIA
     h, b = L.section("-- DARIA")
@@ -555,11 +416,10 @@ def main():
     p = argparse.ArgumentParser(description="run_sim.sh log checker")
     p.add_argument("log")
     p.add_argument("--build", choices=("plain", "daria", "auto"), default="auto")
-    p.add_argument("--audf", default="0,7,14,31")
     p.add_argument("--ref")
-    p.add_argument("--only", choices=("daria", "pokey"))
+    p.add_argument("--only", choices=("daria",))
     a = p.parse_args()
-    bad, notes, build = check(a.log, a.build, [int(x) for x in a.audf.split(",")], a.only)
+    bad, notes, build = check(a.log, a.build, a.only)
     if a.ref:
         mine, ref = verdict_lines(a.log), verdict_lines(a.ref)
         if mine != ref:

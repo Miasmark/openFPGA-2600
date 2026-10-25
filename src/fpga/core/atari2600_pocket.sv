@@ -68,7 +68,7 @@ module atari2600_pocket
 	input  wire [15:0] analog1,
 	input  wire [15:0] analog2,
 	input  wire [15:0] analog3,
-	input  wire  [2:0] port1_input,      // 0 auto, 1 joystick, 2 paddles, 3 driving, 4 light gun
+	input  wire  [2:0] port1_input,      // 0 and 1 joystick, 2 paddles, 3 driving, 4 light gun, 5 dual stick, 6 Booster Grip
 	input  wire  [2:0] port2_input,
 	input  wire [15:0] analog0r,         // right sticks {y, x}: dual-stick fire
 	input  wire [15:0] analog1r,
@@ -208,7 +208,6 @@ end
 
 reg  [39:0] cart_header;
 reg   [7:0] cart_region;
-reg   [7:0] joy0_type, joy1_type;
 reg         cart_is_7800;
 reg         tia_mode;
 reg         a78_refused;
@@ -218,8 +217,6 @@ wire [31:0] cart_size;
 initial begin
 	cart_header = "ATARI";
 	cart_region = 0;
-	joy0_type = 8'd1;
-	joy1_type = 8'd1;
 	tia_mode = 0;
 	a78_refused = 0;
 	cart_loaded = 0;
@@ -244,14 +241,14 @@ wire        hscfw_loaded = 1'b0;
 // reaches the console or the region: tia_mode is set at the end of every
 // load, the header fields are cleared then, and the region logic treats it
 // as a 2600 image (region_pll_hold), so header byte 57 never retunes the PLL.
-// cart_is_7800 decides a78_refused and nothing else. Bytes 55-57 are still
-// taken during a download, as in the 7800 core, and cleared at its end.
-// MARIA is gone (plan step 4), so while a download runs, with the console
-// held in reset, cart_region reaches only region_select (its Auto term while
-// tia_en is low) and the port types only the controllers; the frame
-// fingerprints of 2600 images stay those of 2.2.4's 2600 mode. The rest of
-// the header (the version, cart type, save byte 58, XM and mapper bytes) is
-// no longer read.
+// cart_is_7800 decides a78_refused and nothing else. Byte 57 is still taken
+// during a download, as in the 7800 core, and cleared at its end. MARIA is
+// gone (plan step 4), so while a download runs, with the console held in
+// reset, cart_region reaches only region_select (its Auto term while tia_en
+// is low); the frame fingerprints of 2600 images stay those of 2.2.4's 2600
+// mode. The rest of the header (the version, cart type, controller bytes
+// 55-56, save byte 58, XM and mapper bytes) is not read: the ports' types
+// come from the Port Input menu alone (VIRTUAL CONTROLLERS, below).
 always @(posedge clk_sys) begin
 	cart_is_7800 <= (cart_header == "ATARI");
 
@@ -265,8 +262,6 @@ always @(posedge clk_sys) begin
 			'd03: cart_header[23:16] <= ioctl_dout;
 			'd04: cart_header[15:8] <= ioctl_dout;
 			'd05: cart_header[7:0] <= ioctl_dout;
-			'd55: joy0_type <= ioctl_dout;   // 0=none, 1=joystick, 2=lightgun
-			'd56: joy1_type <= ioctl_dout;
 			'd57: cart_region <= ioctl_dout; // 0=ntsc, 1=pal
 			default: ;
 		endcase
@@ -275,8 +270,6 @@ always @(posedge clk_sys) begin
 		// A78 too, and none of the header fields apply.
 		tia_mode <= 1'b1;
 		a78_refused <= cart_is_7800;
-		joy0_type <= 8'd1;
-		joy1_type <= 8'd1;
 		cart_region <= 0;
 	end
 end
@@ -676,19 +669,12 @@ wire joyb_b2 = ~PBout[4] && ~tia_en;
 //////////////////////////  VIRTUAL CONTROLLERS  ///////////////////////////
 //
 // Port types use MiSTer's numbers: 0 none, 1 joystick, 2 light gun,
-// 3 paddles, 6 driving, 9 Booster Grip, 10 dual stick (MiSTer's Robotron). Auto takes the A78 header's controller byte; a 2600
-// image has none, so its paddle and driving games need the Port Input menu.
-function [7:0] header_port_type(input [7:0] t);
-	case (t)
-		8'd0: header_port_type = 8'd0;
-		8'd2: header_port_type = 8'd2;   // light gun
-		8'd3: header_port_type = 8'd3;   // paddles
-		8'd6: header_port_type = 8'd6;   // 2600 driving controller
-		default: header_port_type = 8'd1; // joysticks; trakball, keypad, mice unsupported
-	endcase
-endfunction
-
-function [7:0] menu_port_type(input [2:0] m, input [7:0] auto_type);
+// 3 paddles, 6 driving, 9 Booster Grip, 10 dual stick (MiSTer's Robotron).
+// A 2600 image names no controller, so the Port Input menu alone sets each
+// port: its 0 (the menu's "Joystick") and 1 are the joystick, and paddle and
+// driving games need their menu value. (The 7800 core's Auto, 0, took an A78
+// header's controller byte; for a 2600 image it was the joystick too.)
+function [7:0] menu_port_type(input [2:0] m);
 	case (m)
 		3'd1: menu_port_type = 8'd1;
 		3'd2: menu_port_type = 8'd3;
@@ -696,12 +682,12 @@ function [7:0] menu_port_type(input [2:0] m, input [7:0] auto_type);
 		3'd4: menu_port_type = 8'd2;
 		3'd5: menu_port_type = 8'd10;
 		3'd6: menu_port_type = 8'd9;
-		default: menu_port_type = auto_type;
+		default: menu_port_type = 8'd1;
 	endcase
 endfunction
 
-wire [7:0] porta_type = menu_port_type(port1_input, header_port_type(joy0_type));
-wire [7:0] portb_type = menu_port_type(port2_input, header_port_type(joy1_type));
+wire [7:0] porta_type = menu_port_type(port1_input);
+wire [7:0] portb_type = menu_port_type(port2_input);
 
 // The D-pad and docked analog sticks become positions (virtual_axis5.sv).
 // A or B is the paddle button, fire or trigger; X held moves slowly and

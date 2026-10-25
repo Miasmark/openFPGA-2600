@@ -2,8 +2,8 @@
 """Planted faults: each checker must pass a good input and fail each fault
 (DARIA step 7, docs/daria_step7/plan.md 3.6 unit gate 1, 7.1 and 7.2 for I4).
 
-  selftest.py --work DIR [--run-sim LOG] [--extra LOG --extra-ref REF
-              [--extra-dir DIR]] [--fp FILE] [--cartram LOG] [--reset LOG]
+  selftest.py --work DIR [--run-sim LOG] [--extra LOG --extra-ref REF]
+              [--fp FILE] [--cartram LOG] [--reset LOG]
               [--artape LOG [--artape-ref REF]] [--tools]
 
 DIR receives the planted copies. Every case prints "ok" when the checker
@@ -11,26 +11,33 @@ gave the expected verdict, "WRONG" otherwise; the last line is SELFTEST
 pass or FAIL, and so is the exit status (0 or 1). The line before it names
 the input-dependent groups below that did not run for want of their input
 (step7_gates.sh's selftest gate is then PARTIAL).
-  --run-sim LOG    a passing run_sim.sh log: wrong TONE ratio, BIOS_BOOT
-                   FAIL, a skipped section, a missing PLL_REGION line, a
-                   truncated log, a geometry change, BUPCHIP_E2E FAIL, a
-                   case cut short (an earlier FRAME line with the right
-                   geometry), a SIMULATOR EXIT line; the POKEY read section
-                   (RANDOM all $FF as with the read fix undone, at $450 and
-                   at $4000, 5 $FF, 23 distinct values, the bench's counts
-                   not the values', IRQST's bit 0 clear when idle or set
-                   once timer 1 fired, the program not done, the $4000 case
-                   or the section gone; 4 $FF and 24 distinct still pass),
-                   and the section alone as an ONLY=pokey log (passes with
-                   --only pokey, fails planted, and the whole log fails with
-                   --only pokey)
+  --run-sim LOG    a passing run_sim.sh log (openFPGA-2600's 2600 cases): a
+                   wrong TONE ratio, a skipped section, a missing PLL_REGION
+                   line, a truncated log, a geometry change (NTSC and PAL
+                   2600 frames), a case cut short (an earlier FRAME line with
+                   the right geometry), a SIMULATOR EXIT line; the A78 that
+                   played its tone (not refused), the refusal's verdict failed
+                   or gone, the 2600 image's tone gone; the reloads (a second
+                   reset vector from elsewhere, the second load or release
+                   gone, the section gone); a 7800 section in the log;
+                   tb_vaxis5's and tb_region's; the FA2 slot's (the reload
+                   lost, a byte wrong, no save, an A78 that wrote the slot or
+                   was taken for FA2, the section gone); and, in a DARIA
+                   build's log, the DARIA section alone as an ONLY=daria log
+                   (passes with --only daria, fails planted or without it,
+                   and the whole log fails with --only daria)
   --extra LOG      a passing extra_tests.sh log, with its reference log
-                   (--extra-ref) and, for a log from before step 7, its
-                   extra/ directory (--extra-dir): an ARCHECK mismatch, a
-                   POKEY statistic changed, a multisprite row shift (on a
-                   copy of the frames), a SaveKey byte lost, the multiload
-                   out of order; with AR_TAPE=1 in the log, the tape
-                   multiload's second load and the tape full load's ARCHECK
+                   (--extra-ref): an ARCHECK mismatch, the multiload out of
+                   order; the SaveKey (a byte lost, Off answering, the round
+                   trip a byte short, the section gone); the Supercharger
+                   BIOS slot's ROM; the Mapper menu (a game repeated, the
+                   override not applied, MC8K left in bank 1, a reset lost,
+                   Auto taken for a multicart or changing games); the
+                   console switches (each item and L); the Port Input
+                   values (INPUT_FAULTS); a 7800 section in the log; with
+                   AR_TAPE=1 in the log, the tape multiload's second load,
+                   the tape full load's ARCHECK and the log without --ref;
+                   the cartridge RAM's verdicts and artape's
   --fp FILE        a tb_load/tb_system fp.csv: frame_gate --strict on a
                    truncated copy (a frame, or a line, missing), a one-frame
                    shift, one RIOT hash, one pixel (video) hash and a
@@ -76,7 +83,10 @@ the input-dependent groups below that did not run for want of their input
                    keep the hash; a code edit, a live ifdef edit and a
                    removed macro change it; --expect and --max-token fail;
                    an excluded daria_ file holding a directive that reaches
-                   later files is refused); needs git and VERILATOR
+                   later files is refused), and pp_shared.py (step7_gates.sh's
+                   pp_equiv gate) on scratch trees (identical and a comment
+                   edit pass, a code edit fails, a diverged file listed passes,
+                   a stale listing fails); needs git and VERILATOR
   always           div_check.py on a copy of the tree's divider sites:
                    passes as it is, fails when one default names the other
                    divider (each site in turn) or pll_core.v's counter 3
@@ -188,21 +198,35 @@ def run_sim_cases(log, w):
     print("run_sim_check.py:")
     expect("the log as it is", [chk, log], True)
     cases = {
-        "tone_ratio": sub1(r"^(TONE AUDC0=4 AUDF0=7: .* ratio )[0-9.]+$", r"\g<1>0.500"),
-        "bios_fail": sub1(r"^BIOS_BOOT pass$", "BIOS_BOOT FAIL"),
-        "skipped": lambda t: re.sub(r"^-- 7800 BIOS loaded.*?^BIOS_BOOT pass\n",
-                                    "-- 7800 BIOS boot rule: skipped (no BIOS image at x; set BIOS=FILE)\n", t, flags=re.M | re.S),
+        "tone_ratio": sub1(r"^(TONE AUDC0=4 AUDF0=14: .* ratio )[0-9.]+$", r"\g<1>0.500"),
+        "skipped": lambda t: re.sub(r"^-- A78 refusal.*?^A78_REFUSAL pass\n",
+                                    "-- A78 refusal: skipped\n", t, count=1, flags=re.M | re.S),
         "no_pll_region": sub1(r"^PLL_REGION pass \(0 errors\)\n", ""),
         "truncated": lambda t: t[:len(t) // 2],
-        "geometry": sub1(r"^(  \+overscan: 238804 clk_sys \(59\.958 Hz\), active lines )242", r"\g<1>241"),
-        "bupchip_fail": sub1(r"^BUPCHIP_E2E pass$", "BUPCHIP_E2E FAIL"),
+        "geometry_pal2600": sub1(r"^(FRAME 75: 284544 clk_sys \(50\.320 Hz\), active lines )288", r"\g<1>287"),
+        "geometry_2600": sub1(r"^(FRAME 17: 238944 clk_sys \(59\.923 Hz\), active lines )240", r"\g<1>239"),
         # a case cut short: an earlier FRAME line with the right geometry
-        "frame_number_border": sub1(r"^FRAME 17(: 238804 clk_sys \(59\.958 Hz\), active lines 224, active pixels/line 320)",
-                                    r"FRAME 9\g<1>"),
+        "frame_number_2600": sub1(r"^FRAME 17(: 238944 clk_sys \(59\.923 Hz\), active lines 240)", r"FRAME 9\g<1>"),
         "frame_number_pal2600": sub1(r"^FRAME 75(: 284544)", r"FRAME 74\g<1>"),
         # a bench that exited non-zero in a piped case (its %Fatal line went
         # to grep): run_sim.sh's sim prints this line past the pipe
-        "simulator_exit": sub1(r"^(-- border hidden:\n)", r"\g<1>SIMULATOR EXIT 1: ./obj/vtb +audf=0 +hide_border\n"),
+        "simulator_exit": sub1(r"^(-- 2600 mode .*\n)", r"\g<1>SIMULATOR EXIT 1: ./obj/vtb +audf=0 +mode2600\n"),
+        # the A78: its tone played (it ran, not refused), the refusal's verdict
+        # gone or failed, the 2600 image's tone gone
+        "a78_played": sub1(r"^(TONE from loaded cart AUDF0=7: measured )0\.0( Hz, TIA reference 1962\.5 Hz, ratio )0\.000$",
+                           r"\g<1>1960.0\g<2>0.999"),
+        "a78_refusal_fail": sub1(r"^A78_REFUSAL pass$", "A78_REFUSAL FAIL"),
+        "a78_refusal_verdict_missing": sub1(r"^A78_REFUSAL pass\n", ""),
+        "a26_tone": sub1(r"^(TONE from loaded cart AUDF0=14: .* ratio )[0-9.]+$", r"\g<1>0.000"),
+        # the reloads: a second reset release from elsewhere than $f000, no
+        # second load, a release missing, the section gone
+        "reload_vector": sub1(r"^(    BOOT 2 vector: )\$f000", r"\g<1>$c000"),
+        "reload_no_image2": sub1(r"^    IMAGE2 load_test2\.a26 .*\n", ""),
+        "reload_a78_one_release": lambda t: re.sub(r"(  a refused A78, then a 2600 image.*?\n)((?:    .*\n)*?)    BOOT 2 at .*\n",
+                                                   r"\g<1>\g<2>", t, count=1, flags=re.S),
+        "reload_missing": lambda t: re.sub(r"^-- reloads.*?(?=^-- )", "", t, count=1, flags=re.M | re.S),
+        # a 7800 section in the log: not this core's
+        "a7800_section": sub1(r"^(-- 2600 mode .*\n)", r"-- border hidden:\n\g<1>"),
         # tb_vaxis5: a seed with mismatches, and the planted fault not caught
         "vaxis5_mismatch": sub1(r"^(VAXIS5 seed 3 .* mismatches )0$", r"\g<1>7"),
         "vaxis5_planted_missed": sub1(r"^(VAXIS5 planted fault .*: )caught, \d+ mismatches$", r"\g<1>caught, 0 mismatches"),
@@ -213,139 +237,126 @@ def run_sim_cases(log, w):
         "region_sketch_no_hazard": sub1(r"^(REGION sketch C trials 49 retunes [\d: ]+ rgn_bad )\d+ b2b \d+$", r"\g<1>0 b2b 0"),
         "region_missing": lambda t: re.sub(r"^-- the region asked of the PLL.*?(?=^-- )", "", t, count=1, flags=re.M | re.S),
         # the FA2 save slot: the reload lost, a saved byte read back wrong,
-        # no save, and the section gone
+        # no save, an A78 that wrote the slot, an A78 taken for FA2 (not
+        # refused), and the section gone
         "fa2_reload_lost": sub1(r"^(FA2 work RAM after the reload: )0( of 255)", r"\g<1>255\g<2>"),
         "fa2_slot_differs": sub1(r"^(FA2 save slot read back \(APF read protocol\): )0( of 256)", r"\g<1>4\g<2>"),
         "fa2_no_save": sub1(r"^(FA2 program: .*flash loads 2, saves )1(, slot RAM writes )256$", r"\g<1>0\g<2>0"),
         "fa2_a78_overwrote": sub1(r"^(FA2 save slot after load, reset .*: )0( of 256)", r"\g<1>256\g<2>"),
-        # the A78 taken for FA2: its save reached the slot (as before the
-        # wrapper's fa2_on gate: 255 of 256 bytes), or it was not taken for
-        # FA2 at all, so the run could not fail
-        "fa2_a78fa2_overwrote": sub1(r"^(FA2 image: 2600 mapper 25, .*saves 1, slot RAM writes )0(\n(?:.*\n)*?"
-                                     r"FA2 save slot after load, reset .*: )0( of 256)", r"\g<1>256\g<2>255\g<3>"),
-        "fa2_a78fa2_not_fa2": sub1(r"^(FA2 image: 2600 mapper )25(, cart_is_7800 1, tia_mode 0; flash loads 0, )saves 1",
-                                   r"\g<1>0\g<2>saves 0"),
+        # the second A78 run of the FA2 section (detect2600.sv takes it for
+        # FA2): its save reached the slot
+        "fa2_a78fa2_overwrote": lambda t: re.sub(
+            r"(^-- FA2 flash save slot.*?^FA2 image: .*?$.*?^)FA2 image: 2600 mapper 32, cart_is_7800 1, tia_mode 1; "
+            r"flash loads 0, saves 0, slot RAM writes 0$",
+            r"\g<1>FA2 image: 2600 mapper 25, cart_is_7800 1, tia_mode 1; flash loads 0, saves 1, slot RAM writes 256",
+            t, count=1, flags=re.M | re.S),
+        "fa2_a78_taken_for_fa2": sub1(r"^(FA2 image: 2600 mapper )32(, cart_is_7800 1)", r"\g<1>25\g<2>"),
         "fa2_missing": lambda t: re.sub(r"^-- FA2 flash save slot.*?(?=^-- )", "", t, count=1, flags=re.M | re.S),
     }
     for k, fn in cases.items():
         expect(k, [chk, plant(log, os.path.join(w, f"run_sim_{k}.log"), fn)], False)
-    pokey_cases(log, w, chk)
-
-
-def pokey_cases(log, w, chk):
-    """The POKEY read section (2.2.2's read fix): planted on the first case's
-    (POKEY at $450) lines of a passing log, or the $4000 case's."""
-    rx = r"^(    POKEYRD RANDOM 40 reads, )\d+ of them \$FF, \d+ distinct:((?: [0-9a-f]{2}){40})$"
-
-    def rnd(f, counts=None, at4000=False):
-        # f(values) -> the values to plant; the bench's counts follow them
-        # unless counts gives others
-        def g(t):
-            def r(m):
-                v = f([int(x, 16) for x in m.group(2).split()])
-                nff, nd = counts or (v.count(0xFF), len(set(v)))
-                return f"{m.group(1)}{nff} of them $FF, {nd} distinct:" + "".join(f" {x:02x}" for x in v)
-            i = t.index("\n  POKEY at $4000:\n") if at4000 else 0
-            return t[:i] + re.sub(rx, r, t[i:], count=1, flags=re.M)
-        return g
-
-    def ffs(n):
-        # n values $FF, the rest as they were but none $FF
-        return lambda v: [0xFF] * n + [x if x != 0xFF else 0x00 for x in v[n:]]
-    pass_cases = {
-        "pokey_four_ff": rnd(ffs(4)),
-        "pokey_24_distinct": rnd(lambda v: [0x10 + (i % 24) for i in range(40)]),
-    }
-    fail_cases = {
-        "pokey_all_ff": rnd(lambda v: [0xFF] * 40),
-        "pokey_4000_all_ff": rnd(lambda v: [0xFF] * 40, at4000=True),
-        "pokey_five_ff": rnd(ffs(5)),
-        "pokey_few_distinct": rnd(lambda v: [0x10 + (i % 23) for i in range(40)]),
-        "pokey_counts_lie": rnd(lambda v: [0xFF] * 40, counts=(0, 40)),
-        "pokey_irqst_idle_clear": sub1(r"^(    POKEYRD IRQST idle \$)[0-9a-f]{2}", r"\g<1>fe"),
-        "pokey_irqst_not_fired": sub1(r"^(    POKEYRD IRQST idle \$[0-9a-f]{2}, timer 1 fired \$)[0-9a-f]{2}", r"\g<1>ff"),
-        "pokey_not_done": sub1(r"^(    POKEYRD marker \$)a5", r"\g<1>00"),
-        "pokey_4000_missing": lambda t: re.sub(r"^  POKEY at \$4000:\n(?:    .*\n)*", "", t, count=1, flags=re.M),
-        "pokey_missing": lambda t: re.sub(r"^-- POKEY reads.*?(?=^-- )", "", t, count=1, flags=re.M | re.S),
-    }
-    for k, fn in pass_cases.items():
-        expect(k, [chk, plant(log, os.path.join(w, f"run_sim_{k}.log"), fn)], True)
-    for k, fn in fail_cases.items():
-        expect(k, [chk, plant(log, os.path.join(w, f"run_sim_{k}.log"), fn)], False)
-    # the section alone, as run_sim.sh ONLY=pokey writes it
+    # the DARIA section alone, as run_sim.sh ONLY=daria writes it
     t = open(log, "rb").read().decode("utf-8", "replace")
     head = re.search(r"^-- run_sim\.sh: .*\n", t, flags=re.M)
-    sec = re.search(r"^-- POKEY reads.*?(?=^-- )", t, flags=re.M | re.S)
-    if not head or not sec:
-        results.append(False)
-        print("  WRONG ONLY=pokey log: the log has no '-- run_sim.sh:' line or no POKEY read section to make it from")
-        return
-    only = os.path.join(w, "run_sim_only_pokey.log")
-    open(only, "w").write(head.group(0) + "-- run_sim.sh ONLY=pokey: tb_load and the POKEY read section alone, not a whole run\n"
-                          + sec.group(0) + "exit 0\n")
-    expect("ONLY=pokey log, --only pokey", [chk, only, "--only", "pokey"], True)
-    expect("ONLY=pokey log without --only", [chk, only], False)
-    expect("ONLY=pokey log, RANDOM all $FF", [chk, plant(only, os.path.join(w, "run_sim_only_pokey_ff.log"),
-                                                         rnd(lambda v: [0xFF] * 40)), "--only", "pokey"], False)
-    expect("the whole log with --only pokey", [chk, log, "--only", "pokey"], False)
+    sec = re.search(r"^-- DARIA: synthetic.*?(?=^-- )", t, flags=re.M | re.S)
+    if head and sec and "POCKET_DARIA 1" in head.group(0):
+        only = os.path.join(w, "run_sim_only_daria.log")
+        open(only, "w").write(head.group(0) + "-- run_sim.sh ONLY=daria: tb_load and the DARIA section alone, not a whole run\n"
+                              + sec.group(0) + "exit 0\n")
+        expect("ONLY=daria log, --only daria", [chk, only, "--only", "daria"], True)
+        expect("ONLY=daria log without --only", [chk, only], False)
+        expect("ONLY=daria log, DARIA FAIL", [chk, plant(only, os.path.join(w, "run_sim_only_daria_fail.log"),
+                                                         sub1(r"^DARIA pass$", "DARIA FAIL")), "--only", "daria"], False)
+        expect("the whole log with --only daria", [chk, log, "--only", "daria"], False)
 
 
-def extra_cases(log, ref, xdir, w):
+def in_case(title, pat, rep):
+    """sub1(pat, rep) applied inside one case of an extra_tests.sh section:
+    from its "  TITLE...:" line to the next case's title or section header."""
+    def f(t):
+        m = re.search(r"^  " + re.escape(title) + r".*:\n", t, flags=re.M)
+        if not m:
+            return t
+        e = re.search(r"^(  \S.*:|-- .*)$", t[m.end():], flags=re.M)
+        end = m.end() + (e.start() if e else len(t) - m.end())
+        return t[:m.end()] + re.sub(pat, rep, t[m.end():end], count=1, flags=re.M) + t[end:]
+    return f
+
+
+def extra_cases(log, ref, w):
     chk = os.path.join(HERE, "extra_tests_check.py")
-    base = [chk, log, "--ref", ref] + (["--extra-dir", xdir] if xdir else [])
+    base = [chk, log, "--ref", ref]
     print("extra_tests_check.py:")
     expect("the log as it is", base, True)
+    text = open(log, errors="replace").read()
     cases = {
         "archeck": sub1(r"^(ARCHECK 24 pages, )0( of 6144)", r"\g<1>3\g<2>"),
-        "pokey_stat": sub1(r"^(  t=0\.50s min=\d+ max=)(\d+)", lambda m: m.group(1) + str(int(m.group(2)) + 1)),
-        "savekey_lost": sub1(r"^SAVEKEY EEPROM \$1234\.\.\$123B in the save RAM: a5 5a", "SAVEKEY EEPROM $1234..$123B in the save RAM: a5 00"),
         "multiload_order": lambda t: t.replace("AUDF0 = 14\n", "AUDF0 = 13\n", 1),
-        "no_ref": None,
+        # the SaveKey: a byte lost, Off answering (the pass tone), the round
+        # trip one byte short, the section gone
+        "savekey_lost": sub1(r"^SAVEKEY EEPROM \$1234\.\.\$123B in the save RAM: a5 5a", "SAVEKEY EEPROM $1234..$123B in the save RAM: a5 00"),
+        "savekey_off_answers": in_case("SaveKey Off", r"^(TONE from loaded cart AUDF0=31: measured )[0-9.]+( Hz, .* ratio )[0-9.]+$",
+                                       r"\g<1>1960.0\g<2>3.995"),
+        "savekey_roundtrip_7": sub1(r"^(SAVEKEY save after load, reset and running: )8( of 32768)", r"\g<1>7\g<2>"),
+        "savekey_missing": lambda t: re.sub(r"^-- SaveKey.*?(?=^-- )", "", t, count=1, flags=re.M | re.S),
+        # the Supercharger BIOS slot: a ROM byte wrong
+        "firmware_rom": sub1(r"^(FIRMWARE Supercharger: 2048 byte file, )0( ROM bytes differ)", r"\g<1>5\g<2>"),
+        # the Mapper menu: a reset that did not move on (game 1 twice), the
+        # override not applied, MC8K left in bank 1, a reset lost, Auto
+        # detecting a multicart, Auto changing games
+        "mapper_game_repeated": in_case("MC2K forced", r"^(    AR \d+ ms: COLUBK = \$)52$", r"\g<1>32"),
+        "mapper_not_forced": in_case("MC4K forced", r"^(    OPTIONS 2600 mapper )30 \(override 30\)$", r"\g<1>0 (override 0)"),
+        "mapper_mc8k_bank1": in_case("MC8K forced", r"^(    AR \d+ ms: COLUBK = \$)12$", r"\g<1>0e"),
+        "mapper_reset_lost": in_case("MC4K forced", r"^    RESET at \d+ ms\n", ""),
+        "mapper_auto_multicart": in_case("MC4K's image with Mapper Auto", r"^(    OPTIONS 2600 mapper )\d+( \(override 0\))$",
+                                         r"\g<1>30\g<2>"),
+        "mapper_auto_changes_game": in_case("MC4K's image with Mapper Auto", r"^(    RESET at (\d+) ms)$",
+                                            r"\g<1>\n    AR \g<2> ms: COLUBK = $32"),
+        # the console switches: left difficulty not seen, L not toggling, the
+        # TV Type item at the load not applied
+        "switches_left_difficulty": in_case("B, B, Colour", r"^(    AR \d+ ms: COLUBK = \$)7f$", r"\g<1>3f"),
+        "switches_l_toggle": in_case("A, A, B&W from the load", r"^(    AR \d+ ms: COLUBK = \$)ff$", r"\g<1>f7"),
+        "switches_tv_type_at_load": in_case("A, A, B&W from the load", r"^(    AR \d+ ms: COLUBK = \$)f7$", r"\g<1>ff"),
+        "switches_missing": lambda t: re.sub(r"^-- Console switches.*?(?=^-- |\Z)", "", t, count=1, flags=re.M | re.S),
+        # a 7800 section in the log
+        "a7800_section": lambda t: t.replace("-- SaveKey", "-- POKEY at $450\n-- SaveKey", 1),
     }
-    if "With the BIOS, from tape" in open(log, errors="replace").read():
+    cases.update(INPUT_FAULTS)
+    if "With the BIOS, from tape" in text:
         last = lambda a, b: (lambda t: t[::-1].replace(a[::-1], b[::-1], 1)[::-1])
         cases["tape_multiload_tone"] = last("AUDF0 = 14\n", "AUDF0 = 13\n")
         cases["tape_archeck"] = last("ARCHECK 24 pages, 0 of", "ARCHECK 24 pages, 9 of")
-    if "-- 2600 cartridge RAM" in open(log, errors="replace").read():
+        # the tape colours need the reference build's log
+        expect("no_ref (the tape colours not compared)", [chk, log], False)
+    if "-- 2600 cartridge RAM" in text:
         # the cartridge-RAM section (its verdicts follow cartram2600_test.py's
         # "-- tb_cartram: ... md5" lines, which must not end the section)
         cases["cartram_matrix_verdict_missing"] = sub1(r"^CARTRAM_MATRIX pass\n", "")
         cases["cartram_s19_verdict_missing"] = sub1(r"^CARTRAM_S19 pass\n", "")
-        if re.search(r"^PASS artape blend 0:", open(log, errors="replace").read(), re.M):
+        if re.search(r"^PASS artape blend 0:", text, re.M):
             cases["artape_missing"] = sub1(r"^PASS artape blend 0:.*\n", "")
             cases["artape_colours_differ_from_the_tape_full_load"] = sub1(r"^(PASS artape blend 0:.*; colours )\$[0-9a-f]{2}",
                                                                           r"\g<1>$54")
     for k, fn in cases.items():
-        if fn is None:
-            expect(k, [chk, log] + (["--extra-dir", xdir] if xdir else []), False)
-            continue
-        expect(k, [chk, plant(log, os.path.join(w, f"extra_{k}.log"), fn), "--ref", ref]
-               + (["--extra-dir", xdir] if xdir else []), False)
-    # the multisprite rule on a copy of the frames with one sprite row shifted
-    if xdir:
-        from PIL import Image
-        src = os.path.join(xdir, "multisprite")
-        dst = os.path.join(w, "extra_ms", "multisprite")
-        shutil.rmtree(os.path.join(w, "extra_ms"), ignore_errors=True)
-        os.makedirs(os.path.join(dst, "gfx"))
-        shutil.copy(os.path.join(src, "frame_001.ppm"), dst)
-        shutil.copy(os.path.join(src, "gfx", "herodown1.png"), os.path.join(dst, "gfx"))
-        im = Image.open(os.path.join(src, "frame_002.ppm")).convert("RGB")
-        bg = Image.open(os.path.join(src, "frame_001.ppm")).convert("RGB")
-        px, bp = im.load(), bg.load()
-        w_, h_ = im.size
-        rows = [y for y in range(h_) if sum(1 for x in range(w_) if px[x, y] != bp[x, y]) > 8]
-        y = rows[len(rows) // 2]
-        xs = [x for x in range(w_) if px[x, y] != bp[x, y]]
-        seg = [px[x, y] for x in range(xs[0], xs[0] + 32)]
-        for i, x in enumerate(range(xs[0] + 2, xs[0] + 34)):
-            if x < w_:
-                px[x, y] = seg[i]
-        im.save(os.path.join(dst, "frame_002.ppm"))
-        log2 = plant(log, os.path.join(w, "extra_ms.log"), lambda t: t.replace("MULTISPRITE pass\n", ""))  \
-            if "MULTISPRITE pass" in open(log, errors="replace").read() else log
-        expect("multisprite_row_shift", [chk, log2, "--ref", ref, "--extra-dir", os.path.join(w, "extra_ms")], False)
-        expect("multisprite_row_shift (multisprite_check.py)", [os.path.join(HERE, "multisprite_check.py"), dst], False)
+        expect(k, [chk, plant(log, os.path.join(w, f"extra_{k}.log"), fn), "--ref", ref], False)
+
+
+# the Port Input runs (extra_tests.sh's inputs section): a wrong type, Port
+# Input 0 not the joystick, a paddle that did not move, a driving controller
+# turning the wrong way, the light gun's trigger not seen, a dual-stick
+# button not mapped, the Booster Grip's trigger not seen, a run gone
+INPUT_FAULTS = {
+    "inputs_types_swapped": in_case("Port 1 Paddles (2)", r"^(    INPUT port types: A )3, B 6", r"\g<1>6, B 3"),
+    "inputs_port_value_0_not_joystick": in_case("Port 1 Joystick (0)", r"^(    INPUT port types: A )1,", r"\g<1>3,"),
+    "inputs_paddle_still": in_case("Port 1 Paddles (2)", r"^(    INPUT at 560 ms\s+paddles\s+)\d+", r"\g<1>191"),
+    # (the first turn starts from 3: a 2 there is a turn to the left)
+    "inputs_driving_reversed": in_case("Port 1 Driving (3)", r"^(    INPUT driving gray codes at 560 ms: port 1 )([0-3]+)",
+                                       r"\g<1>2"),
+    "inputs_gun_trigger": in_case("Port 1 Light Gun (4)", r"^(    INPUT at 360 ms.*SWCHA \d{3})1", r"\g<1>0"),
+    "inputs_dual_stick_a": in_case("Port 1 Dual Stick (5)", r"^(    INPUT at 420 ms.*SWCHA )11110111", r"\g<1>11111111"),
+    "inputs_booster_trigger": in_case("Port 1 Booster Grip (6)", r"^(    INPUT at 420 ms\s+paddles\s+192\s+)0\b", r"\g<1>192"),
+    "inputs_run_missing": lambda t: re.sub(r"^  Port 1 Dual Stick.*?(?=^  Port 1 Booster)", "", t, count=1, flags=re.M | re.S),
+}
 
 
 def fp_rows(path):
@@ -688,28 +699,40 @@ def guard_cases(w):
     # leaves the qsf unchanged, so only the missing DARIA lines can fail it
     expect("release: FROM without the DARIA lines", [pg, "--repo", d, "--from", "base", "--to", "base", "--qsf", "release"], False,
            check=lambda out, rc: "" if "lacks the DARIA line" in out else "the missing DARIA lines are not named")
-    # step7_gates.sh's pp_guards gate picks the qsf mode itself: release when
-    # PP_GUARD_FROM's qsf has POCKET_DARIA too, daria when only the tree's has it
-    g("checkout", "-q", "-f", "base_rel")
-    write(d, "src/fpga/ap_core.qsf", rel_qsf.replace("SEED 1", "SEED 2"))
-    g("add", "-A")
-    g("commit", "-q", "-m", "seed 2")
-    for rel, src in (("sim/step7_gates.sh", os.path.join(SIM, "step7_gates.sh")), ("sim/tools/pp_guards.py", pg),
-                     ("sim/tools/pp_equiv.py", os.path.join(SIM, "tools", "pp_equiv.py"))):
-        os.makedirs(os.path.dirname(os.path.join(d, rel)), exist_ok=True)
-        shutil.copy2(src, os.path.join(d, rel))   # untracked: the guards read committed blobs only
-    env = {k: v for k, v in os.environ.items() if k not in ("SIM_LOCK", "PP_GUARD_FROM")}
-    for frm, mode, want in (("base_rel", "release", True), ("base", "daria", False)):
-        out = os.path.join(w, "gates_pp_guards_" + frm)
-        shutil.rmtree(out, ignore_errors=True)
+    shared_cases(w)
 
-        def check(o, rc, out=out, mode=mode):
-            p = os.path.join(out, "pp_guards.log")
-            t = open(p).read() if os.path.exists(p) else ""
-            return "" if f"GUARD qsf {mode}:" in t else f"pp_guards.log does not show 'GUARD qsf {mode}'"
-        expect(f"step7_gates.sh --only pp_guards, PP_GUARD_FROM {frm}: --qsf {mode}",
-               ["bash", os.path.join(d, "sim", "step7_gates.sh"), "--out", out, "--only", "pp_guards"], want, py=False,
-               env=dict(env, PP_GUARD_FROM=frm, VERILATOR="true"), check=check)
+
+def shared_cases(w):
+    """sim/tools/pp_shared.py (step7_gates.sh's pp_equiv gate) on scratch
+    trees: openFPGA-7800's role played by a git repository at REF, this
+    tree's by a copy of it: identical and with a comment edit, pass; a code
+    edit in a shared file, fail; that file listed as diverged, pass, and
+    listed while unchanged (a stale list), fail."""
+    ps = os.path.join(SIM, "tools", "pp_shared.py")
+    ref = os.path.join(w, "shared_ref")
+    g = git_repo(ref)
+    tree(ref)
+    g("add", "-A")
+    g("commit", "-q", "-m", "ref")
+    g("tag", "REF")
+    print("pp_shared.py on scratch trees:")
+
+    def case(name, edit, want, diverged=""):
+        this = os.path.join(w, "shared_this")
+        shutil.rmtree(this, ignore_errors=True)
+        tree(this)
+        if edit:
+            p = os.path.join(this, "src/fpga/core/a.sv")
+            src = open(p).read()
+            assert edit[0] in src
+            open(p, "w").write(src.replace(edit[0], edit[1], 1))
+        expect(name, [ps, "--ref-repo", ref, "--ref-rev", "REF", "--repo", this, "--out", os.path.join(w, "shared_out"),
+                      "--diverged", diverged], want)
+    case("identical", None, True)
+    case("a comment edit in a shared file", ("// a comment", "// another comment"), True)
+    case("a code edit in a shared file", ("q <= ~q;", "q <= q;"), False)
+    case("a code edit in a file listed as diverged", ("q <= ~q;", "q <= q;"), True, "core/a.sv")
+    case("a file listed as diverged that is unchanged (stale list)", None, False, "core/a.sv")
 
 
 def hygiene_cases(w):
@@ -1583,7 +1606,6 @@ def main():
     p.add_argument("--run-sim")
     p.add_argument("--extra")
     p.add_argument("--extra-ref")
-    p.add_argument("--extra-dir")
     p.add_argument("--fp")
     p.add_argument("--cartram")
     p.add_argument("--reset", help="a passing reset run's log (cartram2600_test.py reset: rst_hif8_rd_rst_k0)")
@@ -1596,7 +1618,7 @@ def main():
     if a.run_sim:
         run_sim_cases(a.run_sim, w)
     if a.extra:
-        extra_cases(a.extra, a.extra_ref or a.extra, a.extra_dir, w)
+        extra_cases(a.extra, a.extra_ref or a.extra, w)
     if a.fp:
         fp_cases(a.fp, w)
     if a.cartram:

@@ -1,64 +1,70 @@
 #!/bin/bash
-# Game-style tests built from 7800basic samples (GPL tools, built locally; no
-# ROMs are stored in this repository). Needs git, a C compiler, libpng-dev,
-# flex, python3 with Pillow, and the Verilator build that run_sim.sh makes.
+# openFPGA-2600's game-free tests beyond run_sim.sh: synthetic 2600 images
+# (our own code, made by Python scripts; no ROMs are stored in this
+# repository) and the Supercharger BIOS, fetched from MiSTer's repository at
+# test time as a user would supply it. Needs python3, curl and the Verilator
+# build that run_sim.sh makes. Plan step 6 ported the 7800 core's script:
+# its 7800 sections (multisprite, POKEY at $450 and $4000, the DLI sweep, the
+# A78 SaveKey cart, the High Score Cart firmware) are gone with the 7800
+# hardware, and with them the dasm and 7800basic clones they were built with.
 #
-#   multisprite  24 holey-DMA sprites crossing zones: frames in work/extra/
-#                multisprite_*.png. Every sprite must match gfx/herodown1.png
-#                row for row, with nothing drawn above or below it.
-#   pokey450     POKEY at $450 (A78 type 0x0040): audio stats + WAV
-#   pokey4000    POKEY at $4000 (type 0x0001, the retail location): same
-#   savekey      SaveKey on port 2 and its save slot
-#   firmware     HSC firmware / Supercharger BIOS data slots
+#   cartram      2600 cartridge RAM on every RAM mapper, Flicker Blend off and
+#                on, and the Supercharger, through tb_cartram's +cartram
+#                monitor (cartram2600_test.py), and the directed s19 run;
+#                first (with AR_TAPE=1 it fetches the Supercharger BIOS first
+#                and adds the tape load with +cartram, artape: about an hour
+#                more)
+#   savekey      the SaveKey on port 2 and its save slot: console_test.py's
+#                2600 image writes 8 bytes over I2C and reads them back; On,
+#                Off (the default: no acknowledge) and the 32 KiB round trip
+#   firmware     the Supercharger BIOS slot, then a 2600 image
 #   supercharger Supercharger loads without the BIOS (POCKET_SUPERCHARGER's
 #                stub), from ar_test.py's images; AR_TAPE=1 adds the
 #                tape path with the BIOS (long: about 20 simulated seconds)
-#   cartram      2600 cartridge RAM on every RAM mapper, Flicker Blend off and
-#                on, the Supercharger and a 7800 RAM cart, through
-#                tb_cartram's +cartram monitor (cartram2600_test.py), and
-#                the directed s19 run; first, as it needs no clone (with
-#                AR_TAPE=1 it fetches the Supercharger BIOS first and adds
-#                the tape load with +cartram, artape: about an hour more)
+#   mapper       the Mapper menu (bs_override) on console_test.py's
+#                multicarts: MC2K, MC4K and MC8K forced, four games each, a
+#                console reset every 200 ms; and one with Mapper Auto
+#   inputs       the Port 1 and 2 Input values on input_test.py's image:
+#                each port type (joystick, paddles, driving, light gun, dual
+#                stick, Booster Grip) as the program reads it
+#   switches     the Left and Right Difficulty and TV Type items, and L's
+#                Colour/B&W toggle, on console_test.py's SWCHB image
 # FP=1 writes each run's per-frame fingerprint to $WORK/fp/extra_<case>.csv
 # (tb_load +fp), and the cartridge-RAM runs' to $WORK/fp/cartram_<case>.csv,
 # for comparing two builds frame by frame. A bench that exits non-zero
 # prints "SIMULATOR EXIT N: <command>" (its "%Fatal" line may have gone to a
 # grep). The checker sim/check/extra_tests_check.py turns this script's
 # output into one exit code (with --ref, the reference build's log, for the
-# POKEY and DLI statistics).
+# Supercharger tape colours).
 #
-# In pieces (2026-10-23: a whole run with AR_TAPE=1 took 5.1-5.2 h on the
-# DARIA build and 3.7-3.9 h on the plain one, about 80 % of it the three tape
-# loads; docs/ENVIRONMENT.md 6 has the table):
+# In pieces (2026-10-23, the 7800 core: a whole run with AR_TAPE=1 took
+# 5.1-5.2 h on the DARIA build and 3.7-3.9 h on the plain one, about 80 % of
+# it the three tape loads; docs/ENVIRONMENT.md 6 has the table):
 #   EXTRA_ONLY=S[,S...]
 #        run only those sections, each exactly as in a whole run: cartram
-#        multisprite pokey450 pokey4000 dli savekey firmware supercharger (an
-#        unknown name: exit 2). The header line then ends ", EXTRA_ONLY ...";
+#        savekey firmware supercharger mapper inputs switches (an unknown
+#        name: exit 2). The header line then ends ", EXTRA_ONLY ...";
 #        extra_tests_check.py fails such a log for the sections left out: a
 #        quick look, not a verdict.
 #   EXTRA_JOBS=N
 #        (default 1) the sections as up to N processes at once, longest
 #        first, each under EXTRA_SLOT (a command prefix that runs one
 #        simulation in one of the caller's slots, e.g. "flock FILE"; empty:
-#        none). The tools and firmware are fetched and built first; the
-#        pieces' logs (in $X/pieces) are then printed in the serial order,
-#        so the output is a serial run's and extra_tests_check.py gives the
-#        same verdict. Exit 1 when a piece exited non-zero (a serial run
-#        stops at that section instead). Every piece is a simulation: do not
-#        run EXTRA_JOBS>1 inside one slot, and EXTRA_JOBS>1 with no
-#        EXTRA_SLOT is refused (exit 2). On the owner's VM use
-#        EXTRA_SLOT=~/daria_work/bin/simslot; "flock FILE" with
-#        one FILE runs the pieces one at a time. With AR_TAPE=1 and N=3 a build
-#        takes about as long as its Supercharger section [estimated: 2.5 h
-#        on the DARIA build, 1.9 h on the plain one].
+#        none). The firmware is fetched first; the pieces' logs (in
+#        $X/pieces) are then printed in the serial order, so the output is a
+#        serial run's and extra_tests_check.py gives the same verdict. Exit 1
+#        when a piece exited non-zero (a serial run stops at that section
+#        instead). Every piece is a simulation: do not run EXTRA_JOBS>1
+#        inside one slot, and EXTRA_JOBS>1 with no EXTRA_SLOT is refused
+#        (exit 2). On the owner's VM use EXTRA_SLOT=~/daria_work/bin/simslot;
+#        "flock FILE" with one FILE runs the pieces one at a time.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="${WORK:-$HERE/work}"
 X="$WORK/extra"
 mkdir -p "$X"
 [ -x "$WORK/obj_load/vtb" ] || { echo "run ./run_sim.sh first"; exit 1; }
-SECTIONS="cartram multisprite pokey450 pokey4000 dli savekey firmware supercharger"
-TOOLSECS="multisprite pokey450 pokey4000 dli savekey"   # these need the dasm and 7800basic clones
+SECTIONS="cartram savekey firmware supercharger mapper inputs switches"
 EXTRA_ONLY="${EXTRA_ONLY:-}"; EXTRA_ONLY="${EXTRA_ONLY//,/ }"
 for s in $EXTRA_ONLY; do
 	case " $SECTIONS " in *" $s "*) ;; *) echo "extra_tests.sh: unknown section '$s' in EXTRA_ONLY (sections: $SECTIONS)" >&2; exit 2 ;; esac
@@ -68,7 +74,6 @@ if [ "${EXTRA_JOBS:-1}" -gt 1 ] && [ -z "${EXTRA_PIECE:-}" ] && [ -z "${EXTRA_SL
 	exit 2
 fi
 want() { [ -z "$EXTRA_ONLY" ] || case " $EXTRA_ONLY " in *" $1 "*) true ;; *) false ;; esac; }
-want_tools() { local s; for s in $TOOLSECS; do want "$s" && return 0; done; return 1; }
 fp() { [ "${FP:-0}" = 1 ] && printf '%s' "+fp=$WORK/fp/extra_$1.csv"; true; }
 [ "${FP:-0}" = 1 ] && mkdir -p "$WORK/fp"
 # Every bench run goes through sim (as in run_sim.sh): a pipe into grep drops
@@ -87,59 +92,23 @@ fetch_ar() {
 		&& mv -f "$X/fw/supercharger.bin.$$" "$X/fw/supercharger.bin"; }
 }
 
-# The two tool clones are pinned, so every run builds the same carts. dasm
-# at c361b82 (2026-07-08). 7800basic at 4b17165 (2025-11-02), the newest
-# commit whose 7800basic.native.sh runs the compiler itself: from 398ac79
-# (2025-11-04) to its head of 2026-10-10 (e7c18d2) it runs it under
-# valgrind, and without valgrind installed every compile fails (the script
-# still exits 0). A cached clone at another commit is built again.
-DASM_REF=c361b8201320e66c2452c58b248030b34be38495
-B78_REF=4b17165b263718d079714303b1f11a536e2e01dd
-fetch_at() {   # fetch_at <dir> <url> <commit>: that commit alone, no history
-	rm -rf "$1"; git init -q "$1"
-	git -C "$1" fetch -q --depth 1 "$2" "$3" && git -C "$1" checkout -q FETCH_HEAD
-}
-at_ref() { [ "$(git -C "$1" rev-parse HEAD 2>/dev/null)" = "$2" ]; }
-tools() {   # the clones at their commits, built; sets TOOLS_LINE and PATH
-	if [ ! -x "$X/dasm/bin/dasm" ] || ! at_ref "$X/dasm" "$DASM_REF"; then
-		fetch_at "$X/dasm" https://github.com/dasm-assembler/dasm "$DASM_REF"
-		make -C "$X/dasm" -j4 > "$X/dasm.make.log" 2>&1 \
-			|| { echo "dasm: make failed (last lines of $X/dasm.make.log):"; tail -5 "$X/dasm.make.log"; exit 1; }
-	fi
-	# 7800basic's makefile is serial only: its 7800preprocess and 7800optimize
-	# rules both write and delete lex.yy.c in the source directory, so with -j
-	# they can compile each other's half-written file and fail (e7c18d2 did
-	# with -j4). Its output goes to a log, so that a failure shows; a partial
-	# build is removed, so the next run builds again.
-	if [ ! -x "$X/7800basic/7800preprocess" ] || ! at_ref "$X/7800basic" "$B78_REF"; then
-		fetch_at "$X/7800basic" https://github.com/7800-devtools/7800basic "$B78_REF"
-		make -C "$X/7800basic" all > "$X/7800basic.make.log" 2>&1 \
-			|| { echo "7800basic: make failed (last lines of $X/7800basic.make.log):"; tail -5 "$X/7800basic.make.log"; rm -rf "$X/7800basic"; exit 1; }
-	fi
-	TOOLS_LINE="-- tools: dasm $(git -C "$X/dasm" rev-parse --short HEAD 2>/dev/null), 7800basic $(git -C "$X/7800basic" rev-parse --short HEAD 2>/dev/null)"
-	export PATH="$X/dasm/bin:$X/7800basic:$PATH" bas7800dir="$X/7800basic"
-}
-
 [ -n "${EXTRA_PIECE:-}" ] || echo "-- extra_tests.sh: WORK $WORK, obj_load/vtb md5 $(md5sum < "$WORK/obj_load/vtb" | cut -d' ' -f1), AR_TAPE ${AR_TAPE:-0}${EXTRA_ONLY:+, EXTRA_ONLY $EXTRA_ONLY}"
 
 # EXTRA_JOBS>1: each section is a piece, this script again with EXTRA_ONLY=it and
-# EXTRA_PIECE=1 (no header, no tools line, nothing fetched or built that
-# another piece uses), its log in $X/pieces; the logs are then printed in the
-# serial order, the tools line where a serial run prints it.
+# EXTRA_PIECE=1 (no header, nothing fetched that another piece uses), its log
+# in $X/pieces; the logs are then printed in the serial order.
 if [ "${EXTRA_JOBS:-1}" -gt 1 ] && [ -z "${EXTRA_PIECE:-}" ]; then
-	if want_tools; then tools; fi
 	if want firmware || { [ "${AR_TAPE:-0}" = 1 ] && { want cartram || want supercharger; }; }; then fetch_ar; fi
 	P="$X/pieces"; rm -rf "$P"; mkdir -p "$P"
-	for s in supercharger cartram pokey450 pokey4000 savekey dli firmware multisprite; do
+	for s in supercharger cartram inputs mapper savekey switches firmware; do
 		want "$s" || continue
 		while [ "$(jobs -rp | wc -l)" -ge "$EXTRA_JOBS" ]; do wait -n || true; done
 		( set +e; EXTRA_ONLY="$s" EXTRA_PIECE=1 EXTRA_JOBS=1 $EXTRA_SLOT bash "$HERE/extra_tests.sh" > "$P/$s.out" 2>&1; echo $? > "$P/$s.rc" ) &
 	done
 	wait
-	rc=0; told=0
+	rc=0
 	for s in $SECTIONS; do
 		want "$s" || continue
-		case " $TOOLSECS " in *" $s "*) [ $told = 1 ] || echo "$TOOLS_LINE"; told=1 ;; esac
 		cat "$P/$s.out"
 		[ "$(cat "$P/$s.rc" 2>/dev/null)" = 0 ] || rc=1
 	done
@@ -149,14 +118,14 @@ fi
 # 2600 cartridge RAM (docs/DARIA_CORE.md, "Fix B"; docs/daria_step7/plan.md
 # 1.2 row 6): tb_cartram (tb_load + the +cartram monitor) is built in WORK
 # from run_sim.sh's source list when missing. Every RAM mapper's test image
-# with Flicker Blend off and on, the Supercharger's full load and multiload
-# and a 7800 RAM cart: no fail code, 0 wrong bytes, 0 reads without a fresh
+# with Flicker Blend off and on, the Supercharger's full load and multiload:
+# no fail code, 0 wrong bytes, 0 reads without a fresh
 # access, writes = strobes, shadow = SRAM, the per-image read and write
 # counts, and each build's latency buckets (cartram2600_test.py's header).
 # Then the directed s19 run: another client's access placed at every
 # clk_sdram edge of the 6507 cycle in turn.
 if want cartram; then
-echo "-- 2600 cartridge RAM (cartram2600_test.py: 8 RAM mappers x Flicker Blend, Supercharger, 7800 RAM cart, s19 sweep)"
+echo "-- 2600 cartridge RAM (cartram2600_test.py: 8 RAM mappers x Flicker Blend, Supercharger, s19 sweep)"
 # (re)built unless it is newer than run_sim.sh's own tb_load build, which
 # run_sim.sh makes afresh on every run: a tb_cartram older than that may be
 # of other RTL
@@ -174,118 +143,38 @@ python3 "$HERE/cartram2600_test.py" matrix --work "$WORK" "${CT_FP[@]}" "${CT_TA
 python3 "$HERE/cartram2600_test.py" s19 --work "$WORK" "${CT_FP[@]}" || true
 fi
 
-if want_tools; then
-	tools
-	[ -n "${EXTRA_PIECE:-}" ] || echo "$TOOLS_LINE"
-fi
-
-# 7800basic.native.sh exits 0 even when the compile fails, so a cart counts
-# as built only when its .a78 is there; otherwise the compile's output (kept
-# in <name>/build.log) is shown and the script stops.
-build() {   # build <name> <sample> <sed expression or "">
-	rm -rf "$X/$1"; cp -r "$X/7800basic/samples/$2" "$X/$1"; rm -f "$X/$1/$2.bas.a78"
-	[ -n "$3" ] && sed -i "$3" "$X/$1/$2.bas"
-	(cd "$X/$1" && sh "$X/7800basic/7800basic.native.sh" "$2.bas" > build.log 2>&1) || true
-	[ -s "$X/$1/$2.bas.a78" ] || { echo "7800basic: $2.bas did not build for $1 (last lines of $X/$1/build.log):"; tail -15 "$X/$1/build.log"; exit 1; }
-	ln -sfn "$WORK/rtl" "$X/$1/rtl"
-}
-
-audio_stats() {
-	python3 - "$1" <<'PY'
-import struct, sys, wave
-d = open(sys.argv[1] + "/audio_raw.pcm", "rb").read()
-v = struct.unpack(f"<{len(d)//2}H", d)
-step = 12013
-for i in range(0, len(v), step):
-    seg = v[i:i+step]
-    print(f"  t={i/48052:.2f}s min={min(seg)} max={max(seg)} levels={len(set(seg))}")
-w = wave.open(sys.argv[1] + "/audio.wav", "wb")
-w.setnchannels(1); w.setsampwidth(2); w.setframerate(48052)
-w.writeframes(struct.pack(f"<{len(v)}h", *[x - 32768 for x in v])); w.close()
-PY
-}
-
-if want multisprite; then
-echo "-- multisprite (holey DMA)"
-ms="$X/multisprite"; build multisprite multisprite ""
-(cd "$ms" && sim "$WORK/obj_load/vtb" +image=multisprite.bas.a78 +audf=0 +dump=3 $(fp multisprite) | grep LOAD)
-python3 - "$ms" <<'PY'
-import sys
-from PIL import Image
-for i in range(1, 3):
-    im = Image.open(f"{sys.argv[1]}/frame_{i:03d}.ppm")
-    im.resize((im.size[0] * 2, im.size[1] * 2), Image.NEAREST).save(f"{sys.argv[1]}/multisprite_{i}.png")
-    print(f"  wrote {sys.argv[1]}/multisprite_{i}.png")
-PY
-# The header's rule, as a check: frame 1 is the background, frame 2 has the
-# 24 sprites (sim/check/multisprite_check.py prints MULTISPRITE pass or FAIL).
-python3 "$HERE/check/multisprite_check.py" "$ms" | sed -n 's/^\(MULTISPRITE.*\|  FAIL.*\)$/\1/p'
-fi
-
-if want pokey450; then
-echo "-- POKEY at \$450"
-build pokey450 pokey 's/ set pokeysupport on/ set pokeysupport $450/'
-(cd "$X/pokey450" && sim "$WORK/obj_load/vtb" +image=pokey.bas.a78 +wav=2000 $(fp pokey450) | grep -E "LOAD")
-audio_stats "$X/pokey450"
-fi
-
-if want pokey4000; then
-echo "-- POKEY at \$4000"
-build pokey4000 pokey 's/ set pokeysupport on/ set pokeysupport $4000/'
-(cd "$X/pokey4000" && sim "$WORK/obj_load/vtb" +image=pokey.bas.a78 +wav=2000 $(fp pokey4000) | grep -E "LOAD")
-audio_stats "$X/pokey4000"
-fi
-
-if want dli; then
-echo "-- DLI + WSYNC + POKEY sweep at \$4000 (Ballblazer's siren pattern)"
-mkdir -p "$X/dli"; ln -sfn "$WORK/rtl" "$X/dli/rtl"
-dasm "$HERE/dli_pokey_test.asm" -f3 -o"$X/dli/dli.bin" >/dev/null
-python3 "$HERE/make_a78.py" --bin "$X/dli/dli.bin" --type 0x0001 > "$X/dli/dli.a78"
-(cd "$X/dli" && sim "$WORK/obj_load/vtb" +image=dli.a78 +wav=1000 $(fp dli) | grep -E "LOAD|PROBE")
-echo "  expect: 60 NMIs, main loop writes in the hundreds of thousands, 61 AUDF1 writes"
-audio_stats "$X/dli"
-fi
-
+# The SaveKey (plan 7.D.4): console_test.py's 2600 image writes 8 bytes to
+# the 24LC256 at $1234 over I2C on port 2 (SDA PA2, SCL PA3), waits out the
+# write cycle and reads them back; its tone says whether they matched (AUDF0
+# 7) or the EEPROM never acknowledged or read back wrong (AUDF0 31). The save
+# file is pseudo-random with the 8 bytes the cart writes inverted, so the round
+# trip shows exactly 8 bytes changed.
 if want savekey; then
-echo "-- SaveKey (24LC256 on port 2) and its save slot"
+echo "-- SaveKey (24LC256 on port 2) and its save slot: console_test.py's 2600 image"
 mkdir -p "$X/savekey"; ln -sfn "$WORK/rtl" "$X/savekey/rtl"
-dasm "$HERE/savekey_test.asm" -f3 -I"$X/7800basic/includes" -o"$X/savekey/sk.bin" >/dev/null
-python3 "$HERE/make_a78.py" --bin "$X/savekey/sk.bin" --save 2 > "$X/savekey/sk_auto.a78"
-python3 "$HERE/make_a78.py" --bin "$X/savekey/sk.bin" --save 3 > "$X/savekey/sk_both.a78"
-python3 "$HERE/make_a78.py" --bin "$X/savekey/sk.bin" > "$X/savekey/sk_plain.a78"
-# A fixed save file (it was os.urandom's: now and then a random byte already
-# held what the cart writes, and the round trip below showed 7 differences,
-# not 8): pseudo-random, with the 8 bytes the cart writes at $1234 changed.
-python3 -c "import random; d = bytearray(random.Random(7800).randbytes(32768)); w = bytes.fromhex('a55a0102807fff00'); d[0x1234:0x123c] = bytes(b ^ 0xff for b in w); open('$X/savekey/random.bin','wb').write(d)"
+python3 "$HERE/console_test.py" savekey > "$X/savekey/sk.a26"
+python3 -c "import random; d = bytearray(random.Random(2600).randbytes(32768)); w = bytes.fromhex('a55a0102807fff00'); d[0x1234:0x123c] = bytes(b ^ 0xff for b in w); open('$X/savekey/random.bin','wb').write(d)"
 cd "$X/savekey"
-echo "  Auto, header declares a SaveKey (expect pass tone ~1962 Hz, bytes match):"
-sim "$WORK/obj_load/vtb" +image=sk_auto.a78 +audf=7 +sk_auto +skcheck $(fp sk_auto) | grep -E "TONE|SAVEKEY"
-echo "  Auto, header declares HSC and SaveKey (byte 58 = 3, as Triple Punch; expect pass tone):"
-sim "$WORK/obj_load/vtb" +image=sk_both.a78 +audf=7 +sk_auto +skcheck $(fp sk_both) | grep -E "TONE|SAVEKEY"
-echo "  Auto, header declares none (expect fail tone ~490 Hz):"
-sim "$WORK/obj_load/vtb" +image=sk_plain.a78 +audf=31 +sk_auto $(fp sk_plain) | grep TONE
-echo "  32 KiB save round trip, APF read protocol (expect exactly the 8 bytes the cart wrote to differ):"
-sim "$WORK/obj_load/vtb" +image=sk_plain.a78 +audf=7 +sk_on +sksave=random.bin $(fp sk_roundtrip) | grep -E "SAVEKEY"
+echo "  SaveKey On (expect pass tone ~1962 Hz, the 8 bytes in the save RAM):"
+sim "$WORK/obj_load/vtb" +image=sk.a26 +audf=7 +sk_on +skcheck $(fp sk_on) | grep -aE "TONE|SAVEKEY"
+echo "  SaveKey Off, the default (expect no acknowledge: fail tone ~490 Hz):"
+sim "$WORK/obj_load/vtb" +image=sk.a26 +audf=31 $(fp sk_off) | grep -aE "TONE"
+echo "  32 KiB save round trip, APF read protocol (expect pass tone, exactly the 8 bytes the cart wrote to differ):"
+sim "$WORK/obj_load/vtb" +image=sk.a26 +audf=7 +sk_on +sksave=random.bin $(fp sk_roundtrip) | grep -aE "TONE|SAVEKEY"
 cd - >/dev/null
 fi
 
+# The Supercharger BIOS's data slot (supercharger.bin), then a 2600 image:
+# the slot's ROM must hold the file, and the image run as before.
 if want firmware; then
-echo "-- Firmware slots: HSC firmware and Supercharger BIOS (not in this repository;"
-echo "   MiSTer's copies are fetched at test time, as a user would supply them)"
+echo "-- Firmware slot: the Supercharger BIOS (not in this repository;"
+echo "   MiSTer's copy is fetched at test time, as a user would supply it)"
 mkdir -p "$X/fw"; ln -sfn "$WORK/rtl" "$X/fw/rtl"
-[ -s "$X/fw/highscor.rom" ] || curl -fsSL "$UP/mem4.hex" | python3 "$HERE/../tools/hex2bin.py" > "$X/fw/highscor.rom"
 fetch_ar
-python3 "$HERE/make_a78.py" 7 > "$X/fw/tone.a78"
-python3 "$HERE/make_a78.py" --bin "$X/fw/highscor.rom" > "$X/fw/hsc.a78"   # the same firmware as an A78
-python3 -c "import random; open('$X/fw/random.sav','wb').write(random.Random(2048).randbytes(2048))"
+python3 "$HERE/tone_test.py" 14 2600 | head -4096 | python3 -c "import sys;sys.stdout.buffer.write(bytes(int(l,16) for l in sys.stdin))" > "$X/fw/tone.a26"
 cd "$X/fw"
-echo "  No firmware file, HSC On (expect HSC_EN 0):"
-sim "$WORK/obj_load/vtb" +image=tone.a78 +audf=7 +hsc_on $(fp fw_none) | grep -E "HSC_EN|TONE"
-echo "  Both files loaded (expect 0 bytes differ, HSC_EN 1, save intact):"
-sim "$WORK/obj_load/vtb" +image=tone.a78 +audf=7 +hsc_on +hscfw=highscor.rom +arfw=supercharger.bin +save=random.sav $(fp fw_both) \
-	| grep -E "FIRMWARE|HSC_EN|TONE|SAVE after"
-echo "  HSC firmware as hsc.a78 (expect its header skipped: 0 bytes differ from the payload, HSC_EN 1):"
-sim "$WORK/obj_load/vtb" +image=tone.a78 +audf=7 +hsc_on +hscfw=hsc.a78 $(fp fw_a78) | grep -E "FIRMWARE|HSC_EN"
+echo "  The BIOS through its slot, then a 2600 image (expect 0 ROM bytes differ, the image's tone):"
+sim "$WORK/obj_load/vtb" +image=tone.a26 +audf=14 +arfw=supercharger.bin $(fp fw_ar) | grep -aE "FIRMWARE|TONE"
 cd - >/dev/null
 fi
 
@@ -310,5 +199,93 @@ if [ "${AR_TAPE:-0}" = 1 ]; then
 	python3 "$HERE/ar_test.py" check ram_tape.bin ar_full.bin || echo "ARCHECK FAIL"
 	sim "$WORK/obj_load/vtb" +image=ar_multi.bin +arfw="$X/fw/supercharger.bin" +arprobe +wav=12000 $(fp ar_tape_multi) | grep -E "^AR "
 fi
+cd - >/dev/null
+fi
+
+# The Mapper menu (plan 3.2 item 1, 7.D.6): bs_override forces a scheme
+# (tb_load's +bs, detect2600.sv's bss_type index: MC2K 29, MC4K 30, MC8K 31,
+# which no image can reach by detection). console_test.py's multicarts hold
+# four games each; a console reset every 200 ms moves to the next game, and
+# the fourth back to the first. Each game sets its own COLUBK and AUDF0
+# (tb_load's +arprobe logs them): game N $12 + $20 N and 3 + 4 N. The MC8K
+# games start in bank 1 and switch to bank 0 with a read of $1FF8 (a game
+# that stays in bank 1 sets $0e and 31). With Mapper Auto the MC4K image
+# runs one game, whatever the resets.
+if want mapper; then
+echo "-- Mapper menu override (bs_override): console_test.py's multicarts, four games, a console reset every 200 ms"
+mkdir -p "$X/mapper"; ln -sfn "$WORK/rtl" "$X/mapper/rtl"
+cd "$X/mapper"
+printf '%s\n' "200 reset" "400 reset" "600 reset" "800 reset" > resets.txt
+printf '%s\n' "200 reset" > reset1.txt
+for s in 2 4 8; do
+	python3 "$HERE/console_test.py" mc $s 4 > mc${s}k.bin
+	bs=$((s == 2 ? 29 : s == 4 ? 30 : 31))
+	echo "  MC${s}K forced (Mapper MC${s}K, bs_override $bs; expect games 0, 1, 2, 3, then 0 again):"
+	sim "$WORK/obj_load/vtb" +image=mc${s}k.bin +bs=$bs +arprobe +wav=1000 +joyscript=resets.txt $(fp mc${s}k) \
+		| grep -aE "^(OPTIONS|AR |RESET)" | sed 's/^/    /'
+done
+echo "  MC4K's image with Mapper Auto (expect one game throughout):"
+sim "$WORK/obj_load/vtb" +image=mc4k.bin +arprobe +wav=400 +joyscript=reset1.txt $(fp mc4k_auto) \
+	| grep -aE "^(OPTIONS|AR |RESET)" | sed 's/^/    /'
+cd - >/dev/null
+fi
+# The Port 1 and 2 Input items (plan 7.D.5; the review of step 5, which had
+# apf_json_check.py read the paddle and light gun arms from the wrapper):
+# input_test.py's image reads the ports every frame as paddle, driving and
+# light-gun games do and stores what it saw; +joyscript presses the
+# controllers and prints it (INPUT lines: tb_load's show, the wrapper's port
+# types, each port's driving gray codes). Six runs cover every menu value on
+# port 1 and the four of port 2: Joystick (0, and 1), Paddles (2), Driving
+# (3), Light Gun (4), Dual Stick (5), Booster Grip (6). tb_load's joy bits:
+# 0 right, 1 left, 2 down, 3 up, 9 A (fire 1), 10 B, 11 X, 12 Y.
+if want inputs; then
+echo "-- Port Input: each port type as input_test.py's program reads it"
+mkdir -p "$X/inputs"; ln -sfn "$WORK/rtl" "$X/inputs/rtl"
+cd "$X/inputs"
+python3 "$HERE/input_test.py" > in.a26
+printf '%s\n' "0 types" "300 show" "300 joy0=1" "500 joy0=0" "560 show" "560 drive" "560 joy1=2" "760 joy1=0" \
+	"820 show" "820 drive" "820 joy0=200" "880 show" "880 joy0=0" "880 joy1=1" "1080 joy1=0" "1140 drive" > pd.txt
+printf '%s\n' "0 types" "300 show" "300 drive" "300 joy0=1" "500 joy0=0" "560 drive" "560 joy0=2" "760 joy0=0" \
+	"820 drive" "820 joy0=200" "880 show" "880 joy0=0" "880 joy2=1" "1080 joy2=0" "1140 show" > dp.txt
+printf '%s\n' "0 types" "300 show" "300 joy0=200" "360 show" "360 joy0=0" "360 joy1=9" "420 show" "420 joy1=200" \
+	"480 show" "480 joy1=0" > gj.txt
+printf '%s\n' "0 types" "300 show" "300 joy0=6" "360 show" "360 joy0=200" "420 show" "420 joy0=0" "420 joy1=200" \
+	"480 show" "480 joy1=0" > jg.txt
+printf '%s\n' "0 types" "300 show" "300 joy0=1" "360 show" "360 joy0=200" "420 show" "420 joy0=400" "480 show" \
+	"480 joy0=800" "540 show" "540 joy0=1000" "600 show" "600 joy0=0" > ds.txt
+printf '%s\n' "0 types" "300 show" "300 joy0=400" "420 show" "420 joy0=0" "540 show" "540 joy0=800" "660 show" \
+	"660 joy0=200" "720 show" "720 joy0=0" "840 show" > bg.txt
+inrun() {   # inrun TITLE CASE PORT1 PORT2 MS SCRIPT
+	echo "  $1:"
+	sim "$WORK/obj_load/vtb" +image=in.a26 +port1=$3 +port2=$4 +wav=$5 +joyscript=$6 $(fp "in_$2") | grep -aE "^INPUT" | sed 's/^/    /'
+}
+inrun "Port 1 Paddles (2), Port 2 Driving (3)" paddles_driving 2 3 1160 pd.txt
+inrun "Port 1 Driving (3), Port 2 Paddles (2)" driving_paddles 3 2 1160 dp.txt
+inrun "Port 1 Light Gun (4), Port 2 Joystick (0)" gun_joystick 4 0 500 gj.txt
+inrun "Port 1 Joystick (0), Port 2 Light Gun (4)" joystick_gun 0 4 500 jg.txt
+inrun "Port 1 Dual Stick (5), Port 2 Joystick (1)" dualstick 5 1 620 ds.txt
+inrun "Port 1 Booster Grip (6), Port 2 Joystick (0)" booster 6 0 860 bg.txt
+cd - >/dev/null
+fi
+
+# The console switches (plan 3.2 item 2, 7.D.5): the Left and Right
+# Difficulty items (SWCHB bits 6 and 7, 1 = A), the TV Type item (bit 3, 1 =
+# Colour) and L, which toggles TV Type until the item changes or the next
+# load (plan O6); select and the reset switch (bits 1 and 0, low while
+# pressed) from controllers 1 and 2. console_test.py's switches image copies
+# SWCHB to COLUBK, so +arprobe logs every change.
+if want switches; then
+echo "-- Console switches: Difficulty, TV Type and L on console_test.py's SWCHB image"
+mkdir -p "$X/switches"; ln -sfn "$WORK/rtl" "$X/switches/rtl"
+cd "$X/switches"
+python3 "$HERE/console_test.py" switches > sw.a26
+printf '%s\n' "100 ldiff=A" "150 rdiff=A" "200 ldiff=B" "250 rdiff=B" "300 bw=1" "350 joy0=40" "400 joy0=0" \
+	"450 joy0=40" "500 joy0=0" "550 bw=0" "600 joy0=80" "620 joy0=0" "640 joy0=100" "660 joy0=0" "680 joy1=40" \
+	"700 joy1=0" > sw.txt
+printf '%s\n' "100 joy0=40" "150 joy0=0" > sw_start.txt
+echo "  B, B, Colour; each item in turn, L twice under B&W, select, reset, controller 2's L (expect SWCHB \$3f \$7f \$ff \$bf \$3f \$37 \$3f \$37 \$3f \$3d \$3f \$3e \$3f \$37):"
+sim "$WORK/obj_load/vtb" +image=sw.a26 +arprobe +wav=720 +joyscript=sw.txt $(fp switches) | grep -aE "^(AR |SWITCH)" | sed 's/^/    /'
+echo "  A, A, B&W from the load, then L (expect SWCHB \$f7, then \$ff):"
+sim "$WORK/obj_load/vtb" +image=sw.a26 +arprobe +wav=200 +ldiffa +rdiffa +bw +joyscript=sw_start.txt $(fp switches_start) | grep -aE "^(AR |SWITCH)" | sed 's/^/    /'
 cd - >/dev/null
 fi
