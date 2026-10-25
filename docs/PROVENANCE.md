@@ -86,9 +86,9 @@ findings: none of them is a name from the private list.
 | `015de7f`, `564985b` | package the core as `Miasmark.2600` (2600 platform, scaler modes, the APF file checks); merged in `4e5be35` |
 | `01fb35b` | comments and the DARIA crossing tables after the cuts |
 | `21a5d5d`, `834596d`, `329a08b` | the SaveKey read byte's hold exception, a declaration fix and the crossing tables for the first 2600 fits |
-| `79de061`, `c14802f`, `0799f8f`, `12f41eb` | (branch `step6-tests`) `79de061` maps Port Input 0 straight to the joystick; the tests ported to the 2600 core; `0799f8f` removes the 7800-only tests, `Pokey/`, `PokeyWatson/` and `pokey_adapter_watson.sv` |
+| `79de061`, `c14802f`, `0799f8f`, `12f41eb`, `175b46a` | (branch `step6-tests`, merged in `b1d5c62`) `79de061` maps Port Input 0 straight to the joystick; the tests ported to the 2600 core; `0799f8f` removes the 7800-only tests, `Pokey/`, `PokeyWatson/` and `pokey_adapter_watson.sv`; `175b46a` makes the gate accept the one expected difference from 2.2.4's fingerprints (the reads the CPU discards while a console reset is held, which 2.2.4 routes to its BIOS area) |
 
-- **The documents** (branch `step8-docs`): the README, THIRD_PARTY_NOTICES
+- **The documents** (branch `step8-docs`, merged in `97504ab`): the README, THIRD_PARTY_NOTICES
   and this section written for the 2600 core, `LICENSES/GPL-2.0.txt` added,
   `tools/fix_hsc_save.py` (a 7800 high score cart tool) removed, and the
   CI's game-data check (`sim/check/game_data.py`) added.
