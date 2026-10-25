@@ -476,6 +476,11 @@ def main():
               and v["defaultval"] == 0, f"{nm}: Joystick (0, default) and the other names by PORT_NAMES")
     for nm in ("Left Difficulty", "Right Difficulty"):
         check([(o["value"], o["name"]) for o in by_addr[nm]["options"]] == [(0, "A"), (1, "B")], f"{nm}: A = 0, B = 1 (diff_*_b)")
+        # default B: the core powers up at B (core_top set_*diff_b = 1'b1), as Stella
+        # does; A turns the music off in some games (Chaotic Grill, Elevator Agent)
+        reg = {"Left Difficulty": "set_ldiff_b", "Right Difficulty": "set_rdiff_b"}[nm]
+        check(by_addr[nm]["defaultval"] == 1 and re.search(reg + r"\s*=\s*1'b1;", core_top) is not None,
+              f"{nm}: default B, the same as core_top's power-up {reg} = 1")
     check([(o["value"], o["name"]) for o in by_addr["TV Type"]["options"]] == [(0, "Colour"), (1, "B&W")], "TV Type: Colour 0, B&W 1")
     check([(o["value"], o["name"]) for o in by_addr["Region"]["options"]] == [(0, "Auto"), (1, "NTSC"), (2, "PAL")],
           "Region: Auto 0, NTSC 1, PAL 2")

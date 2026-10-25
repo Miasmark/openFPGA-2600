@@ -144,7 +144,7 @@ The Pocket shows at most 16 settings; this core uses all 16.
 | Setting | Options | What it does |
 |---|---|---|
 | *Reset* | | Resets the console |
-| *Left Difficulty*, *Right Difficulty* | A, B (default A) | The console's difficulty switches |
+| *Left Difficulty*, *Right Difficulty* | A, B (default B) | The console's difficulty switches. Some games use them for options: Chaotic Grill and Elevator Agent turn their music off with A |
 | *TV Type* | Colour, B&W | The console's TV Type switch. It takes this value when you change it and at every cartridge load; L toggles it in between |
 | *Swap Controllers* | on, off | Swaps ports 1 and 2 |
 | *Port 1 Input* | Joystick, Paddles, Driving, Light Gun, Dual Stick, Booster Grip | The controller on port 1 (see *Controls*) |
