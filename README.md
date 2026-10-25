@@ -18,7 +18,7 @@ exception (see *Verification*).
 
 ## Why a separate core
 
-- **Room.** The core uses 10,782 of the FPGA's 18,480 ALMs (58%), against
+- **Room.** The core uses 10,820 of the FPGA's 18,480 ALMs (59%), against
   14,639 (79%) for the 7800 core, and the menu has room for settings the
   7800 core had no room for:
   - **a Mapper setting**, which the 7800 core had wired but not shown. It
@@ -281,19 +281,20 @@ The test benches and gates are in `sim/` ([docs/DEVELOPING.md](docs/DEVELOPING.m
 
 ### Build figures
 
-The release build (Quartus Prime Lite 21.1, fitter seed 2, DARIA's CPU
+The release build (Quartus Prime Lite 21.1, fitter seed 3, DARIA's CPU
 clock at 38.18 MHz) meets timing on all four corners. Worst setup slack at
-the worse slow corner: +3.159 ns on clk_sdram (against a release gate of
-+1.5 ns), +2.449 ns on DARIA's CPU clock (gate +0.5 ns), and +2.844 ns on
+the worse slow corner: +2.977 ns on clk_sdram (against a release gate of
++1.5 ns), +3.078 ns on DARIA's CPU clock (gate +0.5 ns), and +2.996 ns on
 the one path of DARIA's front end that is timed on its own (its phase
-detector, bounded at 8.0 / 0.5 ns), whose hold slack is +0.313 ns. Worst
-hold slack +0.125 ns. Seeds 1 and 3 pass every check too, with +2.525 and
-+3.025 ns on clk_sdram (seed 1 on the tree just before `329a08b`, the
-crossing-table update); seed 2 has the most clk_sdram margin, which decides,
+detector, bounded at 8.0 / 0.5 ns), whose hold slack is +0.418 ns. Worst
+hold slack +0.112 ns. Seeds 1 and 2 pass every check too, with +2.728 and
++2.638 ns on clk_sdram; seed 3 has the most clk_sdram margin, which decides,
 as for 2.2.4. The debug build (with DARIA's status overlay) passes on seeds
-1, 2 and 3.
+1 and 2 and ships seed 2; on seed 3 it misses clk_sdram hold by 0.155 ns on
+the SRAM controller's request path, which is why the debug and release
+builds can use different seeds.
 
-It uses 10,782 of 18,480 ALMs (58%), 187 of 308 M10K blocks (61%) and 10
+It uses 10,820 of 18,480 ALMs (59%), 187 of 308 M10K blocks (61%) and 10
 DSP blocks, against 14,639 ALMs (79%), 216 M10K blocks and 13 DSP blocks for
 openFPGA-7800 2.2.4. 16 of the M10K blocks are the BupChip's firmware ROM,
 which the 2600 core never fills; synthesis keeps it, as its write port is
