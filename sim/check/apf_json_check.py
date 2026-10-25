@@ -13,7 +13,9 @@ Checks (each prints a line; the last line is APF_JSON pass or APF_JSON FAIL):
   2600 core 1.0.0 (byte for byte: the platform is shared with that core);
 - no 7800 package file is left;
 - interact.json: the Pocket's menu limits (16 entries, 20 with the reloadable
-  data slots, 16 options a list, 23 characters a name), every address decoded
+  data slots, 15 options a list, 23 characters a name; the documents allow
+  16 options, but a 16-option list gave an interact error on the owner's
+  Pocket, 2026-10-25, and 15 works), every address decoded
   by core_top.v, option values inside the item's mask, defaults among the
   options, writeonly on every setting and persist on all but the Mapper
   lists (each forcible bss_type once, names matching detect2600.sv's enum,
@@ -163,7 +165,7 @@ LIMITS = {
         "interact.variables[].graphical.max": ["s32"],
         "interact.variables[].graphical.adjust_small": ["s32"],
         "interact.variables[].graphical.adjust_large": ["s32"],
-        "interact.variables[].options": ["arr", ("count", 16)], "interact.variables[].options[]": ["obj"],
+        "interact.variables[].options": ["arr", ("count", 15)], "interact.variables[].options[]": ["obj"],
         "interact.variables[].options[].value": ["s32"],
         "interact.variables[].options[].name": ["str", ("len", 23)],
         # Not on the interact.json page; the 7800 core has shipped it empty
@@ -450,8 +452,16 @@ def main():
             check(tok is not None and enum.index(tok) == o["value"],
                   f"{nm}: {o['name']} = {o['value']} = {tok}")
             seen.append(o["value"])
-    forcible = set(range(1, 32)) - {enum.index("BANKBUS")}
-    check(sorted(seen) == sorted(forcible), "the two Mapper lists force each of bss_type 1-31 but BUS exactly once")
+    # BUS is never offered (no released game); 2K and DPC are left out to keep
+    # each list at 15 options (the Pocket's real limit), as detect2600.sv
+    # finds both by size alone: 2 KiB or less, and 10 KiB to 10 KiB + 256.
+    not_offered = {enum.index("BANKBUS"), enum.index("BANK2K"), enum.index("BANKP2")}
+    forcible = set(range(1, 32)) - not_offered
+    check(sorted(seen) == sorted(forcible),
+          "the two Mapper lists force each of bss_type 1-31 exactly once, except BUS, 2K and DPC")
+    check(re.search(r"cart_size <= 'h0800\) force_bs<=BANK2K", detect) is not None
+          and re.search(r"cart_size >= 'h2800 && cart_size <= 'h2900\) force_bs<=BANKP2", detect) is not None,
+          "2K and DPC are still detected by size in detect2600.sv")
     skv = by_addr["SaveKey (port 2)"]
     check([(o["value"], o["name"]) for o in skv["options"]] == [(0, "Off"), (1, "On")] and skv["defaultval"] == 0,
           "SaveKey: Off/On, default Off (no Auto)")

@@ -358,10 +358,6 @@
             "name": "Auto"
           },
           {
-            "value": 10,
-            "name": "2K"
-          },
-          {
             "value": 1,
             "name": "F8 (8K)"
           },
@@ -437,10 +433,6 @@
           {
             "value": 15,
             "name": "AR (Supercharger)"
-          },
-          {
-            "value": 7,
-            "name": "DPC (Pitfall II)"
           },
           {
             "value": 21,

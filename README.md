@@ -156,8 +156,8 @@ The Pocket shows at most 16 settings; this core uses all 16.
 | *AtariVox Voice* | Off, Quiet, Normal, Loud (default Normal) | The voice's level, while the SaveKey is On |
 | *Audio* | Mono TIA; Stereo TIA; Stereo, 25% Blend; Stereo, 50% Blend; Full Mono | |
 | *2600 Video* | Normal, Flicker Blend, De-comb, Blend + De-comb | |
-| *Mapper* | Auto, 2K, F8, F6, F4, F0, FA, FE, E0, E7, 3F, 3E, CV, UA, EF, SB | Forces a scheme for the cartridge you load next |
-| *Mapper (more)* | Auto, AR, DPC, DPC+, CDF / CDFJ / CDFJ+, FA2, WD, JANE, CTY, 0840, FC, DF / BF, Multicart 2K, 4K and 8K, 32-in-1 | The same, for the other schemes; *Mapper* wins when both are set |
+| *Mapper* | Auto, F8, F6, F4, F0, FA, FE, E0, E7, 3F, 3E, CV, UA, EF, SB | Forces a scheme for the cartridge you load next |
+| *Mapper (more)* | Auto, AR, DPC+, CDF / CDFJ / CDFJ+, FA2, WD, JANE, CTY, 0840, FC, DF / BF, Multicart 2K, 4K and 8K, 32-in-1 | The same, for the other schemes; *Mapper* wins when both are set |
 
 The two Mapper settings are not saved: they are back on Auto each time the
 core starts. A forced scheme stays forced for every cartridge loaded until
