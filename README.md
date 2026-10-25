@@ -306,9 +306,15 @@ openFPGA-7800 2.2.4's debug fits missed hold on that path by 0.504 ns.
 
 ### Hardware testing
 
-The 1.0.1 build is still to be tested on a Pocket before its release. As
-openFPGA-7800's 2600 mode, the same hardware was tested there, in builds up
-to 2.2.4:
+The 1.0.1 build was tested on the owner's Pocket on 2026-10-25: Pitfall II
+(DPC) with its music, most of the ARM games on DARIA (DPC+ and the CDF
+family), several Supercharger games, Solaris and Jr. Pac-Man. That session
+also found the Pocket's undocumented limits on `interact.json` (15 options a
+list and a file size under about 9 KB) and that two games turn their music
+off with the difficulty switches at A, so both switches now default to B.
+
+As openFPGA-7800's 2600 mode, the same hardware was tested before, in
+builds up to 2.2.4:
 Solaris, Adventure, Pitfall II (DPC), Crystal Castles and Omega Race;
 Supercharger games with and without `supercharger.bin` (Fireball, Frogger,
 Dragonstomper, and Party Mix and Sweat after a reset); paddles (Kaboom!,
