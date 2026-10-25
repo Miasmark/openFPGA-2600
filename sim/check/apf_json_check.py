@@ -15,7 +15,10 @@ Checks (each prints a line; the last line is APF_JSON pass or APF_JSON FAIL):
 - interact.json: the Pocket's menu limits (16 entries, 20 with the reloadable
   data slots, 15 options a list, 23 characters a name; the documents allow
   16 options, but a 16-option list gave an interact error on the owner's
-  Pocket, 2026-10-25, and 15 works), every address decoded
+  Pocket, 2026-10-25, and 15 works; the file also has an undocumented size
+  limit between 8,740 bytes, which the 7800 core's file has and which works,
+  and 10,213, which failed, so it must stay at 8,740 or less and is kept
+  minified), every address decoded
   by core_top.v, option values inside the item's mask, defaults among the
   options, writeonly on every setting and persist on all but the Mapper
   lists (each forcible bss_type once, names matching detect2600.sv's enum,
@@ -413,6 +416,8 @@ def main():
     print("-- interact.json")
     var = js["Cores/Miasmark.2600/interact.json"][0]["interact"]["variables"]
     check(len(var) <= 16, f"{len(var)} entries (limit 16)")
+    isize = os.path.getsize(os.path.join(root, "dist/Cores/Miasmark.2600/interact.json"))
+    check(isize <= 8740, f"interact.json is {isize} bytes (the Pocket failed at 10,213; 8,740 is the largest known to work)")
     check(len(var) + reload <= 20, f"{len(var)} entries + {reload} reloadable slots (limit 20)")
     check(len({v['id'] for v in var}) == len(var), "entry ids unique")
     blk = core_top.split("bridge_addr[31:24] == 8'h10", 1)[1].split("endcase", 1)[0]
