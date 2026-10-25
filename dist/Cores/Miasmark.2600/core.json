@@ -1,0 +1,34 @@
+{
+  "core": {
+    "magic": "APF_VER_1",
+    "metadata": {
+      "platform_ids": ["2600"],
+      "shortname": "2600",
+      "description": "Atari 2600 (VCS), from the MiSTer Atari7800 core by Kitrinx",
+      "author": "Miasmark",
+      "url": "https://github.com/Miasmark/openFPGA-2600",
+      "version": "1.0.1",
+      "date_release": "2026-10-24"
+    },
+    "framework": {
+      "target_product": "Analogue Pocket",
+      "version_required": "1.1",
+      "sleep_supported": false,
+      "dock": {
+        "supported": true,
+        "analog_output": false
+      },
+      "hardware": {
+        "link_port": false,
+        "cartridge_adapter": -1
+      }
+    },
+    "cores": [
+      {
+        "name": "default",
+        "id": 0,
+        "filename": "atari2600.rbf_r"
+      }
+    ]
+  }
+}

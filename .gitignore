@@ -1,0 +1,41 @@
+# Quartus build products
+src/fpga/db/
+src/fpga/incremental_db/
+src/fpga/output_files/
+src/fpga/*.log
+src/fpga/*.qws
+src/fpga/*_assignment_defaults.qdf
+# Packaging / simulation
+release/
+dist/Cores/Miasmark.2600/*.rbf_r
+sim/work*
+sim/atarivox/work/
+# BupChip firmware: user-supplied, never committed (docs/BUPCHIP.md). A local
+# copy may sit in src/fpga/mister/rtl/ for the simulation scripts.
+bupchip.bin
+bupchip.hex
+bupchip.mif
+# Game images, BIOS images and their data: user-supplied, never committed,
+# wherever they land. Test images are rebuilt by the Python scripts under
+# sim/ and tools/, so they are not committed either.
+*.[aA]78
+*.[aA]26
+*.[bB][iI][nN]
+*.[rR][oO][mM]
+*.[zZ][iI][pP]
+*.[iI][sS][oO]
+*.[cC][uU][eE]
+*.[wW][aA][vV]
+*.[mM][uU][sS]
+*.[sS][mM][pP]
+*.[iI][nN][sS]
+*.[tT][rR][kK]
+# The package's own images (not game data): the core's icon and the
+# platform image (Spiritualized's 2600 platform image, THIRD_PARTY_NOTICES.md)
+!dist/Cores/Miasmark.2600/icon.bin
+!dist/Platforms/_images/2600.bin
+dist/Cores/Miasmark.2600/licenses/
+# Python bytecode
+__pycache__/
+# Save files are user data, like the game images
+*.[sS][aA][vV]

@@ -1,0 +1,58 @@
+{
+  "data": {
+    "magic": "APF_VER_1",
+    "data_slots": [
+      {
+        "name": "Cartridge",
+        "id": "0x100",
+        "required": true,
+        "parameters": "0x109",
+        "extensions": [
+          "a26",
+          "bin"
+        ],
+        "size_maximum": "0x400000",
+        "address": "0x00000000"
+      },
+      {
+        "name": "Supercharger",
+        "id": "0x107",
+        "required": false,
+        "filename": "supercharger.bin",
+        "parameters": "0x88",
+        "extensions": [
+          "bin",
+          "rom"
+        ],
+        "size_maximum": "0x4000",
+        "address": "0x06000000"
+      },
+      {
+        "name": "SaveKey",
+        "id": "0x105",
+        "required": false,
+        "filename": "savekey.sav",
+        "parameters": "0x80",
+        "nonvolatile": true,
+        "extensions": [
+          "sav"
+        ],
+        "size_maximum": "0x8000",
+        "address": "0x30000000"
+      },
+      {
+        "name": "FA2 flash",
+        "id": "0x10A",
+        "required": false,
+        "filename": "fa2.sav",
+        "parameters": "0x80",
+        "nonvolatile": true,
+        "extensions": [
+          "sav"
+        ],
+        "size_maximum": "0x100",
+        "address": "0x40000000"
+      }
+    ]
+  }
+}
