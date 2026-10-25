@@ -1,9 +1,9 @@
-# Developing the Atari 7800 Pocket core
+# Developing the Atari 2600 Pocket core
 
-This guide is for anyone who wants to change the core or update the parts
-it's built from. It covers where things live, how to build and test, how to
-make the common changes, and the mistakes this port has already made so you
-don't repeat them.
+This guide comes from openFPGA-7800 and is not yet rewritten for the 2600
+core. Its layout, tools, recipes and pitfalls apply here; its parts on the
+7800-only hardware (MARIA, POKEY, the BIOS, the high score cart, the BupChip's
+music) describe the 7800 core, whose repository still has them.
 
 Related documents:
 
@@ -33,7 +33,7 @@ Related documents:
 |---|---|---|
 | `src/fpga/apf/` | Analogue's APF framework (`apf_top.v` is the real top level) | Analogue; don't edit |
 | `src/fpga/core/core_top.v` | APF glue: PLL, bridge address map, settings, data slots, video/audio out, controllers | This project (from Analogue's template) |
-| `src/fpga/core/atari7800_pocket.sv` | Pocket counterpart of MiSTer's `Atari7800.sv`: header parsing, reset, SDRAM, BIOS/save RAMs, SaveKey, firmware loading | This project |
+| `src/fpga/core/atari2600_pocket.sv` | Pocket counterpart of MiSTer's `Atari7800.sv`: header parsing, reset, SDRAM, BIOS/save RAMs, SaveKey, firmware loading | This project |
 | `src/fpga/core/bupchip/` | The BupChip, ARIA: the Souper cartridge's music co-processor, its memories, asset cache and PSRAM path ([BUPCHIP_CORE.md](BUPCHIP_CORE.md)); with `POCKET_DARIA`, DARIA, the same CPU running the 2600 ARM cartridges: `daria_*.sv` (memories, call port, MMIO, sample requester, the front end `daria_fe*.sv`) and `bup_dbg_snap.sv` ([DARIA_CORE.md](DARIA_CORE.md)) | This project |
 | `src/fpga/core/pll/` | Generated PLL and PLL-reconfiguration IP | Quartus `ip-generate` (see below) |
 | `src/fpga/core/pll_region.v` | PAL/NTSC PLL retune sequence | This project |
@@ -152,7 +152,7 @@ become `logic`), builds two testbenches, and runs them:
   are delayed 0-4 clocks as the engine staggers them, on every clock of four
   random-stimulus seeds (4 x 10^7 clocks), and a planted fault it must catch.
 - `tb_region` (`run_region.sh`): the wrapper's region logic (`region_pll`
-  and, with DARIA, `daria_rgn`), cut out of `atari7800_pocket.sv` as the
+  and, with DARIA, `daria_rgn`), cut out of `atari2600_pocket.sv` as the
   tree has it by `region_unit.py`, with `pll_region.v` in the load sequences
   of RTL-1 and RTL-2 (`docs/IMPROVEMENTS.md`), on both builds, and four
   planted variants it must catch (2.2.1's logic among them).
@@ -262,9 +262,9 @@ addresses `0x2B0`-`0x2C0` in `core_top.v`). Give a changed entry a new
 2. `core_top.v`: a `set_*` register with the same default as
    `interact.json`, and a `case` entry for the address.
 3. `core_top.v`: widen `set_s1`/`set_s2` (the clk_74a → clk_sys
-   synchroniser) and wire the new bit into `atari7800_pocket`. The bit
+   synchroniser) and wire the new bit into `atari2600_pocket`. The bit
    positions in `set_s1` and in the port list must match.
-4. `atari7800_pocket.sv`: a port, and the logic that uses it.
+4. `atari2600_pocket.sv`: a port, and the logic that uses it.
 
 The Pocket writes settings only after the data slots have loaded (see
 below). Anything the Pocket decides while loading can't depend on a
@@ -279,7 +279,7 @@ setting.
 2. `core_top.v`: a `SLOT_*` ID, a synchronised `*_download` flag in the
    clk_sys block next to `bios_download`, and include it in the loader's
    `ioctl_wr` gate.
-3. `atari7800_pocket.sv`: hold the core in reset while it loads (the `reset`
+3. `atari2600_pocket.sv`: hold the core in reset while it loads (the `reset`
    register), and write `ioctl_dout` at `ioctl_addr` where it belongs.
 4. Test through `tb_load` with the same bridge write pattern.
 
@@ -288,12 +288,12 @@ setting.
 Follow the HSC and SaveKey pattern exactly. Every item below is a bug this
 port has already had:
 
-1. Use `save_ram_dp` (in `atari7800_pocket.sv`). It includes the **APF read
+1. Use `save_ram_dp` (in `atari2600_pocket.sv`). It includes the **APF read
    latch**. The host reads with a one-transaction lag: it samples
    `bridge_rd_data` a few cycles after setting the address, then pulses
    `bridge_rd`, and expects the word latched at the previous pulse. Answering
    with the current address rotates the saved file by 4 bytes (2.0.2–2.0.3
-   HSC saves; `tools/fix_hsc_save.py` repairs them).
+   HSC saves; openFPGA-7800's `tools/fix_hsc_save.py` repairs them).
 2. Report the slot's size in the data slot table (`core_top.v`, the
    `dt_sel` rotation, address `index * 2 + 1`), as a **constant**. The Pocket
    reads the size before it writes the settings, so a size that depends on a
@@ -442,12 +442,12 @@ rules:
 data slot is loading, because the A78 header's region byte arrives
 mid-download and stopping `clk_sdram` then would drop bytes. It raises
 `busy` about 3.4 µs before starting and drops it about 3.4 µs after the PLL
-relocks. `busy` resets the core through `atari7800_pocket.sv`.
+relocks. `busy` resets the core through `atari2600_pocket.sv`.
 `sim/tb_pll_region.sv` checks all of this against a model of Intel's
 controller. Only hardware can confirm the PLL itself retunes.
 
 A 2600 image's region is measured from its frame length. The core reset
-from a retune clears that measurement, so `atari7800_pocket.sv` latches it
+from a retune clears that measurement, so `atari2600_pocket.sv` latches it
 (`tia_pal_seen`) until the next cart load. Without the latch a PAL 2600 game
 would flip back to NTSC and loop.
 

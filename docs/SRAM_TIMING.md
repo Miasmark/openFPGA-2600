@@ -167,7 +167,7 @@ which clears `tia_mode` on the edge where the reset register rises.
   `cartram_wr26`, its write data) and `mapper_init_busy` separately from
   the 7800 request, instead of only the merged `cartram_*`.
 - **The register.** Put the 2600 request through one `clk_sys` register
-  (address, strobes and data) in `atari7800_pocket.sv` or at the top of
+  (address, strobes and data) in `atari2600_pocket.sv` or at the top of
   `sram_ctrl`. The DPC+/mapper decode then has a whole `clk_sys` period
   (69.8 ns) to that register. `sram_ctrl` sees a register output, with only
   its compare and arbiter between it and the pads.

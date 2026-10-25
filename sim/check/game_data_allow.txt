@@ -1,0 +1,20 @@
+# Paths sim/check/game_data.py lets through, with the reason. The same paths
+# as the import's hygiene allow list (docs/PROVENANCE.md, "Hygiene of the
+# import"), with the 2600 package's icon and platform image.
+dist/Cores/Miasmark.2600/icon.bin            # the core's icon (binary, .bin)
+dist/Platforms/_images/2600.bin              # the platform image, Spiritualized's (binary, .bin)
+src/fpga/mister/rtl/arm7tdmi/.DS_Store       # a binary file carried in the MiSTer sources
+src/fpga/mister/rtl/t65/T65.vhd              # the T65 source's own comment uses the scratch-directory rule's word
+sim/savekey_test.asm                         # a comment calls a RAM variable a scratch pad (no path)
+docs/BUPCHIP.md                              # a document whose name matches the BupChip firmware rule
+docs/ENVIRONMENT.md                          # openFPGA-7800 process notes: the VM's Quartus lock file path
+docs/daria_fe/README.md                      # openFPGA-7800 process notes (this and the lines below): lock file and session paths
+docs/daria_fe/lanes/A_core.md
+docs/daria_fe/lanes/B_audio.md
+docs/daria_fe/lanes/C_call_copy.md
+docs/daria_fe/lanes/D_arb_guard.md
+docs/daria_fe/lanes/G_step7_resets.md
+docs/daria_fe/spec/audio.md
+docs/daria_fe/spec/bus.md
+docs/daria_fe/spec/cdf.md
+docs/daria_fe/spec/glue.md
