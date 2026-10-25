@@ -314,6 +314,25 @@ fp_compare() {
 	[ -n "${FP_REF:-}" ] || return 0
 	fp_cross "$FP_REF" "${2:-$OUT/rs/fp}" "$1" FP_REF
 }
+# FP_REF's expected differences: "FILE FRAME:COLUMN:FP_REF_VALUE:RUN_VALUE",
+# one cell each, used by fp_cross for FP_REF only (sim/check/fp_expected.py:
+# both values must be exactly these, and every other cell is still compared
+# strictly).
+# - extra_ar_tape.csv, frame 30, cpu: the frame of the +resetat=500 reset
+#   (the stub case, no BIOS). FP_REF's run is openFPGA-7800 2.2.4's. There
+#   the reset clears INPTCTRL (ctrl_reg: bios_en_b 0), so the 11931 reads
+#   the CPU repeats at $F13F while the reset is held (and on its release
+#   clock) come from the BIOS path (bios_sel; bios_out, the SRAM's empty BIOS
+#   area: $00). The 2600 core has no BIOS path (step 4: 6e3b6b3, 3fd7f17):
+#   the same reads find the slot silent (cart2600 sees A12 low while tia_en
+#   is low, as the 7800 core's did) and the bus keeps its charge: $CA. Same
+#   addresses, clocks and count in both trees; the CPU discards these reads
+#   (it is in reset), and every other cell, the frames after the reset
+#   included, is identical. dev 4e5be35 (73fd755's RTL, before step 6's
+#   79de061) gives this run's file byte for byte. Step 6 NOTES has the traces.
+FP_REF_EXPECTED=(
+	"extra_ar_tape.csv 30:cpu:1782fc7148b4a6a1:5f52272fd2527cbb"
+)
 # fp_cross REF_DIR DIR GLOB WHAT: every REF_DIR/GLOB fingerprint has its twin
 # in DIR, equal on every column and frame (frame_gate.py --strict); with
 # GLOB '*.csv' the extra_ and cartram_ files are left out, and so is the ARM
@@ -331,8 +350,15 @@ fp_cross() {
 		esac
 		n=$((n + 1))
 		echo "-- fingerprints $d: $4 against this run"
-		if [ -f "$2/$d" ]; then python3 "$HERE/check/frame_gate.py" --strict "$f" "$2/$d" || rc=1
-		else echo "  FAIL: $2/$d missing"; rc=1; fi
+		if [ ! -f "$2/$d" ]; then echo "  FAIL: $2/$d missing"; rc=1; continue; fi
+		local x=() e
+		[ "$4" != FP_REF ] || for e in "${FP_REF_EXPECTED[@]}"; do [ "${e%% *}" != "$d" ] || x+=("${e#* }"); done
+		if [ ${#x[@]} = 0 ]; then python3 "$HERE/check/frame_gate.py" --strict "$f" "$2/$d" || rc=1
+		else
+			mkdir -p "$OUT/fp_expected"
+			python3 "$HERE/check/fp_expected.py" "$f" "$2/$d" "$OUT/fp_expected/$d" "${x[@]}" \
+				&& python3 "$HERE/check/frame_gate.py" --strict "$OUT/fp_expected/$d" "$2/$d" || rc=1
+		fi
 	done
 	[ $n -gt 0 ] || { echo "  FAIL: no fingerprints matching $3 in $1"; rc=1; }
 	return $rc
