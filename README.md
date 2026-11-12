@@ -305,7 +305,15 @@ The test benches and gates are in `sim/` ([docs/DEVELOPING.md](docs/DEVELOPING.m
 
 ### Build figures
 
-The release build (Quartus Prime Lite 21.1, fitter seed 3, DARIA's CPU
+The build with Composite (after 1.0.1; seed 3, fitted on ab8276f) meets
+timing on all four corners: +3.083 ns on clk_sdram, +2.590 ns on DARIA's CPU
+clock, +3.367 ns on its phase detector (hold +0.426 ns), worst hold +0.104
+ns. Seeds 1 and 2 pass every check too, with +2.821 and +2.429 ns on
+clk_sdram; seed 3 has the most, which decides. It uses 11,584 ALMs (63%),
+190 M10K blocks and 36 DSP blocks: the composite decoder adds about 760
+ALMs, 3 M10K blocks and 26 DSP blocks to 1.0.1's figures below.
+
+The 1.0.1 release build (Quartus Prime Lite 21.1, fitter seed 3, DARIA's CPU
 clock at 38.18 MHz) meets timing on all four corners. Worst setup slack at
 the worse slow corner: +2.977 ns on clk_sdram (against a release gate of
 +1.5 ns), +3.078 ns on DARIA's CPU clock (gate +0.5 ns), and +2.996 ns on
