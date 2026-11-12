@@ -16,9 +16,9 @@ Checks (each prints a line; the last line is APF_JSON pass or APF_JSON FAIL):
   data slots, 15 options a list, 23 characters a name; the documents allow
   16 options, but a 16-option list gave an interact error on the owner's
   Pocket, 2026-10-25, and 15 works; the file also has an undocumented size
-  limit between 8,740 bytes, which the 7800 core's file has and which works,
-  and 10,213, which failed, so it must stay at 8,740 or less and is kept
-  minified), every address decoded
+  limit between 9,258 bytes, which the 7800 core's file has from 2.2.6 and
+  which works (8,740 before), and 10,213, which failed, so it must stay at
+  8,740 or less, the margin kept, and is kept minified), every address decoded
   by core_top.v, option values inside the item's mask, defaults among the
   options, writeonly on every setting and persist on all but the Mapper
   lists (each forcible bss_type once, names matching detect2600.sv's enum,
@@ -26,7 +26,7 @@ Checks (each prints a line; the last line is APF_JSON pass or APF_JSON FAIL):
 - the menu options against the RTL that acts on them: Port Input (the
   wrapper's menu_port_type, the menu value alone, and the code that uses each
   port type), with a planted Paddles/Driving swap that must be caught;
-  Palette (video_mux), Turbo, AtariVox Voice, Region (wrapper), Audio and
+  Palette (video_mux's arms, and core_top's split of bit 2 into Composite), Turbo, AtariVox Voice, Region (wrapper), Audio and
   2600 Video (core_top's split and stmix arms), Mapper (bss_type as is);
 - data.json: the slot order and files, ids and bridge addresses as core_top.v
   decodes them, and the save sizes core_top.v writes into the data table, by
@@ -73,7 +73,7 @@ PORT_NAMES = {"Joystick": 0, "Paddles": 2, "Driving": 3, "Light Gun": 4,
 PORTS = ["bs_override", "diff_left_b", "diff_right_b", "bw_setting", "savekey_setting",
          "swap_joysticks", "region_setting", "palette_temp", "port1_input", "port2_input",
          "turbo", "atarivox_setting", "stereo_tia", "stmix", "decomb", "flicker_blend",
-         "menu_reset"]
+         "composite", "menu_reset"]
 
 # Analogue's documented fields and limits, from the APF developer pages
 # https://www.analogue.co/developer/docs/core-definition-files/<file>-json
@@ -615,11 +615,18 @@ def check_options_rtl(by_addr, wrap, core_top, vmux):
     except LookupError as e:
         check(False, f"Port Input: cannot read {e} from atari2600_pocket.sv")
 
-    # Palette: video_mux's case ({is_PAL, pal_temp}), NTSC half
+    # Palette: video_mux's case ({is_PAL, pal_temp}), NTSC half, for bits 1:0;
+    # bit 2 is Composite (core_top splits it off to the wrapper's composite)
     arms = dict((int(k), c) for k, c in re.findall(r"\n\s*(\d): out_color = n(\w+)_color;", vmux))
     opts = by_addr["Palette"]["options"]
-    check(all(arms.get(o["value"]) == o["name"].lower() for o in opts) and len(arms) == len(opts),
-          f"Palette: {[(o['value'], o['name']) for o in opts]} = video_mux out_color {arms}")
+    split = re.search(r"12'h270: \{set_composite, set_palette\}\s*<= bridge_wr_data\[2:0\];", core_top)
+    port = re.search(r"\.composite\s*\(\s*s_composite\s*\)", core_top)
+    temps = {o["value"] & 3 for o in opts}
+    check(bool(split and port) and all(arms.get(o["value"] & 3) == o["name"].split(",")[0].lower()
+                                       and bool(o["value"] & 4) == o["name"].endswith(", Composite")
+                                       and o["value"] < 8 for o in opts)
+          and len(arms) == len(temps),
+          f"Palette: {[(o['value'], o['name']) for o in opts]} = video_mux out_color {arms}, bit 2 Composite")
 
     # Turbo: 0 never gates fire; else fire toggles every value+1 frames
     tv = {o["name"]: o["value"] for o in by_addr["Turbo (X/Y)"]["options"]}
@@ -685,7 +692,8 @@ def write_vectors(path, var, by_addr):
 
     The model is what the items mean (names checked above), not core_top's
     case statement: Left/Right Difficulty and TV Type and SaveKey are one bit;
-    Audio's value is {stereo, mix[1:0]}, 2600 Video's {de-comb, blend};
+    Audio's value is {stereo, mix[1:0]}, 2600 Video's {de-comb, blend},
+    Palette's {composite, temperature[1:0]};
     Mapper wins over Mapper (more) when both are set."""
     st = {p: 0 for p in PORTS}
     bs = {"Mapper": 0, "Mapper (more)": 0}
@@ -696,10 +704,12 @@ def write_vectors(path, var, by_addr):
             return
         f = {"Left Difficulty": ["diff_left_b"], "Right Difficulty": ["diff_right_b"], "TV Type": ["bw_setting"],
              "SaveKey (port 2)": ["savekey_setting"], "Swap Controllers": ["swap_joysticks"],
-             "Region": ["region_setting"], "Palette": ["palette_temp"], "Port 1 Input": ["port1_input"],
+             "Region": ["region_setting"], "Port 1 Input": ["port1_input"],
              "Port 2 Input": ["port2_input"], "Turbo (X/Y)": ["turbo"], "AtariVox Voice": ["atarivox_setting"]}
         if name in f:
             st[f[name][0]] = val
+        elif name == "Palette":
+            st["palette_temp"], st["composite"] = val & 3, val >> 2 & 1
         elif name == "Audio":
             st["stereo_tia"], st["stmix"] = val >> 2 & 1, val & 3
         elif name == "2600 Video":

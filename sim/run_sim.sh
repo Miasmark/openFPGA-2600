@@ -85,7 +85,7 @@ SRCS=(
 	$(ls "$RTL"/6502/*.sv | grep -v pkg)
 	"$RTL/Maria/maria.sv"
 	"$RTL/cache_ram.v" "$RTL/bram.v"
-	"$RTL/composite_out.sv" "$RTL/cart_ram_tdp.sv" "$RTL/cdf_fastjump_table.sv"
+	"$RTL/composite_out.sv" "$RTL/composite_decoder.sv" "$RTL/cart_ram_tdp.sv" "$RTL/cdf_fastjump_table.sv"
 	"$RTL"/arm_mapper_{memory,controller,subsystem,tables,ram_init,writeback,audio}.sv
 	"$RTL"/mapper_{dpcplus,cdf,bus,fa2}.sv "$RTL/fa2_nvram_bridge.sv"
 	"$RTL/TIA.sv"

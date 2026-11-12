@@ -97,6 +97,8 @@ module tb_load;
 	initial void'($value$plusargs("bs=%d", bs_ovr));
 	logic blend_on = 1'b0;                                // +blend: 2600 Flicker Blend
 	initial blend_on = $test$plusargs("blend");
+	logic composite_on = 1'b0;                            // +composite: the decoded picture
+	initial composite_on = $test$plusargs("composite");
 	// The console switches as the menu sets them (openFPGA-2600's Left and
 	// Right Difficulty and TV Type items): B, B and Colour unless +ldiffa,
 	// +rdiffa (A) or +bw (B&W) say otherwise from the start; +joyscript's
@@ -190,7 +192,7 @@ module tb_load;
 		.region_setting(region_tb), .palette_temp(2'd0),
 		.stereo_tia(1'b0), .swap_joysticks(1'b0), .diff_left_b(ldiff_b),
 		.diff_right_b(rdiff_b), .bw_setting(bw_set), .flicker_blend(blend_on), .pause_core(1'b0),
-		.decomb(1'b0), .bs_override(bs_ovr),
+		.decomb(1'b0), .composite(composite_on), .bs_override(bs_ovr),
 		.joy0(joy0), .joy1(joy1), .joy2(joy2), .joy3(joy3),
 		.analog0(ana0), .analog1(16'h8080), .analog2(16'h8080), .analog3(16'h8080),
 		.port1_input(port1_in), .port2_input(port2_in),
@@ -848,6 +850,19 @@ module tb_load;
 			rf_pic = FNV_OFFSET;
 		end
 		if (!dut.reset && ce_pix && !HBlank && !VBlank) rf_pic = fnv(fnv(fnv(rf_pic, R), G), B);
+	end
+
+	// +composite: how many clk_sys the decoded picture's HBlank trails the RGB
+	// one (atari2600_pocket.sv's COMP_GUN_DELAY), once, after 600 visible lines
+	longint cg_cyc = 0, cg_rgb = 0; int cg_lines = 0; bit cg_done = 0, cg_rhb = 1, cg_chb = 1;
+	always @(posedge clk_sys) if (composite_on && !cg_done) begin
+		cg_cyc++;
+		cg_rhb <= dut.rgb_hb; cg_chb <= dut.comp_hbo;
+		if (cg_rhb && !dut.rgb_hb && !dut.rgb_vb) begin cg_rgb = cg_cyc; cg_lines++; end
+		if (cg_chb && !dut.comp_hbo && cg_lines > 600 && cg_rgb != 0) begin
+			$display("COMPOSITE HBlank trails RGB by %0d clk_sys", cg_cyc - cg_rgb);
+			cg_done = 1;
+		end
 	end
 
 	// ---------------- frame capture (+dump=N: write N frames as PPM) --------

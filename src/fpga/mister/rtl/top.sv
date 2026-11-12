@@ -437,8 +437,9 @@ module Atari7800 (
 		.paddle_read    (i_read)
 	);
 
-	// The composite encoder (unused on the Pocket), on the TIA's signals: the
-	// 7800 core selected MARIA's here while MEN was set, never in 2600 mode.
+	// The composite encoder, on the TIA's signals: the 7800 core selected
+	// MARIA's here while MEN was set, never in 2600 mode. The Pocket decodes
+	// it for the Palette setting's Composite choices (atari2600_pocket.sv).
 	composite_out comp_out
 	(
 		.clk          (clk_sys),

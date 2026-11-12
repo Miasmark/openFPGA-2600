@@ -117,6 +117,28 @@ exception (see *Verification*).
   Blend, and De-comb, which smooths the comb pattern some games draw by
   alternating lines between frames), and the Pocket's display modes (CRT
   and LCD looks, under *Display Mode* in the Pocket's video settings).
+- **Composite** (the *Warm, Composite*, *Cool, Composite* and *Hot,
+  Composite* palettes): the picture as a TV decodes the console's
+  composite signal, with a TV's softening and the colour fringes it puts
+  on sharp edges. It uses upstream MiSTer's own model of the console's
+  video output and its TV decoder (`composite_out.sv`,
+  `composite_decoder.sv`), with MiSTer's default options (Smear 1, AGC on,
+  Comb off), as openFPGA-7800 2.2.6 does. Limits:
+  - **NTSC only.** Upstream's model and decoder are built for the NTSC
+    colour carrier, so PAL games stay RGB with Composite on.
+  - **Flicker Blend and De-comb do not apply** with Composite on: they work
+    on the RGB picture, and the composite signal is built from the TIA's
+    colour codes before them. Games that flicker still flicker.
+  - **MiSTer's other composite options** (Smear, AGC, Comb) stay at their
+    defaults: the menu is full, which is also why Composite sits in the
+    Palette list.
+  - **No artifact colour from fine patterns.** A TIA pixel is a whole cycle
+    of the colour carrier, so one-pixel stripes do not turn into colour on
+    a TV as MARIA's do (openFPGA-7800's Artifact palettes have no 2600
+    counterpart for that reason).
+  - The light gun's crosshair is moved with the decoded picture, which
+    comes out 12 clk_sys (3 pixels' worth of samples) after the RGB one;
+    the gun itself reads the RGB timing, as before.
 - **Audio**: Stereo TIA (the TIA's two channels left and right), and a
   blend of the two (25%, 50% or full mono) for headphones.
 - **A78 images are refused.** A file with an A78 header ("ATARI" in bytes
@@ -136,6 +158,7 @@ exception (see *Verification*).
 | SECAM | No SECAM palette or timing. A candidate for a later release |
 | Supercharger demo-unit images (67,584 bytes) | Not detected |
 | Save states | Planned for a later release |
+| Composite options, PAL composite | MiSTer's Composite Smear, AGC and Comb settings: the menu is full, so *Composite* uses their defaults. PAL: upstream's composite model and decoder are NTSC only |
 
 ## Settings
 
@@ -151,7 +174,7 @@ The Pocket shows at most 16 settings; this core uses all 16.
 | *Port 2 Input* | Joystick, Paddles, Driving, Light Gun | The controller on port 2 |
 | *Turbo (X/Y)* | Off, Fast, Medium, Slow | X repeats fire while held; Y's half does nothing in this core (see *Controls*) |
 | *Region* | Auto, NTSC, PAL | Auto follows the game's frame length (see *PAL games*) |
-| *Palette* | Warm, Cool, Hot | |
+| *Palette* | Warm, Cool, Hot, each also with Composite | Composite: the picture as a TV decodes it (see *Video*); NTSC only |
 | *SaveKey (port 2)* | Off, On (default Off) | The SaveKey and the AtariVox; On takes port 2's LEFT |
 | *AtariVox Voice* | Off, Quiet, Normal, Loud (default Normal) | The voice's level, while the SaveKey is On |
 | *Audio* | Mono TIA; Stereo TIA; Stereo, 25% Blend; Stereo, 50% Blend; Full Mono | |
@@ -275,7 +298,8 @@ frame length, RIOT RAM, picture, audio, the CPU's bus and the reset times
 | 2600 ARM cartridges | The 15 Champ Games demos and Stratovox, 1,500 frames each (frames 1-1,499 compared): frame length, RIOT RAM, picture and audio on every frame, and every ARM call's timing and instruction count, identical to 2.2.4 |
 | TIA pitch | Pure tone, AUDF 0 / 14: 15,700.0 / 1,045 Hz against the TIA's 15,699.8 / 1,046.7 Hz, as in 2.2.4 (the same fingerprints) |
 | A78 refusal | An A78 image gets the unsupported-cartridge screen, writes no SaveKey or FA2 save, and its header's region byte never reaches the PLL; four planted faults are caught |
-| The Pocket files | `sim/check/apf_json_check.py`: every JSON file within the limits of Analogue's documentation, and every menu option checked against the RTL. `sim/run_core_top.sh`: 133 menu writes, the 17 setting ports after each, the data slots and the save bridges, through `core_top.v`. 12 planted faults in the core and its files, and 10 more for the checker alone, are all caught |
+| Composite | A 2600 test pattern (colour bands, playfield stripes, a missile) with Composite on (`tb_load +composite`) gives the same frame byte for byte as openFPGA-7800 2.2.6's 2600 mode, and with it off the same RGB frame; the decoded picture trails the RGB one by 12 clk_sys, which the light gun's crosshair delay follows. The menu checker reads Palette's bit 2 as Composite from `core_top.v`, and `run_core_top.sh` writes every Palette option and checks the wrapper's `composite` port |
+| The Pocket files | `sim/check/apf_json_check.py`: every JSON file within the limits of Analogue's documentation, and every menu option checked against the RTL. `sim/run_core_top.sh`: 134 menu writes, the 18 setting ports after each, the data slots and the save bridges, through `core_top.v`. 12 planted faults in the core and its files, and 10 more for the checker alone, are all caught |
 
 The test benches and gates are in `sim/` ([docs/DEVELOPING.md](docs/DEVELOPING.md)).
 

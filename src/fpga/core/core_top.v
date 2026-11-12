@@ -367,6 +367,7 @@ localparam [15:0] SLOT_ARFW = 16'h0107;
     reg             set_rdiff_b   = 1'b1;
     reg     [1:0]   set_region    = 2'd0;
     reg     [1:0]   set_palette   = 2'd0;
+    reg             set_composite = 1'b0;   // composite video (Palette's Composite choices)
     reg             set_stereo    = 1'b0;
     reg             set_blend     = 1'b0;
     reg             set_savekey   = 1'b0;   // SaveKey: 0 off, 1 on (no Auto: no header)
@@ -392,7 +393,7 @@ always @(posedge clk_74a) begin
             12'h264: set_ldiff_b   <= bridge_wr_data[0];
             12'h268: set_rdiff_b   <= bridge_wr_data[0];
             12'h26C: set_region    <= bridge_wr_data[1:0];
-            12'h270: set_palette   <= bridge_wr_data[1:0];
+            12'h270: {set_composite, set_palette} <= bridge_wr_data[2:0];   // Palette: bit 2 Composite
             12'h280: set_stereo    <= bridge_wr_data[0];
             12'h288: set_blend     <= bridge_wr_data[0];
             12'h290: set_savekey   <= bridge_wr_data[0];
@@ -718,18 +719,18 @@ end
 
 // Settings into clk_sys. They change rarely and only ever from the menu;
 // a two stage synchroniser per bit is enough.
-    reg     [33:0]  set_s1, set_s2;
-    wire            s_bw, s_decomb, s_swap, s_ldiff_b, s_rdiff_b, s_stereo, s_blend, s_savekey;
+    reg     [34:0]  set_s1, set_s2;
+    wire            s_composite, s_bw, s_decomb, s_swap, s_ldiff_b, s_rdiff_b, s_stereo, s_blend, s_savekey;
     wire    [4:0]   s_bs, s_bs_more;
     wire    [2:0]   s_port1, s_port2;
     wire    [1:0]   s_atarivox, s_turbo, s_stmix, s_region, s_palette;
 always @(posedge clk_sys) begin
-    set_s1 <= {set_bw, set_bs_more, set_bs, set_atarivox, set_turbo, set_port2, set_port1,
+    set_s1 <= {set_composite, set_bw, set_bs_more, set_bs, set_atarivox, set_turbo, set_port2, set_port1,
                set_decomb, set_stmix, set_swap, set_ldiff_b, set_rdiff_b, set_region, set_palette,
                set_stereo, set_blend, set_savekey};
     set_s2 <= set_s1;
 end
-assign {s_bw, s_bs_more, s_bs, s_atarivox, s_turbo, s_port2, s_port1,
+assign {s_composite, s_bw, s_bs_more, s_bs, s_atarivox, s_turbo, s_port2, s_port1,
         s_decomb, s_stmix, s_swap, s_ldiff_b, s_rdiff_b, s_region, s_palette,
         s_stereo, s_blend, s_savekey} = set_s2;
 
@@ -855,6 +856,7 @@ atari2600_pocket atari (
     .savekey_setting( {1'b0, s_savekey} ),
     .atarivox_setting( s_atarivox ),
     .decomb         ( s_decomb ),
+    .composite      ( s_composite ),
     .bs_override    ( bs_override ),
     .port1_input    ( s_port1 ),
     .port2_input    ( s_port2 ),
