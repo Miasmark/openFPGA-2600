@@ -7,6 +7,8 @@ module mapper_fa2
 	parameter logic [18:0] WRITE_TICKS = 19'd361535
 )
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
+	input logic ss_ram, input logic [7:0] ss_ra, input logic ss_rwe, input logic [7:0] ss_rd, output logic [7:0] ss_rq,
 	input  logic        clk,
 	input  logic        reset,
 	input  logic        ce,
@@ -29,6 +31,11 @@ module mapper_fa2
 	input  logic        nvram_ready,
 	output logic        nvram_dirty
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	localparam logic [2:0] COPY_NONE      = 3'd0;
 	localparam logic [2:0] COPY_LOAD_REQ  = 3'd1;
 	localparam logic [2:0] COPY_LOAD_NEXT = 3'd2;
@@ -78,15 +85,16 @@ module mapper_fa2
 		end
 	end
 
+	assign ss_rq = ram_q;   // ss port
 	spram #(
 		.addr_width (8),
 		.data_width (8),
 		.mem_name   ("FA2_WORK_RAM")
 	) working_ram (
 		.clock   (clk),
-		.address (ram_addr),
-		.data    (ram_wdata),
-		.wren    (ram_wren),
+		.address (ss_ram ? ss_ra : ram_addr),   // ss port
+		.data    (ss_ram ? ss_rd : ram_wdata),
+		.wren    (ss_ram ? ss_rwe : (ram_wren && !(ss_en || ss_frz))),
 		.q       (ram_q),
 		.cs      (1'b1)
 	);
@@ -126,6 +134,8 @@ module mapper_fa2
 	end
 
 	always_ff @(posedge clk) begin
+		if (ss_en) {timer[18], timer[17], timer[16], timer[15], timer[14], timer[13], timer[12], timer[11], timer[10], timer[9], timer[8], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], ready_response, command_pending, operation_active, copy_addr[7], copy_addr[6], copy_addr[5], copy_addr[4], copy_addr[3], copy_addr[2], copy_addr[1], copy_addr[0], copy_state, bank[2], bank[1], bank[0]} <= {ss_c0, timer[18], timer[17], timer[16], timer[15], timer[14], timer[13], timer[12], timer[11], timer[10], timer[9], timer[8], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], ready_response, command_pending, operation_active, copy_addr[7], copy_addr[6], copy_addr[5], copy_addr[4], copy_addr[3], copy_addr[2], copy_addr[1], copy_addr[0], copy_state, bank[2], bank[1], bank[0]} >> 1;
+		else if (!ss_frz) begin
 		nvram_dirty <= 1'b0;
 
 		if (timer != 19'd0 && ce)
@@ -217,4 +227,6 @@ module mapper_fa2
 			nvram_dirty <= 1'b0;
 		end
 	end
+	end
+	assign ss_c1 = {timer[18], timer[17], timer[16], timer[15], timer[14], timer[13], timer[12], timer[11], timer[10], timer[9], timer[8], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], ready_response, command_pending, operation_active, copy_addr[7], copy_addr[6], copy_addr[5], copy_addr[4], copy_addr[3], copy_addr[2], copy_addr[1], copy_addr[0], copy_state, bank[2], bank[1], bank[0]};
 endmodule

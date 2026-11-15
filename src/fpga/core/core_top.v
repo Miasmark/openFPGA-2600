@@ -349,6 +349,7 @@ synch_3 s01(pll_core_locked, pll_core_locked_s, clk_74a);
 //   0x10000000  settings (interact.json)
 //   0x30000000  SaveKey EEPROM RAM (save slot 2, 32 KiB)
 //   0x40000000  FA2 cartridge flash (save slot 3, 256 bytes)
+//   0x50000000  save-state blob (128 KiB, docs/SAVESTATE.md)
 //   0xF8000000  APF command interface
 // The 7800 core's 7800 BIOS (0x02000000), HSC firmware (0x04000000,
 // 0x08000000), BupChip firmware (0x0A000000) and HSC save (0x20000000)
@@ -380,6 +381,7 @@ localparam [15:0] SLOT_ARFW = 16'h0107;
     reg     [2:0]   set_port2     = 3'd0;
     reg     [1:0]   set_turbo     = 2'd0;   // X / Y turbo: off, fast, medium, slow
     reg     [1:0]   set_atarivox  = 2'd2;   // AtariVox voice: off, quiet, normal, loud
+    reg             set_nopause   = 1'b0;   // Pause in Menu (save states, the Controllers item's bit 1): on by default
     reg     [7:0]   menu_reset_cnt = 8'd0;
 
 always @(posedge clk_74a) begin
@@ -389,7 +391,7 @@ always @(posedge clk_74a) begin
     if (bridge_wr && bridge_addr[31:24] == 8'h10) begin
         case (bridge_addr[11:0])
             12'h200: menu_reset_cnt <= 8'hFF;
-            12'h260: set_swap      <= bridge_wr_data[0];
+            12'h260: {set_nopause, set_swap} <= bridge_wr_data[1:0];   // Controllers: bit 1 no menu pause
             12'h264: set_ldiff_b   <= bridge_wr_data[0];
             12'h268: set_rdiff_b   <= bridge_wr_data[0];
             12'h26C: set_region    <= bridge_wr_data[1:0];
@@ -431,6 +433,10 @@ wire sk_wr  = bridge_wr && sk_sel;
 wire fa2_sel = bridge_addr[31:24] == 8'h40;
 wire fa2_wr  = bridge_wr && fa2_sel;
 
+// The save-state blob (docs/SAVESTATE.md): 128 KiB at 0x50000000, the same
+// scheme (ss_ctl's staging RAM and read latch, in atari2600_pocket.sv).
+    wire    [31:0]  ss_rd_latched;
+
 // for bridge write data, we just broadcast it to all bus devices
 // for bridge read data, we have to mux it
 always @(*) begin
@@ -443,6 +449,9 @@ always @(*) begin
     end
     32'h40xxxxxx: begin
         bridge_rd_data <= fa2_rd_latched;
+    end
+    32'h50xxxxxx: begin
+        bridge_rd_data <= ss_rd_latched;
     end
     32'hF8xxxxxx: begin
         bridge_rd_data <= cmd_bridge_rd_data;
@@ -485,22 +494,24 @@ end
     wire     [31:0] rtc_time_bcd;
     wire            rtc_valid;
 
-    wire            savestate_supported = 1'b0;
-    wire    [31:0]  savestate_addr = 32'd0;
-    wire    [31:0]  savestate_size = 32'd0;
-    wire    [31:0]  savestate_maxloadsize = 32'd0;
+    // Save states (docs/SAVESTATE.md): the blob, 128 KiB at 0x50000000,
+    // served by the wrapper's ss_ctl
+    wire            savestate_supported = 1'b1;
+    wire    [31:0]  savestate_addr = 32'h50000000;
+    wire    [31:0]  savestate_size = 32'd131072;
+    wire    [31:0]  savestate_maxloadsize = 32'd131072;
 
     wire            savestate_start;
-    wire            savestate_start_ack = 1'b0;
-    wire            savestate_start_busy = 1'b0;
-    wire            savestate_start_ok = 1'b0;
-    wire            savestate_start_err = 1'b0;
+    wire            savestate_start_ack;
+    wire            savestate_start_busy;
+    wire            savestate_start_ok;
+    wire            savestate_start_err;
 
     wire            savestate_load;
-    wire            savestate_load_ack = 1'b0;
-    wire            savestate_load_busy = 1'b0;
-    wire            savestate_load_ok = 1'b0;
-    wire            savestate_load_err = 1'b0;
+    wire            savestate_load_ack;
+    wire            savestate_load_busy;
+    wire            savestate_load_ok;
+    wire            savestate_load_err;
 
     wire            osnotify_inmenu;
 
@@ -900,6 +911,23 @@ atari2600_pocket atari (
     .fa2_bridge_rd  ( bridge_rd && fa2_sel ),
     .fa2_bridge_din ( bridge_wr_data ),
     .fa2_bridge_dout( fa2_rd_latched ),
+    .ss_bridge_addr ( bridge_addr ),
+    .ss_bridge_rd   ( bridge_rd ),
+    .ss_bridge_wr   ( bridge_wr ),
+    .ss_bridge_wr_data ( bridge_wr_data ),
+    .ss_bridge_rd_data ( ss_rd_latched ),
+    .savestate_start      ( savestate_start ),
+    .savestate_start_ack  ( savestate_start_ack ),
+    .savestate_start_busy ( savestate_start_busy ),
+    .savestate_start_ok   ( savestate_start_ok ),
+    .savestate_start_err  ( savestate_start_err ),
+    .savestate_load       ( savestate_load ),
+    .savestate_load_ack   ( savestate_load_ack ),
+    .savestate_load_busy  ( savestate_load_busy ),
+    .savestate_load_ok    ( savestate_load_ok ),
+    .savestate_load_err   ( savestate_load_err ),
+    .osnotify_inmenu      ( osnotify_inmenu ),
+    .pause_in_menu        ( ~set_nopause ),
 
     .SDRAM_A        ( dram_a ),
     .SDRAM_BA       ( dram_ba ),

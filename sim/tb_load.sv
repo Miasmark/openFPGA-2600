@@ -176,6 +176,13 @@ module tb_load;
 		.cram_we_n(cram0_we_n), .cram_ub_n(cram0_ub_n), .cram_lb_n(cram0_lb_n));
 `endif
 
+	// save states (+ss_*: the save-state host, below): the APF bridge at
+	// 0x50000000 and the template's save-state signals, on clk_74a
+	logic [31:0] ss_baddr = 32'd0, ss_bwdata = 32'd0;
+	logic        ss_brd = 1'b0, ss_bwr = 1'b0, ss_start = 1'b0, ss_load = 1'b0, ss_inmenu = 1'b0, ss_pause_en = 1'b1;
+	wire  [31:0] ss_brdata;
+	wire         ss_s_ack, ss_s_busy, ss_s_ok, ss_s_err, ss_l_ack, ss_l_busy, ss_l_ok, ss_l_err;
+
 	atari2600_pocket dut (
 `ifdef POCKET_BUPCHIP
 		.clk_arm(clk_arm), .ioctl_wr_any(ioctl_wr_r), .ioctl_hi(ioctl_hi_r),
@@ -205,6 +212,13 @@ module tb_load;
 		.sk_bridge_din(sk_din), .sk_bridge_dout(sk_dout),
 		.fa2_bridge_addr(fa2_addr), .fa2_bridge_wr(fa2_wr), .fa2_bridge_rd(fa2_rd), .fa2_bridge_din(fa2_din),
 		.fa2_bridge_dout(fa2_dout),
+		.ss_bridge_addr(ss_baddr), .ss_bridge_rd(ss_brd), .ss_bridge_wr(ss_bwr), .ss_bridge_wr_data(ss_bwdata),
+		.ss_bridge_rd_data(ss_brdata),
+		.savestate_start(ss_start), .savestate_start_ack(ss_s_ack), .savestate_start_busy(ss_s_busy),
+		.savestate_start_ok(ss_s_ok), .savestate_start_err(ss_s_err),
+		.savestate_load(ss_load), .savestate_load_ack(ss_l_ack), .savestate_load_busy(ss_l_busy),
+		.savestate_load_ok(ss_l_ok), .savestate_load_err(ss_l_err),
+		.osnotify_inmenu(ss_inmenu), .pause_in_menu(ss_pause_en),
 		.SDRAM_A(), .SDRAM_BA(), .SDRAM_DQ(SDRAM_DQ), .SDRAM_DQML(), .SDRAM_DQMH(),
 		.SDRAM_nWE(), .SDRAM_nRAS(), .SDRAM_nCAS(), .SDRAM_CLK(), .SDRAM_CKE(),
 		.SRAM_A(SRAM_A), .SRAM_DQ(SRAM_DQ), .SRAM_OE_N(SRAM_OE_N), .SRAM_WE_N(SRAM_WE_N),
@@ -1010,7 +1024,9 @@ module tb_load;
 	function automatic string boot_src(logic [1:0] from_bios);
 		return from_bios == 2'b11 ? "the BIOS ROM" : from_bios == 2'b00 ? "the cartridge slot" : "both";
 	endfunction
-	always @(posedge clk_sys) begin
+	// (not while the machine is held for a save state: the chain's shift
+	// moves effective_reset's register)
+	always @(posedge clk_sys) if (!dut.ss_hold) begin
 		boot_rst_d <= dut.main.effective_reset;
 		if (boot_on && (dut.main.effective_reset || $time - boot_t0 >= 50000000)) begin
 			$display("BOOT %0d after %0d ms: %0d CPU reads from the BIOS ROM, tia_en %0d",
@@ -1307,6 +1323,286 @@ module tb_load;
 	final if (pad_shadow)
 		$display("INPUT paddle shadow: clocks %0d, INPT0-3 rises %0d, mismatches %0d", ps_clocks, ps_rises, ps_mism);
 
+	// ---------------- save states (+ss_*) ----------------
+	// The Pocket's side of save states (docs/SAVESTATE.md 6): ss_ctl's
+	// commands as core_bridge_cmd gives them (start / load held until ack;
+	// busy, then ok or err), the blob over the bridge at 0x50000000, one
+	// access every 88 clk_74a (a read's word taken 84 clk_74a after its
+	// bridge_rd), and the menu. Times are ms after reset_in falls.
+	//   +ss_save=MS[,MS..]     save; the blob into ss_save_<n>.bin, and
+	//                          ss_save_<n>.txt: "frame F" (the machine frame
+	//                          it was frozen in, +ssfp's numbering)
+	//   +ss_load=FILE +ss_load_at=MS [+ss_load_frame=F]
+	//                          write FILE to the blob and load it; from the
+	//                          load's ok on, +ssfp numbers frames from F
+	//   +ss_load_reset=MS      ... with reset_in held from MS until the load
+	//                          answers (wake: the load is checked in reset and
+	//                          applied at the reset's exit)
+	//   +ss_menu=MS:LEN[,..]   the menu open LEN ms; +ss_nopause: Pause in
+	//                          Menu off
+	//   +ssfp=FILE             the machine's frames, counted on the clocks it
+	//                          is not held (dut.ss_hold low): frame, clocks,
+	//                          RIOT RAM, picture (main's RGB), sound (main's),
+	//                          CPU bus hashes; one line per machine VSync rise
+	//   +ss_measure            fill the chain with 0, shift a 1 through it and
+	//                          print each segment's length (destroys the
+	//                          state), then finish
+	// Each operation prints an "SS" line.
+	longint ss_sysclk = 0, ss_mclk = 0, ss_t0 = 0;
+	// machine time since reset_in fell, as the joyscript counts it (js_t):
+	// clk_sys while the machine is not held; ss_frz_mt where a freeze landed
+	longint ss_mt = 0, ss_frz_mt = 0;
+	bit ss_frz_seen = 0;
+	longint js_t = 0, js_jump = -1;                 // the joyscript's machine time (clk_sys)
+	initial begin
+		wait (reset_in == 1'b0);
+		forever begin
+			@(posedge clk_sys);
+			if (!dut.ss_hold) ss_mt++;
+			if (dut.ss_frz && !ss_frz_seen) ss_frz_mt = ss_mt;
+			ss_frz_seen = dut.ss_frz;
+		end
+	end
+	int     ss_frame = 0;
+	// where each freeze lands (machine frame and clock)
+	int     ss_frz_frame = 0;
+	longint ss_frz_mclk = 0;
+	bit     ss_renumber = 0;
+	logic   ss_frz_q = 1'b0;
+	task automatic ss_bridge_write(input logic [31:0] a, input logic [31:0] d);
+		@(posedge clk_74a);
+		ss_baddr <= a; ss_bwdata <= d; ss_bwr <= 1'b1;
+		@(posedge clk_74a);
+		ss_bwr <= 1'b0;
+		repeat (86) @(posedge clk_74a);
+	endtask
+	task automatic ss_bridge_read(input logic [31:0] a, output logic [31:0] d);
+		@(posedge clk_74a);
+		ss_baddr <= a; ss_brd <= 1'b1;
+		@(posedge clk_74a);
+		ss_brd <= 1'b0;
+		repeat (84) @(posedge clk_74a);
+		d = ss_brdata;
+		repeat (2) @(posedge clk_74a);
+	endtask
+	// one command: start (save) or load; returns 2 ok, 3 err
+	task automatic ss_command(input bit is_load, output int rc, output longint clocks);
+		automatic longint t0 = 0;
+		t0 = ss_sysclk;
+		@(posedge clk_74a);
+		if (is_load) ss_load <= 1'b1; else ss_start <= 1'b1;
+		while (!(is_load ? ss_l_ack : ss_s_ack)) @(posedge clk_74a);
+		@(posedge clk_74a);
+		if (is_load) ss_load <= 1'b0; else ss_start <= 1'b0;
+		// busy, then ok or err with busy low
+		while ((is_load ? ss_l_busy : ss_s_busy) || !((is_load ? ss_l_ok : ss_s_ok) || (is_load ? ss_l_err : ss_s_err)))
+			@(posedge clk_74a);
+		rc = (is_load ? ss_l_ok : ss_s_ok) ? 2 : 3;
+		clocks = ss_sysclk - t0;
+	endtask
+	always @(posedge clk_sys) begin
+		ss_sysclk <= ss_sysclk + 1;
+		if (!dut.ss_hold) ss_mclk <= ss_mclk + 1;
+	end
+	function automatic void ss_ms_list(input string arg, ref int ms[$]);
+		int v = 0;
+		bit any = 0;
+		for (int i = 0; i <= arg.len(); i++) begin
+			if (i == arg.len() || arg[i] == ",") begin
+				if (any) ms.push_back(v);
+				v = 0; any = 0;
+			end else if (arg[i] >= "0" && arg[i] <= "9") begin
+				v = v * 10 + (arg[i] - "0"); any = 1;
+			end
+		end
+	endfunction
+	task automatic ss_wait_ms(input int ms);
+		while (($time - ss_t0) < longint'(ms) * 64'd1_000_000) @(posedge clk_sys);
+	endtask
+	initial begin
+		automatic string arg, path;
+		automatic int ms[$], rc, fd, at_ms, nsave = 0, f0, rst_ms;
+		automatic longint mt0;
+		automatic longint clocks;
+		automatic logic [31:0] w;
+		automatic logic [7:0] blob[];
+		if ($test$plusargs("ss_nopause")) ss_pause_en = 1'b0;
+		wait (reset_in == 1'b0);
+		ss_t0 = $time;
+		if ($value$plusargs("ss_menu=%s", arg)) fork
+			begin
+				automatic int a = 0, b = 0, i = 0;
+				// MS:LEN pairs
+				while (i < arg.len()) begin
+					a = 0; b = 0;
+					while (i < arg.len() && arg[i] != ":") begin a = a * 10 + (arg[i] - "0"); i++; end
+					i++;
+					while (i < arg.len() && arg[i] != ",") begin b = b * 10 + (arg[i] - "0"); i++; end
+					i++;
+					ss_wait_ms(a);
+					ss_inmenu = 1'b1;
+					$display("SS menu open at %0d ms (machine clock %0d, frame %0d)", a, ss_mclk, ss_frame);
+					ss_wait_ms(a + b);
+					ss_inmenu = 1'b0;
+					$display("SS menu closed at %0d ms (machine clock %0d)", a + b, ss_mclk);
+				end
+			end
+		join_none
+		if ($value$plusargs("ss_save=%s", arg)) begin
+			ss_ms_list(arg, ms);
+			foreach (ms[k]) begin
+				ss_wait_ms(ms[k]);
+				nsave++;
+				ss_command(1'b0, rc, clocks);
+				$display("SS save %0d at %0d ms: %s, %0d clk_sys, frozen in machine frame %0d at machine clock %0d",
+					nsave, ms[k], rc == 2 ? "ok" : "err", clocks, ss_frz_frame, ss_frz_mclk);
+				if (rc == 2) begin
+					blob = new[131072];
+					for (int i = 0; i < 32768; i++) begin
+						ss_bridge_read(32'h5000_0000 + 4 * i, w);
+						{blob[4*i], blob[4*i+1], blob[4*i+2], blob[4*i+3]} = w;
+					end
+					path = $sformatf("ss_save_%0d.bin", nsave);
+					fd = $fopen(path, "wb");
+					foreach (blob[i]) $fwrite(fd, "%c", blob[i]);
+					$fclose(fd);
+					fd = $fopen($sformatf("ss_save_%0d.txt", nsave), "w");
+					$fwrite(fd, "frame %0d mclk %0d\n", ss_frz_frame, ss_frz_mt);
+					$fclose(fd);
+					$display("SS save %0d: %s written", nsave, path);
+				end
+			end
+		end
+		if ($value$plusargs("ss_load=%s", path)) begin
+			at_ms = 0;
+			void'($value$plusargs("ss_load_at=%d", at_ms));
+			f0 = -1;
+			void'($value$plusargs("ss_load_frame=%d", f0));
+			rst_ms = -1;
+			void'($value$plusargs("ss_load_reset=%d", rst_ms));
+			mt0 = -1;
+			void'($value$plusargs("ss_load_mclk=%d", mt0));
+			fd = $fopen(path, "rb");
+			if (fd == 0) $fatal(1, "cannot open %s", path);
+			blob = new[131072];
+			foreach (blob[i]) begin
+				automatic int c = $fgetc(fd);
+				blob[i] = (c < 0) ? 8'd0 : 8'(c);
+			end
+			$fclose(fd);
+			ss_wait_ms(at_ms);
+			for (int i = 0; i < 32768; i++)
+				ss_bridge_write(32'h5000_0000 + 4 * i, {blob[4*i], blob[4*i+1], blob[4*i+2], blob[4*i+3]});
+			if (rst_ms >= 0) begin
+				ss_wait_ms(rst_ms);
+				reset_in = 1'b1;
+				repeat (14318) @(posedge clk_sys);
+			end
+			ss_command(1'b1, rc, clocks);
+			if (rst_ms >= 0) begin
+				$display("SS load in reset: %s", rc == 2 ? "ok" : "err");
+				reset_in = 1'b0;
+				wait (dut.ss_ctl.ld_applied || !dut.ss_ctl.pend);
+				$display("SS load %s %s after the reset's exit", path, dut.ss_ctl.ld_applied ? "applied" : "not applied");
+			end else
+				$display("SS load %s at %0d ms: %s, %0d clk_sys", path, at_ms, rc == 2 ? "ok" : "err", clocks);
+			if (rc == 2 && f0 >= 0) begin
+				ss_frame = f0;
+				ss_renumber = 1;
+			end
+			// the machine time of the saved run, for the joyscript's inputs
+			if (rc == 2 && mt0 >= 0) begin
+				ss_mt = mt0;
+				js_jump = mt0;
+			end
+		end
+	end
+	always @(posedge clk_sys) begin
+		ss_frz_q <= dut.ss_frz;
+		if (dut.ss_frz && !ss_frz_q) begin
+			ss_frz_frame <= ss_frame;
+			ss_frz_mclk <= ss_mclk;
+		end
+	end
+
+	// the machine's frames (+ssfp)
+	int          ssfp_fd = 0;
+	longint      ssfp_t0 = 0;
+	logic        ssfp_vs = 1'b0;
+	logic [63:0] ssfp_video = FNV_OFFSET, ssfp_audio = FNV_OFFSET, ssfp_cpu = FNV_OFFSET;
+	logic [31:0] ssfp_last = 32'd0;
+	initial begin
+		automatic string p2;
+		if ($value$plusargs("ssfp=%s", p2)) begin
+			ssfp_fd = $fopen(p2, "w");
+			if (ssfp_fd == 0) $fatal(1, "cannot open %s", p2);
+			$fwrite(ssfp_fd, "frame,mclk,riot,video,audio,cpu\n");
+		end
+	end
+	always @(posedge clk_sys) if (ssfp_fd != 0) begin
+		if (ss_renumber) begin            // a load restored the machine at a frame boundary
+			ss_renumber = 0;
+			ssfp_video = FNV_OFFSET; ssfp_audio = FNV_OFFSET; ssfp_cpu = FNV_OFFSET;
+			ssfp_t0 = ss_mclk;
+		end
+		if (!dut.ss_hold) begin
+			ssfp_vs <= dut.rgb_vs;
+			if (dut.rgb_vs && !ssfp_vs) begin
+				automatic logic [63:0] h = FNV_OFFSET;
+				for (int i = 0; i < 128; i++) h = fnv(h, dut.main.riot_inst.riot_ram.mem_q[i]);
+				if (ss_frame > 0)
+					$fwrite(ssfp_fd, "%0d,%0d,%016x,%016x,%016x,%016x\n", ss_frame, ss_mclk - ssfp_t0, h,
+						ssfp_video, ssfp_audio, ssfp_cpu);
+				ssfp_video = FNV_OFFSET; ssfp_audio = FNV_OFFSET; ssfp_cpu = FNV_OFFSET;
+				ss_frame = ss_frame + 1;
+				ssfp_t0 = ss_mclk;
+			end
+			if (dut.rgb_ce && !dut.rgb_hb && !dut.rgb_vb) ssfp_video = fnv(fnv(fnv(ssfp_video, dut.rgb_r), dut.rgb_g), dut.rgb_b);
+			if ({dut.core_audio_l, dut.core_audio_r} != ssfp_last) begin
+				ssfp_last = {dut.core_audio_l, dut.core_audio_r};
+				for (int i = 0; i < 4; i++) ssfp_audio = fnv(ssfp_audio, ssfp_last[i*8 +: 8]);
+			end
+			if (`FP_CPU.core_phi2_en)
+				ssfp_cpu = fnv(fnv(fnv(fnv(ssfp_cpu, `FP_CPU.addr_out[7:0]), `FP_CPU.addr_out[15:8]),
+					{7'd0, `FP_CPU.rw_n}), `FP_CPU.rw_n ? `FP_CPU.data_in : `FP_CPU.data_out);
+		end
+	end
+	final if (ssfp_fd != 0) $fclose(ssfp_fd);
+
+	// +ss_measure: each segment's length
+	initial if ($test$plusargs("ss_measure")) begin
+		automatic int pos[7], n = 0;
+		automatic bit seen[7];
+		wait (reset_in == 1'b0);
+		repeat (14318 * 50) @(posedge clk_sys);
+		@(negedge clk_sys);
+		force dut.ss_frz = 1'b1;
+		force dut.ss_en = 1'b1;
+		force dut.ss_si = 1'b0;
+		repeat (16384) @(posedge clk_sys);
+		@(negedge clk_sys);
+		force dut.ss_si = 1'b1;
+		@(negedge clk_sys);
+		force dut.ss_si = 1'b0;
+		foreach (seen[i]) seen[i] = 0;
+		for (n = 1; n <= 16384 && !seen[6]; n++) begin
+			@(posedge clk_sys);
+			@(negedge clk_sys);
+			// the 1 went in on the clock before n = 1: it is out of a segment of
+			// L bits after L clocks
+			if (!seen[0] && dut.ss_c_main) begin seen[0] = 1; pos[0] = n + 1; end
+			if (!seen[1] && dut.ss_c_pd)   begin seen[1] = 1; pos[1] = n + 1; end
+			if (!seen[2] && dut.ss_c_va)   begin seen[2] = 1; pos[2] = n + 1; end
+			if (!seen[3] && dut.ss_c_lg)   begin seen[3] = 1; pos[3] = n + 1; end
+			if (!seen[4] && dut.ss_c_sk)   begin seen[4] = 1; pos[4] = n + 1; end
+			if (!seen[5] && dut.ss_c_vx)   begin seen[5] = 1; pos[5] = n + 1; end
+			if (!seen[6] && dut.ss_c_end)  begin seen[6] = 1; pos[6] = n + 1; end
+		end
+		$display("SSCHAIN bits %0d: main %0d, paddles %0d, axes %0d, light gun %0d, SaveKey %0d, AtariVox %0d, tick %0d",
+			pos[6], pos[0], pos[1] - pos[0], pos[2] - pos[1], pos[3] - pos[2], pos[4] - pos[3], pos[5] - pos[4], pos[6] - pos[5]);
+		$finish;
+	end
+
 	// The cart's tone is counted on the console's own mix, before the
 	// AtariVox voice. With POCKET_ATARIVOX the voice runs whenever the SaveKey
 	// does and the AtariVox Voice setting is not Off (tb default Normal), and
@@ -1357,7 +1653,15 @@ module tb_load;
 			capture = 1;                     // fb always holds the last whole frame
 			while ($fgets(line, jf) > 0) begin
 				if ($sscanf(line, "%d %s", ms, word) != 2 || word.substr(0, 0) == "#") continue;
-				for (; at < ms; at++) repeat (14318) @(posedge clk_sys);
+				// machine time: clk_sys while the machine is not held for a
+				// save state (dut.ss_hold), and a load moves it to the saved
+				// machine's (js_jump); without save states, every clk_sys
+				while (js_t < longint'(ms) * 14318) begin
+					@(posedge clk_sys);
+					if (!dut.ss_hold) js_t++;
+					if (js_jump >= 0) begin js_t = js_jump; js_jump = -1; end
+				end
+				at = ms;
 				eq = -1;
 				for (int i = 0; i < word.len(); i++) if (word[i] == "=") begin eq = i; break; end
 				key = eq < 0 ? word : word.substr(0, eq - 1);
@@ -1377,6 +1681,7 @@ module tb_load;
 					repeat (14318 * 10) @(posedge clk_sys);
 					reset_in = 1'b0;
 					at += 10;
+					js_t += 14318 * 10;
 				end
 				else if (key == "joy0") joy0 = 16'(val.atohex());
 				else if (key == "joy1") joy1 = 16'(val.atohex());

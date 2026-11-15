@@ -27,6 +27,8 @@
 #                  status overlay checks (sim/tb_frames.sv's header). The
 #                  build writes WORK/obj_frames.mode ("FRAMES_DEBUG=0|1 md5
 #                  <the binary's>"), which sim/run_frames.sh checks
+#   SS_BENCH=1     build without the 6507's unique-case checks (the save-state
+#                  benches: they fire while the scan chain shifts)
 #   ONLY=daria     build tb_load alone and run only the DARIA section (below),
 #                  e.g. the BUP_DEBUG overlay check at another divider or on
 #                  a scratch tree (sim/bupchip/dstat/run_ovl.sh); its log is
@@ -95,6 +97,7 @@ SRCS=(
 	"$RTL/EEPROM_24LC256.sv" "$FPGA/core/atari2600_pocket.sv"
 	"$FPGA/core/atarivox/avox_rx.sv" "$FPGA/core/atarivox/avox_engine.sv" "$FPGA/core/atarivox/atarivox.sv"
 	"$FPGA/core/virtual_axis.sv" "$FPGA/core/virtual_axis5.sv" "$FPGA/core/stick_dirs.sv" "$FPGA/core/sram_ctrl.sv" "$PATCHED/paddles.sv" "$FPGA/core/paddle_timer4.sv" "$RTL/lightgun.sv"
+	"$FPGA/core/ss_pkg.sv" "$FPGA/core/ss_ctl.sv"
 	"$FPGA/pocket_utils/data_loader.sv"
 	"$FPGA/core/audio_filter.sv"
 	"$RTL/bupchip_peripheral.sv" "$FPGA/pocket_utils/psram.sv"
@@ -162,6 +165,10 @@ exec 3>&1
 sim() { local rc=0; "$@" || rc=$?; [ "$rc" = 0 ] || echo "SIMULATOR EXIT $rc: $*" >&3; return 0; }
 
 VL_OPT=(-O2)
+# Save states (docs/SAVESTATE.md 6): while the scan chain shifts, the 6507's
+# control word holds arbitrary patterns, and its `unique case` checks fire;
+# the save-state benches build with SS_BENCH=1, without them.
+[ "${SS_BENCH:-0}" = 1 ] && VL_OPT+=(--no-assert-case)
 build() {   # build <top> <objdir> [more bench sources]
 	local top="$1" obj="$2"; shift 2
 	"${VERILATOR:-verilator}" --binary --timing -j "${VL_JOBS:-4}" "${VL_OPT[@]}" -Wno-fatal -Wno-lint -Wno-style -Wno-MULTIDRIVEN \

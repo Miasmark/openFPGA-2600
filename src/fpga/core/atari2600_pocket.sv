@@ -103,6 +103,26 @@ module atari2600_pocket
 	input  wire [31:0] sk_bridge_din,   // big endian: [31:24] is the lowest byte
 	output wire [31:0] sk_bridge_dout,  // word latched at the last read strobe
 
+	// Save states (docs/SAVESTATE.md; ss_ctl.sv): the blob at 0x50000000 and
+	// the template's save-state and menu signals (clk_74a)
+	input  wire [31:0] ss_bridge_addr,
+	input  wire        ss_bridge_rd,
+	input  wire        ss_bridge_wr,
+	input  wire [31:0] ss_bridge_wr_data,
+	output wire [31:0] ss_bridge_rd_data,
+	input  wire        savestate_start,
+	output wire        savestate_start_ack,
+	output wire        savestate_start_busy,
+	output wire        savestate_start_ok,
+	output wire        savestate_start_err,
+	input  wire        savestate_load,
+	output wire        savestate_load_ack,
+	output wire        savestate_load_busy,
+	output wire        savestate_load_ok,
+	output wire        savestate_load_err,
+	input  wire        osnotify_inmenu,
+	input  wire        pause_in_menu,   // the Pause in Menu setting (clk_74a)
+
 	// FA2 cartridge flash (256 bytes), second port for its save slot (clk_74a)
 	input  wire  [5:0] fa2_bridge_addr, // 32 bit word address
 	input  wire        fa2_bridge_wr,
@@ -150,6 +170,26 @@ module atari2600_pocket
 );
 
 //////////////////////////////  RESET  ////////////////////////////////////
+
+// Save states (SAVESTATE.md 2): ss_frz holds the machine (every flip-flop of
+// the scan chain) and ss_en shifts the chain; ss_ctl drives both. ss_hold is
+// either: what the machine drives into logic outside the chain is gated
+// with it (the hold rule), so neither a freeze nor the shift's arbitrary
+// patterns reach that logic.
+wire ss_frz, ss_en;
+wire ss_hold = ss_frz | ss_en;
+// the chain: ss_si -> main -> pads -> vaxes -> lightgun -> savekey ->
+// atarivox -> ms_div/ms_tick (ss_c_end) -> ss_ctl
+wire        ss_si, ss_c_main, ss_c_pd, ss_c_va, ss_c_lg, ss_c_sk, ss_c_vx, ss_c_end;
+// the RAM state port (RIOT 0, FA2 1, AtariVox 2) and the SRAM cartridge port
+wire        ss_ram, ss_rwe;
+wire  [1:0] ss_rsel;
+wire  [7:0] ss_ra, ss_rq_main;
+wire [31:0] ss_rd, ss_rq_vox;
+wire        ss_t_own, ss_t_rd, ss_t_wr;
+wire [16:0] ss_t_addr;
+wire  [7:0] ss_t_wdata;
+wire        main_cpu_ce, vox_quiet, vox_on_f;
 
 reg old_cart_download = 1'b0;
 wire mapper_init_busy;
@@ -351,12 +391,13 @@ reg         daria_mres_r  = 1'b1;
 always @(posedge clk_sys) begin
 	daria_profile <= tia_mode && (daria_fbs == 6'd21 || daria_fbs == 6'd23);
 	daria_ram32_r <= daria_ram32;
-	daria_mres_r  <= daria_reset;
+	if (!ss_hold) daria_mres_r <= daria_reset;   // ss hold
 end
 
 // The front end's side of the system module and of the BupChip
 wire [12:0] daria_a_in;
 wire        daria_pclk0, daria_pclk1, daria_access;
+assign      daria_pclk1 = main_cpu_ce;
 wire  [7:0] daria_fe_do;
 wire        daria_fe_oe, daria_call_busy, daria_dma_busy, daria_init_busy;
 wire        daria_call_tog, daria_ret_tog, daria_ready, daria_cart_win;
@@ -458,7 +499,7 @@ sdram sdram
 	.ch0_addr   (cart_download ? cart_write_addr : cart_addr),
 	.ch0_wr     (cart_download ? (ioctl_wr & cart_download) : 1'b0),
 	.ch0_din    (cart_download ? ioctl_dout : cart_din),
-	.ch0_rd     (cart_read & ~cart_download & ~reset),
+	.ch0_rd     (cart_read & ~cart_download & ~reset & ~ss_en),   // ss hold: re-read after the shift
 	.ch0_dout   (cart_data_sd),
 	.ch0_busy   (cart_busy)
 );
@@ -487,6 +528,10 @@ EEPROM_24LC0X #(
 	.ADDR_WIDTH (15),
 	.PAGE_WIDTH (6)
 ) savekey (
+	.ss_en          (ss_en),
+	.ss_frz         (ss_frz),
+	.ss_si          (ss_c_lg),
+	.ss_so          (ss_c_sk),
 	.clk            (clk_sys),
 	.ce             (1'b1),
 	.reset          (reset | ~use_sk),
@@ -512,7 +557,7 @@ assign sk_ram_done = sk_pend && (sk_ack == sk_req);
 always @(posedge clk_sys) begin
 	if (sk_ram_done)
 		sk_pend <= 1'b0;
-	else if ((sk_ram_rd | sk_ram_wr) && !sk_pend) begin
+	else if ((sk_ram_rd | sk_ram_wr) && !sk_pend && !ss_hold) begin   // ss hold
 		sk_pend <= 1'b1;
 		sk_req <= ~sk_req;
 	end
@@ -568,7 +613,7 @@ fa2_nvram_bridge fa2_bridge
 	.new_image          (1'b0),
 	.backing_busy       (1'b0),
 	.file_load_complete (1'b1),
-	.request            (fa2_req & fa2_on),
+	.request            (fa2_req & fa2_on & ~ss_hold),   // ss hold
 	.write              (fa2_we),
 	.addr               (fa2_addr),
 	.wdata              (fa2_wdata),
@@ -619,7 +664,7 @@ wire  [9:0] comp_burst_start, comp_burst_len;
 reg  [1:0] turbo_cnt = 2'd0;
 reg        turbo_on = 1'b1;
 reg        turbo_vs = 1'b0;
-always @(posedge clk_sys) begin
+always @(posedge clk_sys) if (!ss_hold) begin   // ss hold: input conditioning, not saved
 	turbo_vs <= rgb_vs;
 	if (rgb_vs && !turbo_vs) begin
 		if (turbo_cnt >= turbo) begin
@@ -671,7 +716,7 @@ always @(posedge clk_sys) begin
 	bw_set_d <= bw_setting;
 	if (cart_download || bw_setting != bw_set_d)
 		bw_mode <= bw_setting;
-	else if (~old_bw & is_bw)
+	else if (~old_bw & is_bw & ~ss_hold)   // ss hold
 		bw_mode <= ~bw_mode;
 end
 
@@ -709,16 +754,22 @@ wire [7:0] portb_type = menu_port_type(port2_input);
 wire [15:0] ana_a = swap_joysticks ? analog1 : analog0;
 wire [15:0] ana_b = swap_joysticks ? analog0 : analog1;
 
+// (save states: ms_div and ms_tick are the chain's last 15 bits, after the
+// AtariVox: ss_c_vx to ss_c_end)
 reg [13:0] ms_div = 14'd0;
 reg        ms_tick = 1'b0;
-always @(posedge clk_sys) begin
-	ms_tick <= 1'b0;
-	if (ms_div == 14'd14317) begin
-		ms_div  <= 14'd0;
-		ms_tick <= 1'b1;
-	end else
-		ms_div <= ms_div + 1'd1;
-end
+always @(posedge clk_sys)
+	if (ss_en)
+		{ms_div, ms_tick} <= {ss_c_vx, ms_div, ms_tick} >> 1;
+	else if (!ss_frz) begin
+		ms_tick <= 1'b0;
+		if (ms_div == 14'd14317) begin
+			ms_div  <= 14'd0;
+			ms_tick <= 1'b1;
+		end else
+			ms_div <= ms_div + 1'd1;
+	end
+assign ss_c_end = ms_tick;
 
 wire [15:0] vjoy [4];
 assign vjoy[0] = joya;
@@ -799,6 +850,10 @@ wire  [7:0] gun_y;
 wire [39:0] vx_position;
 wire [31:0] vx_phase01;
 virtual_axis5 vaxes (
+	.ss_en    (ss_en),
+	.ss_frz   (ss_frz),
+	.ss_si    (ss_c_pd),
+	.ss_so    (ss_c_va),
 	.clk      (clk_sys),
 	.reset    (cart_download),
 	.tick     (ms_tick),
@@ -840,6 +895,10 @@ wire [7:0] gun_yl = gun_my[15:8] + 8'd8;
 wire [3:0] paddle_en = {(portb_type == 8'd3) ? 2'b11 : 2'b00, (porta_type == 8'd3) ? 2'b11 : 2'b00};
 wire [3:0] pad_wire;
 paddle_timer4 pads (
+	.ss_en   (ss_en),
+	.ss_frz  (ss_frz),
+	.ss_si   (ss_c_main),
+	.ss_so   (ss_c_pd),
 	.clk     (clk_sys),
 	.ce      (1'b1),
 	.reset   ({4{reset}} | ~paddle_en),
@@ -865,6 +924,10 @@ wire [1:0] drive_b = drive_gray(vx_phase[1][15:14]);
 // Light gun, MiSTer's lightgun.sv driven like its joystick mode.
 wire gun_target, gun_sensor, gun_trigger;
 lightgun lightgun (
+	.ss_en        (ss_en),
+	.ss_frz       (ss_frz),
+	.ss_si        (ss_c_va),
+	.ss_so        (ss_c_lg),
 	.CLK          (clk_sys),
 	.RESET        (reset),
 	.MOUSE        (25'd0),
@@ -966,7 +1029,7 @@ reg tia_pal_seen = 1'b0;
 always @(posedge clk_sys)
 	if (cart_download)
 		tia_pal_seen <= 1'b0;
-	else if (tia_pal)
+	else if (tia_pal && !ss_hold)   // ss hold
 		tia_pal_seen <= 1'b1;
 
 wire region_select = (region_setting == 2'd0) ?
@@ -1062,7 +1125,7 @@ always @(posedge clk_sys) begin
 	if (!pll_busy_s[1]) begin
 		if ((cart_download | old_cart_download) & ~rgn_a78)
 			region_pll <= daria_rgn_nx;
-		else if (!region_pll_hold && (!daria_rt_pend || daria_a78_hdr) && !(daria_reset & daria_arm))
+		else if (!region_pll_hold && (!daria_rt_pend || daria_a78_hdr) && !(daria_reset & daria_arm) && !ss_hold)
 			region_pll <= region_select;
 	end
 end
@@ -1074,10 +1137,11 @@ end
 wire daria_rt_mask = pll_busy_s[1] | (daria_rt_cnt[3:2] == 2'b11) | daria_rt_pend;
 `else
 always @(posedge clk_sys)
-	if (!region_pll_hold)
+	if (!region_pll_hold && !ss_hold)   // ss hold
 		region_pll <= region_select;
 `endif
 
+wire        [15:0] core_audio_l, core_audio_r, audio_live_l, audio_live_r;
 `ifdef POCKET_ATARIVOX
 // The AtariVox's voice (docs/ATARIVOX.md): the SpeakJet's serial input on
 // PA0 (port 2 UP) and our speech engine. It is part of the AtariVox, so it
@@ -1085,8 +1149,19 @@ always @(posedge clk_sys)
 // Off. A console reset leaves it running, as the real one, powered from the
 // port; a cart load resets it.
 wire vox_on = use_sk && (atarivox_setting != 2'd0);
+assign vox_on_f = vox_on;
 wire signed [15:0] vox_sample;
 atarivox atarivox (
+	.ss_en  (ss_en),
+	.ss_frz (ss_frz),
+	.ss_si  (ss_c_sk),
+	.ss_so  (ss_c_vx),
+	.ss_ram (ss_ram && ss_rsel == 2'd2),
+	.ss_ra  (ss_ra),
+	.ss_rwe (ss_rwe),
+	.ss_rd  (ss_rd),
+	.ss_rq  (ss_rq_vox),
+	.quiet  (vox_quiet),
 	.clk    (clk_sys),
 	.reset  (reset_in | cart_download | ~vox_on),
 	.pal    (region_pll),
@@ -1105,12 +1180,30 @@ wire signed [19:0] vox_gain = (atarivox_setting == 2'd3) ? (20'(vox_sample) <<< 
 wire signed [15:0] vox_lim  = (vox_gain > 20'sd32767) ? 16'sd32767 :
                               (vox_gain < -20'sd32767) ? -16'sd32767 : vox_gain[15:0];
 wire        [17:0] vox_add  = vox_on ? 18'(18'(vox_lim) + 18'sd32768) : 18'd0;
-wire        [15:0] core_audio_l, core_audio_r;
 wire        [17:0] mix_l = 18'(core_audio_l) + vox_add;
 wire        [17:0] mix_r = 18'(core_audio_r) + vox_add;
-assign AUDIO_L = |mix_l[17:16] ? 16'hFFFF : mix_l[15:0];
-assign AUDIO_R = |mix_r[17:16] ? 16'hFFFF : mix_r[15:0];
+assign audio_live_l = |mix_l[17:16] ? 16'hFFFF : mix_l[15:0];
+assign audio_live_r = |mix_r[17:16] ? 16'hFFFF : mix_r[15:0];
+`else
+assign audio_live_l = core_audio_l;
+assign audio_live_r = core_audio_r;
+assign ss_c_vx   = ss_c_sk;
+assign vox_on_f  = 1'b0;
+assign vox_quiet = 1'b1;
+assign ss_rq_vox = 32'd0;
 `endif
+
+// Save states: the sound holds its last sample while the machine is frozen
+// or shifting (the TIA's outputs follow the shift), and goes on from it at
+// the resume.
+reg [15:0] audio_held_l = 16'h8000, audio_held_r = 16'h8000;
+always @(posedge clk_sys)
+	if (!ss_hold) begin
+		audio_held_l <= audio_live_l;
+		audio_held_r <= audio_live_r;
+	end
+assign AUDIO_L = ss_hold ? audio_held_l : audio_live_l;
+assign AUDIO_R = ss_hold ? audio_held_r : audio_live_r;
 
 
 wire VBlank_orig;
@@ -1138,6 +1231,16 @@ wire  [7:0] fb_wdata, fb_q;
 
 Atari7800 main
 (
+	.ss_en        (ss_en),
+	.ss_frz       (ss_frz),
+	.ss_si        (ss_si),
+	.ss_so        (ss_c_main),
+	.ss_ram       (ss_ram && ss_rsel != 2'd2),
+	.ss_rsel      (ss_rsel[0]),
+	.ss_ra        (ss_ra),
+	.ss_rwe       (ss_rwe),
+	.ss_rd        (ss_rd[7:0]),
+	.ss_rq        (ss_rq_main),
 	// Supercharger BIOS: built without it (EXTERNAL_FIRMWARE), loaded from
 	// the user's file instead, its first 2 KiB.
 	.fw_ar_load   (arfw_download),
@@ -1176,20 +1279,11 @@ Atari7800 main
 	.tia_mode     (tia_mode && ~use_bios),
 	.bypass_bios  (~use_bios),
 	.cart_present (~(use_bios & ~cart_loaded)), // 1: no BIOS boots an empty slot
-`ifdef POCKET_DARIA
-	.cpu_ce       (daria_pclk1),
-`else
-	.cpu_ce       (),
-`endif
+	.cpu_ce       (main_cpu_ce),
 
 	// Audio
-`ifdef POCKET_ATARIVOX
 	.AUDIO_R      (core_audio_r),
 	.AUDIO_L      (core_audio_l),
-`else
-	.AUDIO_R      (AUDIO_R),
-	.AUDIO_L      (AUDIO_L),
-`endif
 
 	// Cart interface
 	.cart_out     (cart_download ? ioctl_dout : (cart_loaded ? cart_data_sd : cart_data_rom)),
@@ -1340,15 +1434,17 @@ sram_ctrl sram
 	.c_bios       (1'b0),
 	.c_addr       (17'd0),
 	.c_wdata      (8'd0),
-	.t_rd         (cartram_rd26),
-	.t_wr         (cartram_wr26),
-	.t_addr       (cartram_addr26[16:0]),
-	.t_wdata      (cartram_wrdata26),
+	// the cartridge port: the 6507's (not while the chain shifts) or, while
+	// frozen, the save-state controller's (ss_t_own)
+	.t_rd         (ss_t_own ? ss_t_rd : (cartram_rd26 & ~ss_en)),
+	.t_wr         (ss_t_own ? ss_t_wr : (cartram_wr26 & ~ss_en)),
+	.t_addr       (ss_t_own ? ss_t_addr : cartram_addr26[16:0]),
+	.t_wdata      (ss_t_own ? ss_t_wdata : cartram_wrdata26),
 	.c_rdata      (sram_c_rdata),
 
 	.fb_en        (fb_active),
 	.fb_addr      (fb_addr),
-	.fb_we        (fb_we),
+	.fb_we        (fb_we & ~ss_hold),   // ss hold: the blended frame is kept
 	.fb_wdata     (fb_wdata),
 	.fb_q         (fb_q),
 
@@ -1504,14 +1600,14 @@ daria_fe u_fe
 (
 	.clk_sys         (clk_sys),
 	.clk_arm         (clk_arm),
-	.cart_reset      (daria_reset & ~daria_rt_mask),
-	.pause           (pause_core),
+	.cart_reset      (daria_reset & ~daria_rt_mask & ~ss_hold),   // ss hold: DARIA is refused (v1)
+	.pause           (pause_core | ss_hold),
 	.a_in            (daria_a_in),
 	.d_in            (din),
 	.rw              (RW),
 	.pclk1           (daria_pclk1),
 	.pclk0           (daria_pclk0),
-	.access          (daria_access),
+	.access          (daria_access & ~ss_hold),
 	.scheme          (daria_scheme),
 	.revision        (mapper_revision),
 	.cdf_ldx         (cdf_ldx),
@@ -1756,21 +1852,149 @@ always @(posedge clk_sys) begin
 	end
 end
 
-assign R      = use_comp ? comp_r   : rgb_r;
-assign G      = use_comp ? comp_g   : rgb_g;
-assign B      = use_comp ? comp_b   : rgb_b;
-assign HSync  = use_comp ? comp_hso : rgb_hs;
-assign VSync  = use_comp ? comp_vso : rgb_vs;
-assign HBlank = use_comp ? comp_hbo : rgb_hb;
-assign VBlank = use_comp ? comp_vbo : rgb_vb;
-assign ce_pix = use_comp ? comp_ce  : rgb_ce;
+wire vid_hs = use_comp ? comp_hso : rgb_hs;
+wire vid_vs = use_comp ? comp_vso : rgb_vs;
+wire vid_hb = use_comp ? comp_hbo : rgb_hb;
+wire vid_vb = use_comp ? comp_vbo : rgb_vb;
+wire vid_ce = use_comp ? comp_ce  : rgb_ce;
+
+////////////////////////////  SAVE STATES  ////////////////////////////////
+// docs/SAVESTATE.md; ss_ctl.sv. While the machine is held the Pocket gets
+// the substitute raster's sync and a black picture.
+wire ss_resume_ok;
+ss_raster ss_rast
+(
+	.clk       (clk_sys),
+	.hold      (ss_hold),
+	.hs        (vid_hs),
+	.vs        (vid_vs),
+	.hb        (vid_hb),
+	.vb        (vid_vb),
+	.ce        (vid_ce),
+	.o_hs      (HSync),
+	.o_vs      (VSync),
+	.o_hb      (HBlank),
+	.o_vb      (VBlank),
+	.o_ce      (ce_pix),
+	.resume_ok (ss_resume_ok)
+);
+assign R = ss_hold ? 8'd0 : use_comp ? comp_r : rgb_r;
+assign G = ss_hold ? 8'd0 : use_comp ? comp_g : rgb_g;
+assign B = ss_hold ? 8'd0 : use_comp ? comp_b : rgb_b;
+
+// The cartridge image's CRC32 (zlib's), over every byte the loader writes,
+// for the blob's header: a state is tied to its image.
+function automatic [31:0] crc32_byte(input [31:0] c, input [7:0] b);
+	reg [31:0] x;
+	integer k;
+	begin
+		x = c ^ {24'd0, b};
+		for (k = 0; k < 8; k = k + 1)
+			x = x[0] ? (x >> 1) ^ 32'hEDB88320 : x >> 1;
+		crc32_byte = x;
+	end
+endfunction
+/* verilator lint_off PROCASSINIT */
+reg [31:0] cart_crc_r = 32'hFFFFFFFF, cart_crc = 32'd0;
+reg        cart_crc_ok = 1'b0;
+/* verilator lint_on PROCASSINIT */
+wire [31:0] cart_crc_base = (~old_cart_download && cart_download) ? 32'hFFFFFFFF : cart_crc_r;
+always @(posedge clk_sys) begin
+	if (cart_download) begin
+		cart_crc_r  <= (ioctl_wr) ? crc32_byte(cart_crc_base, ioctl_dout) : cart_crc_base;
+		cart_crc_ok <= 1'b0;
+	end else if (old_cart_download) begin
+		cart_crc    <= ~cart_crc_r;
+		cart_crc_ok <= 1'b1;
+	end
+end
+
+// What a save waits for (SAVESTATE.md 2.1): no SaveKey RAM access, no FA2
+// flash copy (its requests come a few clocks apart: none for 8 clocks), the
+// AtariVox silent.
+/* verilator lint_off PROCASSINIT */
+reg  [3:0] fa2_quiet_cnt = 4'd0;
+/* verilator lint_on PROCASSINIT */
+always @(posedge clk_sys)
+	fa2_quiet_cnt <= fa2_req ? 4'd0 : (fa2_quiet_cnt[3] ? fa2_quiet_cnt : fa2_quiet_cnt + 4'd1);
+`ifdef POCKET_SRAM
+wire sk_idle = !sk_pend && !sk_ram_rd && !sk_ram_wr;
+`else
+wire sk_idle = !sk_ram_rd && !sk_ram_wr;
+`endif
+wire ss_quiet = sk_idle && fa2_quiet_cnt[3] && vox_quiet;
+
+// Refused in v1 (SAVESTATE.md 4): DPC+ and the CDF family (DARIA, 21 and
+// 23), the Supercharger (15), BUS (24), the bad game screen (32: ELF, a
+// refused A78) and no image at all.
+wire ss_refuse = a78_refused || !tia_mode || run_bs == 6'd21 || run_bs == 6'd23 ||
+                 run_bs == 6'd15 || run_bs == 6'd24 || run_bs == 6'd32;
+
+a26_ss_ctl ss_ctl
+(
+	.clk_74a              (clk_74a),
+	.bridge_addr          (ss_bridge_addr),
+	.bridge_rd            (ss_bridge_rd),
+	.bridge_wr            (ss_bridge_wr),
+	.bridge_wr_data       (ss_bridge_wr_data),
+	.bridge_rd_data       (ss_bridge_rd_data),
+	.savestate_start      (savestate_start),
+	.savestate_start_ack  (savestate_start_ack),
+	.savestate_start_busy (savestate_start_busy),
+	.savestate_start_ok   (savestate_start_ok),
+	.savestate_start_err  (savestate_start_err),
+	.savestate_load       (savestate_load),
+	.savestate_load_ack   (savestate_load_ack),
+	.savestate_load_busy  (savestate_load_busy),
+	.savestate_load_ok    (savestate_load_ok),
+	.savestate_load_err   (savestate_load_err),
+	.osnotify_inmenu      (osnotify_inmenu),
+	.pause_en             (pause_in_menu),
+
+	.clk                  (clk_sys),
+	.mreset               (reset),
+	.cart_ready           (tia_mode && cart_crc_ok),
+	.refuse               (ss_refuse),
+	.cpu_ce               (main_cpu_ce),
+	.vsync                (rgb_vs),
+	.quiet                (ss_quiet),
+	.resume_ok            (ss_resume_ok),
+	.cart_crc             (cart_crc),
+	.cart_len             (cart_size),
+	.mapper_word          ({17'd0, mapper_revision, 3'd0, sc & ~a78_refused, 2'd0, run_bs}),
+	.flags_word           ({15'd0, |bs_override, 5'd0, port2_input, 1'b0, port1_input, 1'b0, vox_on_f, use_sk, region_pll}),
+
+	.frz                  (ss_frz),
+	.ss_en                (ss_en),
+	.ss_si                (ss_si),
+	.ss_so                (ss_c_end),
+	.ss_ram               (ss_ram),
+	.ss_rsel              (ss_rsel),
+	.ss_ra                (ss_ra),
+	.ss_rwe               (ss_rwe),
+	.ss_rd                (ss_rd),
+	.ss_rq8               (ss_rq_main),
+	.ss_rq32              (ss_rq_vox),
+	.t_own                (ss_t_own),
+	.t_rd                 (ss_t_rd),
+	.t_wr                 (ss_t_wr),
+	.t_addr               (ss_t_addr),
+	.t_wdata              (ss_t_wdata),
+	.t_rdata              (sram_c_rdata)
+);
 
 assign tia_mode_o = tia_en;
 assign is_pal_o = region_pll;
 // MARIA's frame follows region_select (274 visible lines for PAL, 224 NTSC).
 // A 2600 image's window follows the TIA's own region measurement (288 / 240),
 // which is what the stabiliser uses, whatever the Region setting says.
-assign video_pal_o = tia_mode ? tia_pal : region_select;
+// (Held while the machine is: the scaler slot stays.)
+wire video_pal_live = tia_mode ? tia_pal : region_select;
+/* verilator lint_off PROCASSINIT */
+reg  video_pal_held = 1'b0;
+/* verilator lint_on PROCASSINIT */
+always @(posedge clk_sys) if (!ss_hold) video_pal_held <= video_pal_live;
+assign video_pal_o = ss_hold ? video_pal_held : video_pal_live;
 
 endmodule
 

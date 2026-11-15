@@ -15,6 +15,12 @@
 //
 // Ticks must come at least 5 clocks apart.
 //
+// Save states (docs/SAVESTATE.md): every register is in the scan chain
+// (ss_si in, ss_so out): slot, then for axis k = 0..4 {pos16, vel,
+// analog_on, rest, rest_valid}, after axes 0 and 1 their phase; 245 bits.
+// While ss_en is high they shift (in at the MSB of each segment); while
+// ss_frz is high they hold.
+//
 // SPDX-License-Identifier: MIT
 //------------------------------------------------------------------------------
 
@@ -29,6 +35,10 @@ module virtual_axis5 #(
 	parameter [7:0]  DEADZONE = 8'd24,
 	parameter        PHASE_SHIFT = 1          // phase moves 2^n x position speed
 ) (
+	input  wire        ss_en,         // save states: shift the chain
+	input  wire        ss_frz,        // hold every register
+	input  wire        ss_si,
+	output wire        ss_so,
 	input  wire        clk,
 	input  wire        reset,
 	input  wire        tick,          // 1 kHz strobe, at least 5 clocks apart
@@ -45,8 +55,14 @@ module virtual_axis5 #(
 	/* verilator lint_off PROCASSINIT */  // power-up values (DEVELOPING.md, "Power-up values")
 	reg  [2:0] slot = 3'd0;
 	/* verilator lint_on PROCASSINIT */
+	wire [5:0] ss_ax;               // the chain after slot (0) and after axis k (k + 1)
 	always @(posedge clk)
-		slot <= tick ? 3'd1 : (slot == 3'd0 || slot == 3'd4) ? 3'd0 : slot + 3'd1;
+		if (ss_en)
+			slot <= {ss_si, slot} >> 1;
+		else if (!ss_frz)
+			slot <= tick ? 3'd1 : (slot == 3'd0 || slot == 3'd4) ? 3'd0 : slot + 3'd1;
+	assign ss_ax[0] = slot[0];
+	assign ss_so = ss_ax[5];
 
 	wire [4:0] upd = {slot == 3'd4, slot == 3'd3, slot == 3'd2, slot == 3'd1, tick};
 
@@ -127,7 +143,10 @@ module virtual_axis5 #(
 		wire        held = neg[k] ^ pos[k];
 		wire  [8:0] off_rest = (an > rest) ? {1'b0, an - rest} : {1'b0, rest - an};
 
-		always @(posedge clk) begin
+		wire ss_mid;                // after this axis's main segment
+		always @(posedge clk) if (ss_en)
+			{pos16, vel, analog_on, rest, rest_valid} <= {ss_ax[k], pos16, vel, analog_on, rest, rest_valid} >> 1;
+		else if (!ss_frz) begin
 			if (reset) begin
 				pos16      <= 16'h8000;
 				vel        <= 16'd0;
@@ -155,6 +174,7 @@ module virtual_axis5 #(
 			end
 		end
 
+		assign ss_mid = rest_valid;
 		assign ax_pos16[k] = pos16;
 		assign ax_vel[k]   = vel;
 		assign ax_aon[k]   = analog_on;
@@ -166,10 +186,15 @@ module virtual_axis5 #(
 			reg [15:0] phase_r = 16'd0;
 			/* verilator lint_on PROCASSINIT */
 			always @(posedge clk)
-				if (!reset && upd[k] && w_phase)
+				if (ss_en)
+					phase_r <= {ss_mid, phase_r} >> 1;
+				else if (!ss_frz && !reset && upd[k] && w_phase)
 					phase_r <= n_phase;
+			assign ss_ax[k + 1] = phase_r[0];
 			assign ax_phase[k] = phase_r;
 			assign phase[16*k +: 16] = phase_r;
+		end else begin : nph
+			assign ss_ax[k + 1] = ss_mid;
 		end
 	end
 	endgenerate

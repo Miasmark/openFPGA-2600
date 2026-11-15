@@ -19,7 +19,8 @@ module tb_avox;
 
 	wire down_n;
 	wire signed [15:0] sample;
-	atarivox dut (.clk(clk), .reset(reset), .pal(pal), .line(line), .down_n(down_n), .sample(sample));
+	atarivox dut (.ss_en(1'b0), .ss_frz(1'b0), .ss_si(1'b0), .ss_so(), .ss_ram(1'b0), .ss_ra(8'd0), .ss_rwe(1'b0), .ss_rd(32'd0), .ss_rq(), .quiet(),
+		.clk(clk), .reset(reset), .pal(pal), .line(line), .down_n(down_n), .sample(sample));
 
 	longint cyc = 0;
 	integer lf;

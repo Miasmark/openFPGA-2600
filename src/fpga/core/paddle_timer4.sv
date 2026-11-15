@@ -35,12 +35,23 @@
 // power up 0 in Quartus, as in Verilator), so the two agree from the first
 // clock. sim/tb_paddles4.sv compares them on every clock.
 //
+// Save states (docs/SAVESTATE.md): every register is in the scan chain
+// (ss_si in, ss_so out): the shared ones {cc, old_clear, pv}, then paddles
+// 0-3, each {high_count, lowest, highest, difference, m, read_count, chg,
+// cleared, lgh, pend}, 165 bits; 696 in all. While ss_en is high they shift
+// (in at the MSB of each segment, out at its LSB); while ss_frz is high they
+// hold.
+//
 // SPDX-License-Identifier: MIT
 //------------------------------------------------------------------------------
 
 `default_nettype none
 
 module paddle_timer4 (
+	input  wire        ss_en,      // save states: shift the chain
+	input  wire        ss_frz,     // hold every register
+	input  wire        ss_si,
+	output wire        ss_so,
 	input  wire        clk,
 	input  wire        ce,
 	input  wire  [3:0] reset,      // per paddle (paddle_timer's reset)
@@ -65,14 +76,7 @@ module paddle_timer4 (
 	wire dump_done = (cc >= CLEAR_TICKS); // clear_count >= CLEAR_NS
 	wire clear_rise = clear && !old_clear;
 
-	always @(posedge clk) if (ce) begin
-		old_clear <= clear;
-		if (clear) begin
-			if (!dump_done)
-				cc <= cc + 9'd1;
-		end else
-			cc <= 9'd0;
-	end
+	wire [4:0] ss_c;                     // the chain after the shared registers and after each paddle
 
 	// ---- per paddle state, read by the engine through sel ----
 	wire [32:0] p_high    [0:3];
@@ -92,9 +96,23 @@ module paddle_timer4 (
 	wire        ev_high = e_go && !e_d[33] && (e_hi < e_h); // a new highest
 	wire        e_lt  = (e_d[32:0] != 33'd0);             // lowest < the new highest
 	wire [33:0] e_w   = {1'b0, e_d[32:0]} + {NS_PER_TICK, 1'b0};
+
+	// the shared registers (pv: the engine's pending width)
 	always @(posedge clk)
-		if (ev_high)
-			pv <= e_w[33:8];
+		if (ss_en)
+			{cc, old_clear, pv} <= {ss_si, cc, old_clear, pv} >> 1;
+		else if (!ss_frz && ce) begin
+			old_clear <= clear;
+			if (clear) begin
+				if (!dump_done)
+					cc <= cc + 9'd1;
+			end else
+				cc <= 9'd0;
+			if (ev_high)
+				pv <= e_w[33:8];
+		end
+	assign ss_c[0] = pv[0];
+	assign ss_so = ss_c[4];
 
 	genvar p;
 	generate
@@ -118,7 +136,10 @@ module paddle_timer4 (
 		wire [33:0] next_d = (lgh | ~read_measured) ? UNMEASURED : {1'b0, lowest} + slope;
 		wire        mine   = (sel == p);
 
-		always @(posedge clk) if (ce) begin
+		always @(posedge clk) if (ss_en)
+			{high_count, lowest, highest, difference, m, read_count, chg, cleared, lgh, pend} <=
+				{ss_c[p], high_count, lowest, highest, difference, m, read_count, chg, cleared, lgh, pend} >> 1;
+		else if (!ss_frz && ce) begin
 			if (~read_measured && clear_rise)
 				read_count <= read_count + 2'd1;
 
@@ -165,6 +186,7 @@ module paddle_timer4 (
 			end
 		end
 
+		assign ss_c[p + 1]  = pend;
 		assign p_high[p]    = high_count;
 		assign p_lowest[p]  = lowest;
 		assign p_highest[p] = highest;

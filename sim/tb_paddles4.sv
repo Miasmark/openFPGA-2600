@@ -20,9 +20,15 @@
 //   - positions per paddle: steps of 1-3 and jumps, on any clock, sometimes
 //     on two or more paddles at once;
 //   - resets of 1-20 clocks on one paddle, a pair, or all four;
-//   - with +ce, the clock enable low for 1-2,000 clocks at random times.
+//   - with +ce, the clock enable low for 1-2,000 clocks at random times;
+//   - with +chain=N, the save-state chain (paddle_timer4's ss_* ports): about
+//     every 200,000 clocks, with the reference's clock enable low meanwhile,
+//     the engine's registers are shifted out N clocks with random bits in,
+//     kept, and shifted back in (a load of what was saved), after a hold of
+//     1-50 clocks with ss_frz high. N = 696, the chain's length, must change
+//     nothing; any other N must be seen.
 //
-//   +seed=N +cycles=N +ce   (defaults 1, 2 x 10^7, ce always high)
+//   +seed=N +cycles=N +ce +chain=N  (defaults 1, 2 x 10^7, ce always high, no chain)
 // Prints "PADDLES4 seed ... mismatches N", the first 10 mismatches and
 // coverage counted on the reference's registers; ends with $finish whatever
 // the result: sim/run_paddles4.sh reads the line and gives the verdict.
@@ -59,6 +65,8 @@ module tb_paddles4;
 
 	// ---- stimulus (driven on the rising edge, as flops) ----
 	logic       ce = 1'b1, clear = 1'b0;
+	logic       ss_busy = 1'b0;           // the chain test (+chain) runs: the reference waits
+	wire        ref_ce = ce && !ss_busy;
 	logic [3:0] rst = 4'd0, read = 4'd0;
 	logic [7:0] k [4] = '{8'd128, 8'd128, 8'd128, 8'd128};
 	wire [31:0] kohms = {k[3], k[2], k[1], k[0]};
@@ -70,7 +78,7 @@ module tb_paddles4;
 	for (g = 0; g < 4; g = g + 1) begin : rf
 		paddle_timer pt (
 			.clk        (clk),
-			.ce         (ce),
+			.ce         (ref_ce),
 			.reset      (rst[g]),
 			.kohms      ({2'b00, k[g]}),
 			.clear      (clear),
@@ -83,7 +91,13 @@ module tb_paddles4;
 
 	// ---- the design ----
 	wire [3:0] dut_charged;
+	logic ss_en = 1'b0, ss_frz = 1'b0, ss_si = 1'b0;
+	wire  ss_so;
 	paddle_timer4 dut (
+		.ss_en   (ss_en),
+		.ss_frz  (ss_frz),
+		.ss_si   (ss_si),
+		.ss_so   (ss_so),
 		.clk     (clk),
 		.ce      (ce),
 		.reset   (rst),
@@ -92,6 +106,36 @@ module tb_paddles4;
 		.read    (read),
 		.charged (dut_charged)
 	);
+
+	// ---- the chain (+chain=N): out with random bits in, hold, back in ----
+	int unsigned chain_n = 0, ch_left = 0, ch_ph = 0, ch_gap = 100000, ch_i = 0, ch_rot = 0;
+	bit   kept [0:4095];
+	initial void'($value$plusargs("chain=%d", chain_n));
+	always @(posedge clk) begin
+		if (chain_n != 0) begin
+			case (ch_ph)
+				0: if (ch_gap != 0) ch_gap <= ch_gap - 1;
+				   else begin ss_busy <= 1'b1; ss_frz <= 1'b1; ch_left <= urange(1, 50); ch_ph <= 1; end
+				1: if (ch_left != 0) ch_left <= ch_left - 1;
+				   else begin ss_en <= 1'b1; ss_si <= 1'(urange(0, 1)); ch_i <= 0; ch_ph <= 2; end
+				2: begin                      // out: keep ss_so, random bits in
+					kept[ch_i] = ss_so;
+					if (ch_i + 1 == chain_n) begin ss_en <= 1'b0; ch_left <= urange(1, 50); ch_ph <= 3; end
+					else ss_si <= 1'(urange(0, 1));
+					ch_i <= ch_i + 1;
+				end
+				3: if (ch_left != 0) ch_left <= ch_left - 1;
+				   else begin ss_en <= 1'b1; ss_si <= kept[0]; ch_i <= 1; ch_ph <= 4; end
+				4: begin                      // back in, in the order it came out
+					if (ch_i == chain_n) begin ss_en <= 1'b0; ch_left <= urange(1, 50); ch_ph <= 5; end
+					else ss_si <= kept[ch_i];
+					ch_i <= ch_i + 1;
+				end
+				5: if (ch_left != 0) ch_left <= ch_left - 1;
+				   else begin ss_frz <= 1'b0; ss_busy <= 1'b0; ch_gap <= urange(100000, 300000); ch_rot <= ch_rot + 1; ch_ph <= 0; end
+			endcase
+		end
+	end
 
 	// ---- stimulus generator ----
 	int unsigned phase_left = 2000;   // clocks left in this dump / charge period
@@ -193,7 +237,7 @@ module tb_paddles4;
 		if (mism <= 10)
 			$display("MISMATCH clock %0d paddle %0d %s: reference %0h, engine %0h", n, p, what, a, b);
 	endtask
-	always @(negedge clk) begin
+	always @(negedge clk) if (!ss_busy) begin
 		n++;
 		if (rf[0].pt.clear_count != 33'(dut.cc) * 33'd6984) report("clear_count", 0, rf[0].pt.clear_count, dut.cc);
 		if (ref_charged != dut_charged) report("charged", -1, ref_charged, dut_charged);
@@ -227,6 +271,7 @@ module tb_paddles4;
 			$display("PADDLES4 coverage: final read_count %0d %0d %0d %0d, difference %0h %0h %0h %0h",
 				rf[0].pt.read_count, rf[1].pt.read_count, rf[2].pt.read_count, rf[3].pt.read_count,
 				rf[0].pt.difference, rf[1].pt.difference, rf[2].pt.difference, rf[3].pt.difference);
+			if (chain_n != 0) $display("PADDLES4 chain %0d bits: %0d loads", chain_n, ch_rot);
 			$display("PADDLES4 seed %0d ce %0d clocks %0d mismatches %0d", seed, use_ce, n, mism);
 			$finish;
 		end

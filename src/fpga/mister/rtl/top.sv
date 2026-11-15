@@ -6,6 +6,8 @@
 // BupChip's command and audio), the 7800's RAM0/RAM1, the 7800 BIOS read
 // path and the High Score Cart are gone; MARIA's clock and decode remain.
 module Atari7800 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
+	input logic ss_ram, input logic ss_rsel, input logic [7:0] ss_ra, input logic ss_rwe, input logic [7:0] ss_rd, output logic [7:0] ss_rq,
 `ifdef POCKET_SRAM
 	// Pocket: the Flicker Blend frame lives in the Pocket's SRAM
 	// (core/sram_ctrl.sv), as does the cartridge RAM (EXTERNAL_CARTRAM).
@@ -168,6 +170,11 @@ module Atari7800 (
 	input              blend,
 	output [3:0]       i_read
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4, ss_c5, ss_c6, ss_c7, ss_c8, ss_c9, ss_c10, ss_c11, ss_c12;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c12;
+
 
 	/////////////
 	// Signals //
@@ -230,6 +237,8 @@ module Atari7800 (
 	// Reset assertion is immediate. Release lands on the phase before the first
 	// one the CPU acts on, so that first visible edge is still source-caused.
 	always_ff @(posedge clk_sys) begin
+		if (ss_en) {reset_hold} <= {ss_c0, reset_hold} >> 1;
+		else if (!ss_frz) begin
 		if (reset) begin
 			reset_hold <= 1'b1;
 			reset_phase_wait <= 2'd0;
@@ -250,10 +259,14 @@ module Atari7800 (
 			end
 		end
 	end
+	end
+	assign ss_c1 = {reset_hold};
 
 	// In 2600 mode SHB and the CPU phase can collapse onto one clk_sys tick.
 	// Require release to survive a phase-1 sample; assertion stays immediate.
 	always_ff @(posedge clk_sys) begin
+		if (ss_en) {tia_RDY_seen_high} <= {ss_c1, tia_RDY_seen_high} >> 1;
+		else if (!ss_frz) begin
 		if (effective_reset)
 			tia_RDY_seen_high <= 1'b1;
 		else if (!tia_RDY)
@@ -261,6 +274,8 @@ module Atari7800 (
 		else if (pclk1)
 			tia_RDY_seen_high <= 1'b1;
 	end
+	end
+	assign ss_c2 = {tia_RDY_seen_high};
 	// On a Harmony/Melody the ARM is the cartridge, so while a mapper call
 	// runs the 6507 makes no forward progress; Stella models the same thing
 	// as zero elapsed time. rubyQ writes its parameter block, calls the ARM
@@ -285,11 +300,15 @@ module Atari7800 (
 	//   mapper           take   | take  |  hide |     |  hide |  take
 	logic stall_cycle_taken;
 	always_ff @(posedge clk_sys) begin
+		if (ss_en) {stall_cycle_taken} <= {ss_c2, stall_cycle_taken} >> 1;
+		else if (!ss_frz) begin
 		if (!arm_call_stall)
 			stall_cycle_taken <= 1'b0;
 		else if (pclk0)
 			stall_cycle_taken <= 1'b1;
 	end
+	end
+	assign ss_c3 = {stall_cycle_taken};
 	wire mapper_phi2 = pclk0 && (!arm_call_stall || !stall_cycle_taken);
 	assign RDY = maria_RDY && tia_RDY && (~tia_en || tia_RDY_seen_high) &&
 		!arm_call_stall;
@@ -312,10 +331,14 @@ module Atari7800 (
 	wire [7:0] DB = cpu_DB_oe ? physical_write_DB : read_DB;
 
 	always_ff @(posedge clk_sys) begin
+		if (ss_en) {open_bus[7], open_bus[6], open_bus[5], open_bus[4], open_bus[3], open_bus[2], open_bus[1], open_bus[0]} <= {ss_c3, open_bus[7], open_bus[6], open_bus[5], open_bus[4], open_bus[3], open_bus[2], open_bus[1], open_bus[0]} >> 1;
+		else if (!ss_frz) begin
 		pause_clock <= pause ? pause_clock + 1'd1 : {1'b0, mclk1};
 		open_bus <= DB;
 		last_address <= AB;
 	end
+	end
+	assign ss_c4 = {open_bus[7], open_bus[6], open_bus[5], open_bus[4], open_bus[3], open_bus[2], open_bus[1], open_bus[0]};
 
 	wire cs_cart = ~|{cs_tia, cs_riot};
 `ifdef POCKET_SRAM
@@ -347,7 +370,7 @@ module Atari7800 (
 	end
 
 	cpu_phase_controller phase_controller
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c4), .ss_so(ss_c5),
 		.clk_sys        (clk_sys),
 		.request_tia    (phase_source_request_tia),
 		.maria_phi1     (pclk1_m),
@@ -366,7 +389,7 @@ module Atari7800 (
 
 	// MARIA's clock, phase and 2600 decode block (Maria/maria.sv): its
 	// video, DMA, registers and 7800 memory map are gone (plan step 4).
-	maria maria_inst(
+	maria maria_inst( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c5), .ss_so(ss_c6),
 		.ce             (~pause || effective_reset),
 		/* verilator lint_off PINCONNECTEMPTY */
 		.mclk0          (),             // MARIA's own tia_clk_x2 uses it
@@ -390,7 +413,7 @@ module Atari7800 (
 	logic cart_ce_2600;
 
 	TIA tia_inst
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c6), .ss_so(ss_c7),
 		.clk            (clk_sys),
 		.ce             (tia_clk_x2),     // Clock enable for CLK generation only
 		.is_7800        (~(phase_source_tia || phase_edge_source_tia)),
@@ -471,7 +494,7 @@ module Atari7800 (
 	assign comp_burst_len   = 10'd56;
 
 	video_mux mux
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c7), .ss_so(ss_c8),
 		.clk_sys        (clk_sys),
 		// MARIA's picture is gone (video_mux.sv itself is unchanged)
 		.maria_luma     (4'd0),
@@ -551,8 +574,12 @@ module Atari7800 (
 	assign AUDIO_L = audio_mix_l;
 
 	logic [7:0] ar_ram_addr;
+	// save states: the RIOT RAM's and the FA2 work RAM's state port (ss_rsel 0 and 1)
+	wire [7:0] ss_rq_riot, ss_rq_fa2;
+	assign ss_rq = ss_rsel ? ss_rq_fa2 : ss_rq_riot;
+
 	M6532 riot_inst
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c8), .ss_so(ss_c9),
 		.clk          (clk_sys),
 		.ce           (pclk0),     // PHI 2 Clock enable
 		.res_n        (~effective_reset),
@@ -561,6 +588,7 @@ module Atari7800 (
 		// 2600 never had one, so it starts from zero.
 		.ram_init     (effective_reset),
 		.ram_init_7800(~tia_mode),
+		.ss_ram(ss_ram && !ss_rsel), .ss_ra(ss_ra[6:0]), .ss_rwe(ss_rwe), .ss_rd(ss_rd), .ss_rq(ss_rq_riot),   // ss port
 		.addr         (AB[6:0]),
 		.RW_n         (RW),
 		// Bus stuffing pulls the data lines low for any write off the cartridge,
@@ -583,7 +611,7 @@ module Atari7800 (
 	);
 
 	M6502C cpu_inst
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c9), .ss_so(ss_c10),
 		.pclk1        (pclk1_raw),
 		.pclk0        (pclk0_raw),
 		.phi1_ce      (pclk1),
@@ -614,8 +642,12 @@ module Atari7800 (
 	// stands for all of them, rising on that same clk_sys and falling with
 	// the reset. Before its first image the 7800 core ran in 7800 mode
 	// (tia_mode 0); the 2600 core has none, so tia_mode does not reach here.
-	always_ff @(posedge clk_sys)
+	always_ff @(posedge clk_sys) begin
+		if (ss_en) {tia_en} <= {ss_c10, tia_en} >> 1;
+		else if (!ss_frz)
 		tia_en <= !effective_reset;
+	end
+	assign ss_c11 = {tia_en};
 
 	// The 2600 mappers' cartridge RAM request, while the 2600 owns the bus or
 	// a mapper initialises its RAM. The 7800 core merged cart.sv's request in
@@ -847,7 +879,7 @@ module Atari7800 (
 `endif
 
 	cart2600 cart2600
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c11), .ss_so(ss_c12),
 `ifdef EXTERNAL_FIRMWARE
 		.fw_load        (fw_ar_load),
 		.fw_wr          (fw_wr),
@@ -855,6 +887,7 @@ module Atari7800 (
 		.fw_data        (fw_data),
 `endif
 		.pal            (PAL),
+		.ss_ram(ss_ram && ss_rsel), .ss_ra(ss_ra), .ss_rwe(ss_rwe), .ss_rd(ss_rd), .ss_rq(ss_rq_fa2),   // ss port
 		.ddr_timeout    (arm_ddr_timeout),
 		.d_out          (cart_DB_out),
 		.d_in           (cart_din),
@@ -863,12 +896,12 @@ module Atari7800 (
 		// tia_en, low only in reset.
 		.a_in           ({AB[12] & tia_en, AB[11:0]}),
 		.rw             (RW),
-		.reset          (effective_reset),
+		.reset          (effective_reset && !(ss_en || ss_frz)),   // ss hold
 		.clk            (clk_sys),
-		.ce             (cart_ce_2600),
-		.phi1           (pclk1),
+		.ce             (cart_ce_2600 && !(ss_en || ss_frz)),   // ss hold
+		.phi1           (pclk1 && !(ss_en || ss_frz)),
 		// Held with the CPU: the stalled cycle is one held read, seen once.
-		.phi2           (mapper_phi2),
+		.phi2           (mapper_phi2 && !(ss_en || ss_frz)),
 		.arm_driver_run (tia_en),
 		.sc             (sc),
 		.mapper         (|mapper ? mapper : force_bs),
@@ -976,6 +1009,7 @@ endmodule
 // opposite phase. This lets TIA remain externally clocked until the boundary.
 module cpu_phase_controller
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input  logic clk_sys,
 	input  logic request_tia,
 	input  logic maria_phi1,
@@ -989,6 +1023,11 @@ module cpu_phase_controller
 	output logic source_stable,
 	output logic phase_valid
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 
 	typedef enum logic [1:0] {
 		PRIME,
@@ -1048,6 +1087,8 @@ module cpu_phase_controller
 	end
 
 	always_ff @(posedge clk_sys) begin
+		if (ss_en) {last_phase2, phase_valid, active_tia, state, target_tia} <= {ss_c0, last_phase2, phase_valid, active_tia, state, target_tia} >> 1;
+		else if (!ss_frz) begin
 		if (phi1) begin
 			last_phase2 <= 1'b0;
 			phase_valid <= 1'b1;
@@ -1090,11 +1131,14 @@ module cpu_phase_controller
 			end
 		endcase
 	end
+	end
+	assign ss_c1 = {last_phase2, phase_valid, active_tia, state, target_tia};
 
 endmodule
 
 module M6502C
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input         pclk1,     // start of phase 1, from MARIA or TIA
 	input         pclk0,     // start of phase 2, from MARIA or TIA
 	output        phi1_ce,   // pin 3:  the paired phase 1, for the rest of the system
@@ -1114,6 +1158,11 @@ module M6502C
 	output        RW_OE,     // 0 while halted: R/W released
 	output logic  is_halted  // This is used to indicate that sally has released the bus
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c2;
+
 
 	// The source controller removes MARIA restart and source-handoff hazards.
 	// Keep this local pairing gate as the CPU pin invariant: an unexpected
@@ -1123,9 +1172,13 @@ module M6502C
 	wire  phi2_en = pclk0 &  in_phase2;
 
 	always_ff @(posedge clk_sys) begin
+		if (ss_en) {in_phase2} <= {ss_c0, in_phase2} >> 1;
+		else if (!ss_frz) begin
 		if      (phi1_en) in_phase2 <= 1'b1;
 		else if (phi2_en) in_phase2 <= 1'b0;
 	end
+	end
+	assign ss_c1 = {in_phase2};
 
 	// SALLY pin 39 is the system clock - TIA, RIOT, both cartridge slots and
 	// MARIA pin 6 all run off it, not off MARIA's own divider. So the rest of
@@ -1138,7 +1191,7 @@ module M6502C
 	// SALLY carries the halt handshake itself: the two phase-2 flip-flops that
 	// release the bus, and the stall into the core's own RDY. The wrapper is
 	// only a name and a pin adapter.
-	sally cpu (
+	sally cpu ( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c1), .ss_so(ss_c2),
 		.clk_sys  (clk_sys),
 		.phi1_en  (phi1_en),
 		.phi2_en  (phi2_en),

@@ -75,6 +75,10 @@ module tb_vaxis5;
 	wire [39:0] dpos;
 	wire [31:0] dph;
 	virtual_axis5 dut (
+		.ss_en    (1'b0),
+		.ss_frz   (1'b0),
+		.ss_si    (1'b0),
+		.ss_so    (),
 		.clk(clk), .reset(reset), .tick(tick),
 		.neg(neg), .pos(pos), .slow(slow), .fast(fast),
 		.analog({an[4], an[3], an[2], an[1], an[0]}),

@@ -37,6 +37,7 @@
 // constantly 1, not 0. Tying it 0 changes nothing: with wsync 0, lrc only
 // ever sets ready_int, which the reset already sets and nothing clears.
 module maria(
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	// Busses
 	input  logic [15:0] AB_in,
 
@@ -57,6 +58,11 @@ module maria(
 	// CPU
 	output logic        ready
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 
 	wire              maria_en = 1'b0;
 	wire              sel_slow_clock = 1'b1;
@@ -83,6 +89,8 @@ module maria(
 	assign tia_clk_x2 = tia_clk_en && mclk0;
 
 	always @(posedge clk_sys) begin
+		if (ss_en) {mclk1, mclk0, pclk0, pclk1, men_count[2], men_count[1], men_count[0], tia_enable_count[2], tia_enable_count[1], tia_enable_count[0], slow_clk_latch, clk_toggle, clock_div[1], clock_div[0], pclk_toggle} <= {ss_c0, mclk1, mclk0, pclk0, pclk1, men_count[2], men_count[1], men_count[0], tia_enable_count[2], tia_enable_count[1], tia_enable_count[0], slow_clk_latch, clk_toggle, clock_div[1], clock_div[0], pclk_toggle} >> 1;
+		else if (!ss_frz) begin
 		mclk1 <= 1'b0;
 		mclk0 <= 1'b0;
 		pclk0 <= 1'b0;
@@ -156,6 +164,8 @@ module maria(
 			end
 		end
 	end
+	end
+	assign ss_c1 = {mclk1, mclk0, pclk0, pclk1, men_count[2], men_count[1], men_count[0], tia_enable_count[2], tia_enable_count[1], tia_enable_count[0], slow_clk_latch, clk_toggle, clock_div[1], clock_div[0], pclk_toggle};
 
 	/* verilator lint_off CASEX */
 	always_comb begin

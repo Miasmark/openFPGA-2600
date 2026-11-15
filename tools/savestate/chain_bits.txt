@@ -1,0 +1,1 @@
+3053 measured by tb_load +ss_measure: main 1663, paddles 696, axes 245, light gun 134, SaveKey 65, AtariVox 235, tick 15

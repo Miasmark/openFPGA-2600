@@ -111,6 +111,8 @@ lint() {
 			[ -f "$FPGA/core/virtual_axis5.sv" ] && SRCS+=("$FPGA/core/virtual_axis5.sv")
 			# the four paddle timers with one engine (paddle_timer4.sv); trees before it have none
 			[ -f "$FPGA/core/paddle_timer4.sv" ] && SRCS+=("$FPGA/core/paddle_timer4.sv")
+			# the save-state controller and its package (docs/SAVESTATE.md); trees before it have none
+			[ -f "$FPGA/core/ss_ctl.sv" ] && SRCS+=("$FPGA/core/ss_pkg.sv" "$FPGA/core/ss_ctl.sv")
 			# the AtariVox (32e3ede), in core.qip's order; trees before it have none
 			for f in avox_rx avox_engine atarivox; do
 				[ -f "$FPGA/core/atarivox/$f.sv" ] && SRCS+=("$FPGA/core/atarivox/$f.sv")

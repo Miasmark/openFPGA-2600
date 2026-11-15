@@ -6,9 +6,24 @@
 // Port 2: `line` is the UP pin as the console drives it; `down_n` goes to
 // the DOWN pin and is low while the buffer is half full.
 //
+// Save states (docs/SAVESTATE.md): the scan chain runs through div, avox_rx
+// and avox_engine (ss_si to ss_so, 235 bits); the engine's register file
+// through its state port (ss_ram). `quiet`: nothing coming in or waiting,
+// and the voice silent (the engine's sample 0) for 4,096 ticks (0.25 s).
+//
 // MIT licence, as the rest of the Pocket port's own code.
 
 module atarivox (
+	input  logic               ss_en,       // save states: shift the chain
+	input  logic               ss_frz,      // hold every register
+	input  logic               ss_si,
+	output logic               ss_so,
+	input  logic               ss_ram,      // the register file's state port
+	input  logic        [7:0]  ss_ra,
+	input  logic               ss_rwe,
+	input  logic       [31:0]  ss_rd,
+	output logic       [31:0]  ss_rq,
+	output logic               quiet,
 	input  logic               clk,         // clk_sys
 	input  logic               reset,
 	input  logic               pal,         // clk_sys is the PAL frequency
@@ -26,13 +41,23 @@ module atarivox (
 	/* verilator lint_on PROCASSINIT */
 	wire  [9:0] div_last = pal ? 10'd865 : 10'd873;
 	wire        tick = (div == div_last);
+	logic ss_c1, ss_c2;
 	always_ff @(posedge clk)
-		div <= (reset || tick) ? 10'd0 : div + 10'd1;
+		if (ss_en)
+			div <= {ss_si, div} >> 1;
+		else if (!ss_frz)
+			div <= (reset || tick) ? 10'd0 : div + 10'd1;
 
 	logic       abort_set, ready_set, pop, nonempty, half_full;
 	logic [7:0] q;
 
+	logic rx_idle;
 	avox_rx rx (
+		.ss_en     (ss_en),
+		.ss_frz    (ss_frz),
+		.ss_si     (div[0]),
+		.ss_so     (ss_c1),
+		.idle      (rx_idle),
 		.clk       (clk),
 		.reset     (reset),
 		.line      (line),
@@ -45,6 +70,15 @@ module atarivox (
 	);
 
 	avox_engine engine (
+		.ss_en         (ss_en),
+		.ss_frz        (ss_frz),
+		.ss_si         (ss_c1),
+		.ss_so         (ss_c2),
+		.ss_ram        (ss_ram),
+		.ss_ra         (ss_ra),
+		.ss_rwe        (ss_rwe),
+		.ss_rd         (ss_rd),
+		.ss_rq         (ss_rq),
 		.clk           (clk),
 		.reset         (reset),
 		.tick          (tick),
@@ -60,5 +94,20 @@ module atarivox (
 	);
 
 	assign down_n = ~half_full;
+	assign ss_so  = ss_c2;
+
+	// quiet: rx idle and the sample 0 for 4,096 ticks; not a machine
+	// register (not chained), it follows the voice whatever the freeze.
+	/* verilator lint_off PROCASSINIT */
+	logic [12:0] qcnt = 13'd0;
+	/* verilator lint_on PROCASSINIT */
+	always_ff @(posedge clk)
+		if (reset)
+			qcnt <= 13'h1000;
+		else if (!rx_idle || sample != 16'sd0)
+			qcnt <= 13'd0;
+		else if (tick && !qcnt[12])
+			qcnt <= qcnt + 13'd1;
+	assign quiet = rx_idle && qcnt[12];
 
 endmodule

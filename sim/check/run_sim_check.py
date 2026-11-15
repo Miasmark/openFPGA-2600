@@ -139,6 +139,7 @@ VAXIS5 = [r"VAXIS5 seed %d cycles 10000000 ticks [1-9]\d* resets [1-9]\d* \(on a
 # tb_paddles4 through sim/run_paddles4.sh's defaults: seeds 1 and 2, and 3
 # and 4 with the clock enable dropping, 2 x 10^7 clocks each
 PADDLES4 = [r"PADDLES4 seed %d ce %d clocks 20000000 mismatches 0" % (k, k > 2) for k in (1, 2, 3, 4)] + [
+    r"PADDLES4 planted fault \(the chain shifted one bit short\), seed 2: caught, [1-9]\d* mismatches",
     r"PADDLES4 planted fault \(the engine reads paddle 0's cleared\), seed 1: caught, [1-9]\d* mismatches",
     r"PADDLES4 planted fault \(a pending width dropped in a dump\), seed 1: caught, [1-9]\d* mismatches",
     r"PADDLES4 pass",

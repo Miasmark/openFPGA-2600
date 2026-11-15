@@ -357,7 +357,9 @@ def main():
     check(md["url"] == "https://github.com/Miasmark/openFPGA-2600", "url")
     check(bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", md["date_release"])), "date_release is a date")
     check(len(md["description"]) <= 63, f"description {len(md['description'])} characters (limit 63)")
-    check(core["framework"]["sleep_supported"] is False, "sleep_supported false")
+    # save states (docs/SAVESTATE.md): sleep is a save and, on wake, a load
+    ss = "savestate_supported = 1'b1" in open(os.path.join(root, "src/fpga/core/core_top.v")).read()
+    check(core["framework"]["sleep_supported"] is ss, f"sleep_supported {str(ss).lower()} (core_top.v's savestate_supported)")
     check(core["framework"]["dock"]["supported"] is True, "dock supported")
     rbf = core["cores"][0]["filename"]
     check(rbf == "atari2600.rbf_r", "bitstream atari2600.rbf_r")

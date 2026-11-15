@@ -93,6 +93,7 @@
 //============================================================================
 
 module sally (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input  logic        clk_sys,
 	input  logic        phi1_en,    // start of phase 1 (this repo: pclk1)
 	input  logic        phi2_en,    // start of phase 2 (this repo: pclk0)
@@ -128,13 +129,20 @@ module sally (
 	output logic  [7:0] dbg_a, dbg_x, dbg_y, dbg_s, dbg_p, dbg_ir,
 	output logic [15:0] dbg_pc
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 
 	// The 7474 pair. Two phase-2 samples in, two out; MARIA holds halt_n low
 	// for a whole number of CPU cycles, so the release is symmetric with the
 	// assertion.
 	logic halt_s, halt_bus;
 
-	always_ff @(posedge clk_sys) begin
+	always_ff @(posedge clk_sys)
+		if (!(ss_en || ss_frz))  // ss hold
+ begin
 		if (!res_n) begin
 			halt_s   <= 1'b0;
 			halt_bus <= 1'b0;
@@ -202,7 +210,9 @@ module sally (
 	// not. Tracked from the ungated enables for that reason - the core's own
 	// phase outputs freeze with it.
 	logic phase2;
-	always_ff @(posedge clk_sys) begin
+	always_ff @(posedge clk_sys)
+		if (!(ss_en || ss_frz))  // ss hold
+ begin
 		if      (phi1_en) phase2 <= 1'b0;
 		else if (phi2_en) phase2 <= 1'b1;
 	end
@@ -210,7 +220,7 @@ module sally (
 	assign phi1_out = ~phase2;
 	assign phi2_out =  phase2;
 
-	mos6502 #(.BCD_EN(1'b1)) core (
+	mos6502 #(.BCD_EN(1'b1)) core ( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk_sys  (clk_sys),
 		.phi1_en  (core_phi1_en), // stopped for the halt, see above
 		.phi2_en  (core_phi2_en),

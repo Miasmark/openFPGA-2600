@@ -4,6 +4,7 @@
 
 module video_mux
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input  logic       clk_sys,
 	input  logic [3:0] maria_luma,
 	input  logic [3:0] maria_chroma,
@@ -51,6 +52,11 @@ module video_mux
 	input  logic  [7:0] fb_q
 `endif
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 
 logic [23:0] out_color, nwarm_color, ncool_color, nhot_color,
 	pwarm_color, pcool_color, phot_color, custom_color, old_color;
@@ -64,7 +70,9 @@ logic [23:0] out_color, nwarm_color, ncool_color, nhot_color,
 wire pix_ce_normal = is_maria ? maria_pix_ce : tia_pix_ce;
 logic [1:0] pix_ce_paused_tia;
 logic pix_ce_paused_maria;
-always @(posedge clk_sys) begin
+always @(posedge clk_sys)
+		if (!(ss_en || ss_frz))  // ss hold
+ begin
 	pix_ce_paused_maria <= ~pix_ce_paused_maria;
 	pix_ce_paused_tia <= pix_ce_paused_tia + 2'd1;
 end
@@ -163,6 +171,8 @@ wire [23:0] blend_color = {
 };
 
 always @(posedge clk_sys) begin
+		if (ss_en) {pal_buff[15], pal_buff[14], pal_buff[13], pal_buff[12], pal_buff[11], pal_buff[10], pal_buff[9], pal_buff[8], pal_buff[7], pal_buff[6], pal_buff[5], pal_buff[4], pal_buff[3], pal_buff[2], pal_buff[1], frame_ptr[15], frame_ptr[14], frame_ptr[13], frame_ptr[12], frame_ptr[11], frame_ptr[10], frame_ptr[9], frame_ptr[8], frame_ptr[7], frame_ptr[6], frame_ptr[5], frame_ptr[4], frame_ptr[3], frame_ptr[2], frame_ptr[1], frame_ptr[0], old_color[23], old_color[22], old_color[21], old_color[20], old_color[19], old_color[18], old_color[17], old_color[15], old_color[14], old_color[13], old_color[12], old_color[11], old_color[10], old_color[9], old_color[7], old_color[6], old_color[5], old_color[4], old_color[3], old_color[2], old_color[1], old_vblank, pix_ce_delayed, pix_ce, red[7], red[6], red[5], red[4], red[3], red[2], red[1], red[0], green[7], green[6], green[5], green[4], green[3], green[2], green[1], green[0], blue[7], blue[6], blue[5], blue[4], blue[3], blue[2], blue[1], blue[0], vsync, vblank, hsync, hblank} <= {ss_c0, pal_buff[15], pal_buff[14], pal_buff[13], pal_buff[12], pal_buff[11], pal_buff[10], pal_buff[9], pal_buff[8], pal_buff[7], pal_buff[6], pal_buff[5], pal_buff[4], pal_buff[3], pal_buff[2], pal_buff[1], frame_ptr[15], frame_ptr[14], frame_ptr[13], frame_ptr[12], frame_ptr[11], frame_ptr[10], frame_ptr[9], frame_ptr[8], frame_ptr[7], frame_ptr[6], frame_ptr[5], frame_ptr[4], frame_ptr[3], frame_ptr[2], frame_ptr[1], frame_ptr[0], old_color[23], old_color[22], old_color[21], old_color[20], old_color[19], old_color[18], old_color[17], old_color[15], old_color[14], old_color[13], old_color[12], old_color[11], old_color[10], old_color[9], old_color[7], old_color[6], old_color[5], old_color[4], old_color[3], old_color[2], old_color[1], old_vblank, pix_ce_delayed, pix_ce, red[7], red[6], red[5], red[4], red[3], red[2], red[1], red[0], green[7], green[6], green[5], green[4], green[3], green[2], green[1], green[0], blue[7], blue[6], blue[5], blue[4], blue[3], blue[2], blue[1], blue[0], vsync, vblank, hsync, hblank} >> 1;
+		else if (!ss_frz) begin
 	if (pal_load) begin
 		if (pal_wr) begin
 			pal_count <= pal_count == 2 ? 2'd0 : pal_count + 1'd1;
@@ -197,6 +207,8 @@ always @(posedge clk_sys) begin
 		hblank <= is_maria ? maria_hblank : tia_hblank;
 	end
 end
+	end
+	assign ss_c1 = {pal_buff[15], pal_buff[14], pal_buff[13], pal_buff[12], pal_buff[11], pal_buff[10], pal_buff[9], pal_buff[8], pal_buff[7], pal_buff[6], pal_buff[5], pal_buff[4], pal_buff[3], pal_buff[2], pal_buff[1], frame_ptr[15], frame_ptr[14], frame_ptr[13], frame_ptr[12], frame_ptr[11], frame_ptr[10], frame_ptr[9], frame_ptr[8], frame_ptr[7], frame_ptr[6], frame_ptr[5], frame_ptr[4], frame_ptr[3], frame_ptr[2], frame_ptr[1], frame_ptr[0], old_color[23], old_color[22], old_color[21], old_color[20], old_color[19], old_color[18], old_color[17], old_color[15], old_color[14], old_color[13], old_color[12], old_color[11], old_color[10], old_color[9], old_color[7], old_color[6], old_color[5], old_color[4], old_color[3], old_color[2], old_color[1], old_vblank, pix_ce_delayed, pix_ce, red[7], red[6], red[5], red[4], red[3], red[2], red[1], red[0], green[7], green[6], green[5], green[4], green[3], green[2], green[1], green[0], blue[7], blue[6], blue[5], blue[4], blue[3], blue[2], blue[1], blue[0], vsync, vblank, hsync, hblank};
 
 // Palletes research by Robert Tuccitto represents three different console temperatures for each of
 // the two video standards. Because the 7800 dramatically shifted it's UV color angle as it warmed

@@ -3,6 +3,8 @@
 
 module cart2600
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
+	input logic ss_ram, input logic [7:0] ss_ra, input logic ss_rwe, input logic [7:0] ss_rd, output logic [7:0] ss_rq,
 `ifdef EXTERNAL_FIRMWARE
 	// Pocket: Supercharger BIOS written at load time (see POCKET_CHANGES.md)
 	input           fw_load,
@@ -142,6 +144,11 @@ module cart2600
 `endif
 `endif
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4, ss_c5, ss_c6, ss_c7, ss_c8, ss_c9, ss_c10, ss_c11, ss_c12, ss_c13, ss_c14, ss_c15, ss_c16, ss_c17, ss_c18, ss_c19, ss_c20, ss_c21, ss_c22, ss_c23, ss_c24, ss_c25, ss_c26, ss_c27;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c27;
+
 	`define NUM_MAPPERS BANKEND
 
 	// Muxxing signals
@@ -274,19 +281,27 @@ module cart2600
 	// dropped the store.
 	logic access_taken;
 	always @(posedge clk) begin
+		if (ss_en) {access_taken} <= {ss_c0, access_taken} >> 1;
+		else if (!ss_frz) begin
 		if (reset || address_change || phi1)
 			access_taken <= 1'b0;
 		else if (phi2)
 			access_taken <= 1'b1;
 	end
+	end
+	assign ss_c1 = {access_taken};
 
-	always @(posedge clk) begin :reset_2600_cart
+	always @(posedge clk) begin
+		if (ss_en) {old_ain[12], old_ain[11], old_ain[10], old_ain[9], old_ain[8], old_ain[7], old_ain[6], old_ain[5], old_ain[4], old_ain[3], old_ain[2], old_ain[1], old_ain[0]} <= {ss_c1, old_ain[12], old_ain[11], old_ain[10], old_ain[9], old_ain[8], old_ain[7], old_ain[6], old_ain[5], old_ain[4], old_ain[3], old_ain[2], old_ain[1], old_ain[0]} >> 1;
+		else if (!ss_frz) begin :reset_2600_cart
 		old_ain <= a_in;
 	end
+	end
+	assign ss_c2 = {old_ain[12], old_ain[11], old_ain[10], old_ain[9], old_ain[8], old_ain[7], old_ain[6], old_ain[5], old_ain[4], old_ain[3], old_ain[2], old_ain[1], old_ain[0]};
 
 	// Bank CTY is compatible with F4 minus the ARM enhanced music
 	mapper_CTY mapper_CTY
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c2), .ss_so(ss_c3),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -598,7 +613,9 @@ module cart2600
 	assign state_commit = 1'b0;
 `endif
 
-	always_ff @(posedge clk) begin
+	always_ff @(posedge clk)
+		if (!(ss_en || ss_frz))  // ss hold
+ begin
 		if (load_start)
 			load_end_d <= 1'b0;
 		else
@@ -1053,7 +1070,7 @@ module cart2600
 	);
 
 	mapper_F8 mapper_F8
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c3), .ss_so(ss_c4),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1070,7 +1087,7 @@ module cart2600
 	);
 
 	mapper_F6 mapper_F6
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c4), .ss_so(ss_c5),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1087,7 +1104,7 @@ module cart2600
 	);
 
 	mapper_FE mapper_FE
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c5), .ss_so(ss_c6),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1105,7 +1122,7 @@ module cart2600
 	);
 
 	mapper_E0 mapper_E0
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c6), .ss_so(ss_c7),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1122,7 +1139,7 @@ module cart2600
 	);
 
 	mapper_3F mapper_3F
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c7), .ss_so(ss_c8),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1139,7 +1156,7 @@ module cart2600
 	);
 
 	mapper_F4 mapper_F4
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c8), .ss_so(ss_c9),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1156,7 +1173,7 @@ module cart2600
 	);
 
 	mapper_P2 mapper_P2
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c9), .ss_so(ss_c10),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1174,7 +1191,7 @@ module cart2600
 	);
 
 	mapper_FA mapper_FA
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c10), .ss_so(ss_c11),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1191,7 +1208,7 @@ module cart2600
 	);
 
 	mapper_fa2 mapper_FA2
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c11), .ss_so(ss_c12),
 		.clk           (clk),
 		.reset         (reset || mapper != BANKFA2),
 		.ce            (ce),
@@ -1211,6 +1228,7 @@ module cart2600
 		.nvram_wdata   (fa2_nvram_wdata_raw),
 		.nvram_rdata   (fa2_nvram_rdata),
 		.nvram_ready   (fa2_nvram_ready),
+		.ss_ram(ss_ram), .ss_ra(ss_ra), .ss_rwe(ss_rwe), .ss_rd(ss_rd), .ss_rq(ss_rq),   // ss port
 		.nvram_dirty   (fa2_nvram_dirty_raw)
 	);
 	assign ram_sel[BANKFA2] = 1'b0;
@@ -1252,7 +1270,7 @@ module cart2600
 	);
 
 	mapper_UA mapper_UA
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c12), .ss_so(ss_c13),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1272,7 +1290,7 @@ module cart2600
 	);
 
 	mapper_E7 mapper_E7
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c13), .ss_so(ss_c14),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1289,7 +1307,7 @@ module cart2600
 	);
 
 	mapper_F0 mapper_F0
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c14), .ss_so(ss_c15),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1306,7 +1324,7 @@ module cart2600
 	);
 
 	mapper_32 mapper_32
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c15), .ss_so(ss_c16),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1357,7 +1375,7 @@ module cart2600
 	);
 
 	mapper_WD mapper_WD
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c16), .ss_so(ss_c17),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1376,7 +1394,7 @@ module cart2600
 	);
 
 	mapper_3E mapper_3E
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c17), .ss_so(ss_c18),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1394,7 +1412,7 @@ module cart2600
 	);
 
 	mapper_SB mapper_SB
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c18), .ss_so(ss_c19),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1411,7 +1429,7 @@ module cart2600
 	);
 
 	mapper_EF mapper_EF
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c19), .ss_so(ss_c20),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1428,7 +1446,7 @@ module cart2600
 	);
 
 	mapper_0840 mapper_0840
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c20), .ss_so(ss_c21),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1445,7 +1463,7 @@ module cart2600
 	);
 
 	mapper_FC mapper_FC
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c21), .ss_so(ss_c22),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1463,7 +1481,7 @@ module cart2600
 	);
 
 	mapper_DF mapper_DF
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c22), .ss_so(ss_c23),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1481,7 +1499,7 @@ module cart2600
 	);
 
 	mapper_MC #(.SLICE(0)) mapper_MC_MC2K
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c23), .ss_so(ss_c24),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1500,7 +1518,7 @@ module cart2600
 	);
 
 	mapper_MC #(.SLICE(1)) mapper_MC_MC4K
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c24), .ss_so(ss_c25),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1519,7 +1537,7 @@ module cart2600
 	);
 
 	mapper_MC #(.SLICE(2)) mapper_MC_MC8K
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c25), .ss_so(ss_c26),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),
@@ -1538,7 +1556,7 @@ module cart2600
 	);
 
 	mapper_JANE mapper_JANE
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c26), .ss_so(ss_c27),
 		.clk        (clk),
 		.reset      (reset),
 		.a_change   (address_change),

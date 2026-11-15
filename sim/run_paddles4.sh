@@ -4,7 +4,9 @@
 # of four random-stimulus seeds (2 x 10^7 clocks each by default; seeds 3
 # and 4 with the clock enable dropping at random), and two planted faults
 # the bench must catch: the engine reads paddle 0's `cleared` for every
-# paddle, and a pending width is dropped in a dump.
+# paddle, and a pending width is dropped in a dump. Seeds 2 and 4 also save
+# and load the save-state chain (+chain=696) about every 200,000 clocks; the
+# same with the chain one bit short (695) must be caught.
 # run_sim.sh runs it after tb_vaxis5; it also runs alone.
 #   sim/run_paddles4.sh
 # Environment (all optional):
@@ -46,18 +48,28 @@ plant() {   # plant <name> <sed expression>: one line changed
 
 build obj_good "$SRC"
 plant cleared0 's/^\(\twire        e_go  = ce \&\& e_act \&\& !clear \&\& \)p_cleared\[sel\];/\1p_cleared[0];/'
-plant dropwidth 's/^\(\t\t\tif (clear) begin\)$/\1 pend <= 1'"'"'b0;/'
+plant dropwidth 's/^\(\t\t\t\tif (dump_done) begin\)$/\1 pend <= 1'"'"'b0;/'
 
 ok=1
 for s in $SEEDS $CE_SEEDS; do
 	ce=""; [[ " $CE_SEEDS " == *" $s "* ]] && ce="+ce"
-	"$WORK/obj_good/vtb" +seed="$s" +cycles="$CYCLES" $ce > "$WORK/seed_$s.log" 2>&1 || ok=0
+	# seeds 2 and 4 also save and load the chain (the save-state scan chain)
+	ch=""; [ $((s % 2)) = 0 ] && ch="+chain=696"
+	"$WORK/obj_good/vtb" +seed="$s" +cycles="$CYCLES" $ce $ch > "$WORK/seed_$s.log" 2>&1 || ok=0
 	grep -m10 '^MISMATCH' "$WORK/seed_$s.log"
 	line="$(grep -m1 '^PADDLES4 seed' "$WORK/seed_$s.log")"
 	echo "${line:-PADDLES4 seed $s: no result line (see $WORK/seed_$s.log)}"
-	grep '^PADDLES4 coverage' "$WORK/seed_$s.log" | sed 's/^/  /'
+	grep -E '^PADDLES4 (coverage|chain)' "$WORK/seed_$s.log" | sed 's/^/  /'
 	[[ "$line" =~ \ mismatches\ 0$ ]] || ok=0
 done
+# the chain one bit short: the load must be seen
+"$WORK/obj_good/vtb" +seed=2 +cycles="$CYCLES" +chain=695 > "$WORK/planted_chain.log" 2>&1
+pm="$(sed -n 's/^PADDLES4 seed .* mismatches \([0-9]*\)$/\1/p' "$WORK/planted_chain.log")"
+if [ -n "$pm" ] && [ "$pm" -gt 0 ]; then
+	echo "PADDLES4 planted fault (the chain shifted one bit short), seed 2: caught, $pm mismatches"
+else
+	echo "PADDLES4 planted fault (the chain shifted one bit short), seed 2: NOT caught (${pm:-no result line})"; ok=0
+fi
 for f in cleared0:"the engine reads paddle 0's cleared" dropwidth:"a pending width dropped in a dump"; do
 	n="${f%%:*}"; what="${f#*:}"
 	"$WORK/obj_$n/vtb" +seed=1 +cycles="$CYCLES" > "$WORK/planted_$n.log" 2>&1

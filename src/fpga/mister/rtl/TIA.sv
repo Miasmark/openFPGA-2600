@@ -109,6 +109,7 @@ typedef struct packed {
 
 module lfsr_6
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input clk,
 	input phi1,
 	input phi2,
@@ -116,11 +117,18 @@ module lfsr_6
 	input sys_reset,
 	output logic [5:0] lfsr
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	reg [5:0] lfsr_latch1, lfsr_next;
 
 	assign lfsr = reset ? 6'd0 : (phi2 ? lfsr_next : lfsr_latch1);
 
 	always @(posedge clk) begin
+		if (ss_en) {lfsr_next[5], lfsr_next[4], lfsr_next[3], lfsr_next[2], lfsr_next[1], lfsr_next[0], lfsr_latch1[5], lfsr_latch1[4], lfsr_latch1[3], lfsr_latch1[2], lfsr_latch1[1], lfsr_latch1[0]} <= {ss_c0, lfsr_next[5], lfsr_next[4], lfsr_next[3], lfsr_next[2], lfsr_next[1], lfsr_next[0], lfsr_latch1[5], lfsr_latch1[4], lfsr_latch1[3], lfsr_latch1[2], lfsr_latch1[1], lfsr_latch1[0]} >> 1;
+		else if (!ss_frz) begin
 
 		if (phi1)
 			lfsr_next <= {~((lfsr_latch1[1] && ~lfsr_latch1[0]) || ~(lfsr_latch1[1] || ~lfsr_latch1[0])), lfsr_latch1[5:1]};
@@ -132,11 +140,14 @@ module lfsr_6
 			lfsr_latch1 <= 0;
 		end
 	end
+	end
+	assign ss_c1 = {lfsr_next[5], lfsr_next[4], lfsr_next[3], lfsr_next[2], lfsr_next[1], lfsr_next[0], lfsr_latch1[5], lfsr_latch1[4], lfsr_latch1[3], lfsr_latch1[2], lfsr_latch1[1], lfsr_latch1[0]};
 
 endmodule
 
 module lfsr_6_instant
 (
+	input logic ss_en, input logic ss_frz,
 	input clk,
 	input phi1,
 	input phi2,
@@ -147,7 +158,9 @@ module lfsr_6_instant
 	reg [5:0] lfsr_latch1;
 
 	wire [5:0] lfsr_next = reset ? 6'd0 : {~((lfsr[1] && ~lfsr[0]) || ~(lfsr[1] || ~lfsr[0])), lfsr[5:1]};
-	always @(posedge clk) begin
+	always @(posedge clk)
+		if (!(ss_en || ss_frz))  // ss hold
+ begin
 		if (phi1) begin
 			lfsr_latch1 <= lfsr_next;
 		end
@@ -165,6 +178,7 @@ endmodule
 
 module sr_latch
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input clk,
 	input reset,
 	input r,
@@ -172,6 +186,11 @@ module sr_latch
 	output logic q,
 	output logic q_n
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 
 	wire i_val = r ? 1'd0 : (s ? 1'd1 : sr_val);
 	logic sr_val, sr_val_n;
@@ -179,10 +198,14 @@ module sr_latch
 	assign q = i_val;
 
 	always @(posedge clk) begin
+		if (ss_en) {sr_val} <= {ss_c0, sr_val} >> 1;
+		else if (!ss_frz) begin
 		sr_val <= i_val;
 		if (reset)
 			sr_val <= 1'd0;
 	end
+	end
+	assign ss_c1 = {sr_val};
 
 endmodule
 
@@ -199,6 +222,7 @@ endmodule
 // for Verilator and TimeQuest.
 module f_cell
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input  logic   clk,
 	input  logic   reset,
 	input  logic   tick,
@@ -207,12 +231,19 @@ module f_cell
 	output logic   q_n,
 	output logic   q
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	logic master, slave;
 
 	assign q   = reset ? 1'd0 : (tick ? ~master : slave);
 	assign q_n = ~q;
 
 	always @(posedge clk) begin
+		if (ss_en) {slave, master} <= {ss_c0, slave, master} >> 1;
+		else if (!ss_frz) begin
 		if (tick)
 			slave  <= ~master;
 		else
@@ -223,11 +254,14 @@ module f_cell
 			slave  <= 1'd0;
 		end
 	end
+	end
+	assign ss_c1 = {slave, master};
 
 endmodule
 
 module f_counter_ll
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input  logic   clk,
 	input  logic   reset,
 	input  logic   sys_reset,
@@ -236,6 +270,11 @@ module f_counter_ll
 	output logic   f1_qn,
 	output logic   f1_q_l
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c3;
+
 
 	logic q_left, q_left_n, q_right, q_right_n;
 	logic f1_q_l_l;
@@ -248,7 +287,7 @@ module f_counter_ll
 	assign f1_qn = q_right_n;
 
 	f_cell f_left
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk        (clk),
 		.reset      (reset || sys_reset),
 		.tick       (tick),
@@ -259,7 +298,7 @@ module f_counter_ll
 	);
 
 	f_cell f_right
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c1), .ss_so(ss_c2),
 		.clk        (clk),
 		.reset      (reset || sys_reset),
 		.tick       (tick),
@@ -270,7 +309,7 @@ module f_counter_ll
 	);
 
 	sr_latch q_1l
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c2), .ss_so(ss_c3),
 		.clk        (clk),
 		.reset      (sys_reset),
 		.r          (~q_right_n),
@@ -282,6 +321,7 @@ endmodule
 
 module d_cell
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input  logic   clk,
 	input  logic   reset,
 	input  logic   phi1,
@@ -289,11 +329,18 @@ module d_cell
 	input  logic   in,
 	output logic   out
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	logic out_next, out_latch;
 
 	assign out = reset ? 1'd0 : (phi2 ? out_next : out_latch);
 
 	always @(posedge clk) begin
+		if (ss_en) {out_next, out_latch} <= {ss_c0, out_next, out_latch} >> 1;
+		else if (!ss_frz) begin
 		if (phi1)
 			out_next <= in;
 
@@ -305,16 +352,24 @@ module d_cell
 			out_next <= 0;
 		end
 	end
+	end
+	assign ss_c1 = {out_next, out_latch};
 endmodule
 
 module inverter_reg
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input clk,
 	input reset,
 	input set,
 	input in,
 	output out
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 
 	logic inv_latch = 0;
 	// FIXME: I'm treating this as a gate delay since I am using a 14mhz clock for this design,
@@ -322,17 +377,22 @@ module inverter_reg
 	assign out = /*set ? in : */inv_latch;
 
 	always @(posedge clk) begin
+		if (ss_en) {inv_latch} <= {ss_c0, inv_latch} >> 1;
+		else if (!ss_frz) begin
 		if (set)
 			inv_latch <= in;
 		if (reset)
 			inv_latch <= 0;
 	end
+	end
+	assign ss_c1 = {inv_latch};
 endmodule
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
 module f_counter
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input  logic   clk,
 	input  logic   reset,
 	input  logic   sys_reset,
@@ -342,6 +402,11 @@ module f_counter
 	output logic   f1_qn_edge,
 	output logic   f1_q_l
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 
 // This component re-occurs throughout the design multiple times and contains two
 // F1 cells, effectively creating a counter that goes from 0 to 3 and then resets, flipping the
@@ -378,6 +443,8 @@ assign f1_q_l = reset ? 1'd1 : (~f1_qn ? 1'd0 : f1_qn_reg);
 assign clock.clock = 0; // Clock is unused for ripple counters!!
 
 always_ff @(posedge clk) begin
+		if (ss_en) {old_tick, old_reset, f_count[1], f_count[0], f1_qn_reg} <= {ss_c0, old_tick, old_reset, f_count[1], f_count[0], f1_qn_reg} >> 1;
+		else if (!ss_frz) begin
 	old_tick <= tick;
 	old_reset <= reset;
 
@@ -396,18 +463,26 @@ always_ff @(posedge clk) begin
 		f1_qn_reg <= 0;
 
 end
+	end
+	assign ss_c1 = {old_tick, old_reset, f_count[1], f_count[0], f1_qn_reg};
 
 endmodule
 
 
 module cpuclk
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input         clk,
 	input         reset,
 	input clock_t oclk,
 	input         resp0,
 	output        phi0
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c4;
+
 
 	logic q_1, q_2, q_3, q_4;
 	logic qn_1, qn_2, qn_3, qn_4;
@@ -417,7 +492,7 @@ module cpuclk
 	wire q_3_nor = ~(q_4 || qn_2);
 
 	sr_latch q_1l
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk    (clk),
 		.reset  (reset),
 		.r      (~(oclk.clock || q_4)),
@@ -427,7 +502,7 @@ module cpuclk
 	);
 
 	sr_latch q_2l
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c1), .ss_so(ss_c2),
 		.clk    (clk),
 		.reset  (reset),
 		.r      (oclk.clock && q_1),
@@ -437,7 +512,7 @@ module cpuclk
 	);
 
 	sr_latch q_3l
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c2), .ss_so(ss_c3),
 		.clk    (clk),
 		.reset  (reset),
 		.r      (~(oclk.clock || ~q_3_nor)),
@@ -447,7 +522,7 @@ module cpuclk
 	);
 
 	sr_latch q_4l
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c3), .ss_so(ss_c4),
 		.clk    (clk),
 		.reset  (reset),
 		.r      (oclk.clock && q_3),
@@ -460,6 +535,7 @@ endmodule
 /////////////////////////////////////////////////////////////////////////////////////////
 module clockgen
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input  logic   clk,    // System clock
 	input  logic   is_7800,
 	input  logic   ce,     // clock enable. This is expected to be 7.159091 mhz, 2x the original atari oscillator
@@ -480,6 +556,11 @@ module clockgen
 	output logic   pclk_gen_edge_p1,
 	output logic   pclk_gen_edge_p2
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c2;
+
 
 parameter PHI2_EXT = 0;
 // Fantastic Clocks and Where To Find Them
@@ -514,7 +595,7 @@ assign pclk.level_p2 = pclk_clock;
 clock_t hclk_ll, hclk_hl;
 
 f_counter hclk_counter
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 	.clk        (clk),
 	.reset      (rsync),
 	.sys_reset  (reset),
@@ -540,7 +621,9 @@ wire resp0 = (hclk.level_p2 && rsynd) || reset;
 // );
 assign phi0_ll = 0;
 
-always_ff @(posedge clk) begin : phi0_gen
+always_ff @(posedge clk) begin
+		if (ss_en) {oclk_tog, oclk_clock, pclk_div[2], pclk_div[1], pclk_div[0], pclk_clock} <= {ss_c1, oclk_tog, oclk_clock, pclk_div[2], pclk_div[1], pclk_div[0], pclk_clock} >> 1;
+		else if (!ss_frz) begin : phi0_gen
 	// Oscillator Clock
 	if (ce) begin
 		oclk_tog <= ~oclk_tog;
@@ -573,12 +656,15 @@ always_ff @(posedge clk) begin : phi0_gen
 		pclk_clock <= 0;
 	end
 end
+	end
+	assign ss_c2 = {oclk_tog, oclk_clock, pclk_div[2], pclk_div[1], pclk_div[0], pclk_clock};
 
 endmodule
 
 /////////////////////////////////////////////////////////////////////////////////////////
 module horiz_gen
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input logic clk,
 	input logic rst,
 	input clock_t hclk,
@@ -596,6 +682,11 @@ module horiz_gen
 	output logic rhb,
 	output logic rsynd
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4, ss_c5, ss_c6, ss_c7, ss_c8, ss_c9, ss_c10, ss_c11, ss_c12;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c12;
+
 
 	logic [5:0] lfsr;
 	logic sec_latch, sec_latch_n;
@@ -610,7 +701,7 @@ module horiz_gen
 	wire eer = (ehb || rsynl || err);
 	
 	lfsr_6 timing_lfsr
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk       (clk),
 		.phi1      (hclk.level_p1),
 		.phi2      (hclk.level_p2),
@@ -635,7 +726,7 @@ module horiz_gen
 	end
 
 	sr_latch sec_l
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c1), .ss_so(ss_c2),
 		.clk    (clk),
 		.reset  (rst),
 		.r      (sec),
@@ -644,11 +735,11 @@ module horiz_gen
 		.q_n    (sec_latch_n)
 	);
 
-	inverter_reg rsynd_ir(clk, rst, hclk.level_p1, eer, rsynd);
-	inverter_reg shb_ir(clk, rst, hclk.level_p2, rsynd, shb);
+	inverter_reg rsynd_ir(ss_en, ss_frz, ss_c2, ss_c3, clk, rst, hclk.level_p1, eer, rsynd);
+	inverter_reg shb_ir(ss_en, ss_frz, ss_c3, ss_c4, clk, rst, hclk.level_p2, rsynd, shb);
 
 	d_cell aud1_d
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c4), .ss_so(ss_c5),
 		.clk        (clk),
 		.reset      (rst),
 		.phi1       (hclk.level_p1),
@@ -658,7 +749,7 @@ module horiz_gen
 	);
 
 	d_cell aud2_d
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c5), .ss_so(ss_c6),
 		.clk        (clk),
 		.reset      (rst),
 		.phi1       (hclk.level_p1),
@@ -668,7 +759,7 @@ module horiz_gen
 	);
 
 	d_cell rhs_db
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c6), .ss_so(ss_c7),
 		.clk        (clk),
 		.reset      (rst),
 		.phi1       (hclk.level_p1),
@@ -678,7 +769,7 @@ module horiz_gen
 	);
 
 	d_cell hsync_dl
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c7), .ss_so(ss_c8),
 		.clk        (clk),
 		.reset      (rst || rhs_d),
 		.phi1       (hclk.level_p1),
@@ -691,7 +782,7 @@ module horiz_gen
 	wire hb_1b = sec_latch_n && lrhb;
 
 	d_cell hblank_dl
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c8), .ss_so(ss_c9),
 		.clk        (clk),
 		.reset      (rst || shb),
 		.phi1       (hclk.level_p1),
@@ -703,7 +794,7 @@ module horiz_gen
 	assign hblank = ~hblank_n;
 
 	d_cell hgap_dl
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c9), .ss_so(ss_c10),
 		.clk        (clk),
 		.reset      (rst || shb),
 		.phi1       (hclk.level_p1),
@@ -715,7 +806,7 @@ module horiz_gen
 	assign hgap = ~hgap_n;
 
 	d_cell cb_dl
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c10), .ss_so(ss_c11),
 		.clk        (clk),
 		.reset      (rst || rhs_d),
 		.phi1       (hclk.level_p1),
@@ -725,7 +816,7 @@ module horiz_gen
 	);
 
 	d_cell cnt_d
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c11), .ss_so(ss_c12),
 		.clk        (clk),
 		.reset      (rst),
 		.phi1       (hclk.level_p1),
@@ -739,6 +830,7 @@ endmodule
 /////////////////////////////////////////////////////////////////////////////////////////
 module hmove_gen
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input  logic       clk,
 	input  logic       reset,
 	input  clock_t     hclk,
@@ -758,6 +850,11 @@ module hmove_gen
 	output logic       m1_mclk,
 	output logic       bl_mclk
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4, ss_c5;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c5;
+
 	logic [1:0] p0ec, p1ec, m0ec, m1ec, blec;
 	logic [3:0] hmove_cnt;
 	logic sec_1, sec_0;
@@ -772,7 +869,7 @@ module hmove_gen
 	assign bl_mclk = (blec[1] && hclk.level_p1);
 
 	sr_latch hmove_l
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk    (clk),
 		.reset  (reset),
 		.r      (sec_1),
@@ -781,11 +878,13 @@ module hmove_gen
 		.q_n    ()
 	);
 
-	inverter_reg s0_ir(clk, reset, hclk.level_p1, hmove_latch, sec_0);
-	inverter_reg sec_ir(clk, reset, hclk.level_p2, sec_0, sec);
-	inverter_reg sec1_ir(clk, reset, hclk.level_p1, sec, sec_1);
+	inverter_reg s0_ir(ss_en, ss_frz, ss_c1, ss_c2, clk, reset, hclk.level_p1, hmove_latch, sec_0);
+	inverter_reg sec_ir(ss_en, ss_frz, ss_c2, ss_c3, clk, reset, hclk.level_p2, sec_0, sec);
+	inverter_reg sec1_ir(ss_en, ss_frz, ss_c3, ss_c4, clk, reset, hclk.level_p1, sec, sec_1);
 
-	always @(posedge clk) begin : hmove_block
+	always @(posedge clk) begin
+		if (ss_en) {hmove_cnt[3], hmove_cnt[2], hmove_cnt[1], hmove_cnt[0], p0ec[1], p0ec[0], p1ec[1], p1ec[0], m0ec[1], m0ec[0], m1ec[1], m1ec[0], blec[1], blec[0]} <= {ss_c4, hmove_cnt[3], hmove_cnt[2], hmove_cnt[1], hmove_cnt[0], p0ec[1], p0ec[0], p1ec[1], p1ec[0], m0ec[1], m0ec[0], m1ec[1], m1ec[0], blec[1], blec[0]} >> 1;
+		else if (!ss_frz) begin : hmove_block
 		if (hclk.edge_p2) begin
 			if (sec || |hmove_cnt)
 				hmove_cnt <= hmove_cnt + 1'd1;
@@ -813,6 +912,8 @@ module hmove_gen
 			hmove_cnt <= 0;
 		end
 	end
+	end
+	assign ss_c5 = {hmove_cnt[3], hmove_cnt[2], hmove_cnt[1], hmove_cnt[0], p0ec[1], p0ec[0], p1ec[1], p1ec[0], m0ec[1], m0ec[0], m1ec[1], m1ec[0], blec[1], blec[0]};
 
 endmodule
 
@@ -821,6 +922,7 @@ endmodule
 
 module playfield
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input         clk,     // Master clock
 	input         reset,   // System reset
 	input logic   clkp,    // Pixel Clock
@@ -831,6 +933,11 @@ module playfield
 	input [19:0]  pfc,     // Combined playfield registers
 	output logic  pf       // Playfield graphics
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4, ss_c5;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c5;
+
 
 	logic [4:0] pf_index, pf_next, pf_latch2, pf_latch1;
 	logic pf_1, pf_2, pf_3;
@@ -868,7 +975,7 @@ module playfield
 	assign pf_1 = pf_bits[index_lut[pf_index]];
 
 	f_cell pf_out
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (clkp),
@@ -879,7 +986,7 @@ module playfield
 	);
 
 	sr_latch dir_l
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c1), .ss_so(ss_c2),
 		.clk        (clk),
 		.reset      (reset),
 		.r          (pf_reset),
@@ -888,10 +995,12 @@ module playfield
 		.q_n        ()
 	);
 
-	inverter_reg pf1_ir(clk, reset, hclk.level_p1, pf_1, pf_2);
-	inverter_reg pf2_ir(clk, reset, hclk.level_p2, pf_2, pf_3);
+	inverter_reg pf1_ir(ss_en, ss_frz, ss_c2, ss_c3, clk, reset, hclk.level_p1, pf_1, pf_2);
+	inverter_reg pf2_ir(ss_en, ss_frz, ss_c3, ss_c4, clk, reset, hclk.level_p2, pf_2, pf_3);
 
-	always @(posedge clk) begin : pf_block
+	always @(posedge clk) begin
+		if (ss_en) {pf_latch1[4], pf_latch1[3], pf_latch1[2], pf_latch1[1], pf_latch1[0], pf_latch2[4], pf_latch2[3], pf_latch2[2], pf_latch2[1], pf_latch2[0]} <= {ss_c4, pf_latch1[4], pf_latch1[3], pf_latch1[2], pf_latch1[1], pf_latch1[0], pf_latch2[4], pf_latch2[3], pf_latch2[2], pf_latch2[1], pf_latch2[0]} >> 1;
+		else if (!ss_frz) begin : pf_block
 		if (hclk.level_p1) begin
 			pf_latch1 <= pf_next;
 		end
@@ -900,18 +1009,26 @@ module playfield
 			pf_latch2 <= pf_latch1;
 		end
 	end
+	end
+	assign ss_c5 = {pf_latch1[4], pf_latch1[3], pf_latch1[2], pf_latch1[1], pf_latch1[0], pf_latch2[4], pf_latch2[3], pf_latch2[2], pf_latch2[1], pf_latch2[0]};
 
 endmodule
 
 /////////////////////////////////////////////////////////////////////////////////////////
 module object_tick
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input clk,
 	input reset,
 	input motck,
 	input ec,
 	output tick
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	// The reason for signal this centers around an analog delay of around 21ns which causes an
 	// extra clock edge to form if the hmove counter is glitched into remaining on during non-hblank
 	// clocks. This was discovered by Crispy and is available in this topic here:
@@ -921,6 +1038,8 @@ module object_tick
 	wire edge_miss = (old_motck && ~motck) && (~old_ec && ec);
 	assign tick = (motck || ec) && ~edge_miss;
 	always @(posedge clk) begin
+		if (ss_en) {old_motck, old_ec} <= {ss_c0, old_motck, old_ec} >> 1;
+		else if (!ss_frz) begin
 		old_motck <= motck;
 		old_ec <= ec;
 		if (reset) begin
@@ -928,6 +1047,8 @@ module object_tick
 			old_ec <= 0;
 		end
 	end
+	end
+	assign ss_c1 = {old_motck, old_ec};
 
 endmodule
 
@@ -935,6 +1056,7 @@ endmodule
 
 module ball
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input       clk,         // Master Clock
 	input       reset,       // System Reset
 	input       clkp,        // Pixel Clock
@@ -947,6 +1069,11 @@ module ball
 	input [1:0] blsiz,       // Ball size register
 	output      bl           // Ball graphics output
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4, ss_c5, ss_c6;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c6;
+
 	clock_t objclk;
 
 	logic [1:0] d1l_1, d1l_2;
@@ -958,7 +1085,7 @@ module ball
 	wire object_reset = (lfsr == 6'b111111 || lfsr == 6'b101101 || q_or_res);
 
 	object_tick bl_tick
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk        (clk),
 		.reset      (reset),
 		.motck      (motck),
@@ -967,7 +1094,7 @@ module ball
 	);
 
 	f_counter_ll object_counter
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c1), .ss_so(ss_c2),
 		.clk        (clk),
 		.reset      (blre),
 		.sys_reset  (reset),
@@ -978,7 +1105,7 @@ module ball
 	);
 
 	lfsr_6 object_lfsr
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c2), .ss_so(ss_c3),
 		.clk       (clk),
 		.phi1      (objclk.level_p1),
 		.phi2      (objclk.level_p2),
@@ -995,7 +1122,7 @@ module ball
 	wire gr5 = ~(gr2a || gr4);
 
 	f_cell ball_out
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c3), .ss_so(ss_c4),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (clkp),
@@ -1006,7 +1133,7 @@ module ball
 	);
 
 	d_cell obj_1
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c4), .ss_so(ss_c5),
 		.clk        (clk),
 		.reset      (reset),
 		.phi1       (objclk.level_p1),
@@ -1016,7 +1143,7 @@ module ball
 	);
 
 	d_cell obj_2
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c5), .ss_so(ss_c6),
 		.clk        (clk),
 		.reset      (reset),
 		.phi1       (objclk.level_p1),
@@ -1030,6 +1157,7 @@ endmodule
 /////////////////////////////////////////////////////////////////////////////////////////
 module missile
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input       clk,        // Master Clock
 	input       reset,      // System Reset
 	input       clkp,       // Pixel clock
@@ -1040,6 +1168,11 @@ module missile
 	input [5:0] nusiz,      // Player/missile size
 	output      m           // Missile graphics output
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4, ss_c5, ss_c6, ss_c7;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c7;
+
 
 	clock_t objclk;
 
@@ -1059,7 +1192,7 @@ module missile
 		((lfsr == 6'b111001) && ((ns_sel == 3'b100) || (ns_sel == 3'b110)));
 
 	object_tick m_tick
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk        (clk),
 		.reset      (reset),
 		.motck      (motck),
@@ -1068,7 +1201,7 @@ module missile
 	);
 
 	f_counter_ll object_counter
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c1), .ss_so(ss_c2),
 		.clk        (clk),
 		.reset      (mre),
 		.sys_reset  (reset),
@@ -1079,7 +1212,7 @@ module missile
 	);
 
 	lfsr_6 object_lfsr
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c2), .ss_so(ss_c3),
 		.clk       (clk),
 		.phi1      (objclk.level_p1),
 		.phi2      (objclk.level_p2),
@@ -1095,7 +1228,7 @@ module missile
 	wire mg4  = ~(mg3 || mg2b);
 
 	f_cell mis_out
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c3), .ss_so(ss_c4),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (clkp),
@@ -1106,7 +1239,7 @@ module missile
 	);
 
 	d_cell obj_1
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c4), .ss_so(ss_c5),
 		.clk        (clk),
 		.reset      (reset),
 		.phi1       (objclk.level_p1),
@@ -1116,7 +1249,7 @@ module missile
 	);
 
 	d_cell obj_2
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c5), .ss_so(ss_c6),
 		.clk        (clk),
 		.reset      (reset),
 		.phi1       (objclk.level_p1),
@@ -1126,7 +1259,7 @@ module missile
 	);
 
 	d_cell obj_3
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c6), .ss_so(ss_c7),
 		.clk        (clk),
 		.reset      (reset),
 		.phi1       (objclk.level_p1),
@@ -1140,6 +1273,7 @@ endmodule
 /////////////////////////////////////////////////////////////////////////////////////////
 module player
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input       clk,        // Master Clock
 	input       reset,      // System Reset
 	input       clkp,       // Pixel Clock
@@ -1155,6 +1289,11 @@ module player
 	output      msrst,      // Missile to player reset signal
 	output      p           // Player graphics output
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4, ss_c5, ss_c6, ss_c7, ss_c8, ss_c9, ss_c10, ss_c11, ss_c12;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c12;
+
 	clock_t objclk;
 
 	logic [1:0] d1l_1, d1l_2;
@@ -1192,7 +1331,7 @@ module player
 	assign gs[2] = ~((pref && f_psc3_q_n) || (~pref && f_psc3_q));
 
 	object_tick p_tick
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk        (clk),
 		.reset      (reset),
 		.motck      (motck),
@@ -1201,7 +1340,7 @@ module player
 	);
 
 	f_counter_ll object_counter
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c1), .ss_so(ss_c2),
 		.clk        (clk),
 		.reset      (pre),
 		.sys_reset  (reset),
@@ -1212,7 +1351,7 @@ module player
 	);
 
 	lfsr_6 object_lfsr
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c2), .ss_so(ss_c3),
 		.clk       (clk),
 		.phi1      (objclk.level_p1),
 		.phi2      (objclk.level_p2),
@@ -1226,7 +1365,7 @@ module player
 	wire pl_2 = ~(pl_1a || pl_1b);
 
 	f_cell pl_out
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c3), .ss_so(ss_c4),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (clkp),
@@ -1237,7 +1376,7 @@ module player
 	);
 
 	d_cell obj_reset
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c4), .ss_so(ss_c5),
 		.clk        (clk),
 		.reset      (reset),
 		.phi1       (objclk.level_p1),
@@ -1247,7 +1386,7 @@ module player
 	);
 
 	d_cell obj_start
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c5), .ss_so(ss_c6),
 		.clk        (clk),
 		.reset      (reset),
 		.phi1       (objclk.level_p1),
@@ -1257,7 +1396,7 @@ module player
 	);
 
 	d_cell obj_fstob
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c6), .ss_so(ss_c7),
 		.clk        (clk),
 		.reset      (reset || or_d),
 		.phi1       (objclk.level_p1),
@@ -1267,7 +1406,7 @@ module player
 	);
 
 	f_cell f_ena
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c7), .ss_so(ss_c8),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (object_tick),
@@ -1278,7 +1417,7 @@ module player
 	);
 
 	f_cell f_go
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c8), .ss_so(ss_c9),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (object_tick),
@@ -1291,7 +1430,7 @@ module player
 	wire ena_n_or_go_n = (ena_n || go_n);
 
 	f_cell f_psc1
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c9), .ss_so(ss_c10),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (object_tick),
@@ -1304,7 +1443,7 @@ module player
 	wire ena_n_or_go_2 = (ena_n_or_go_n || f_psc1_q_n);
 
 	f_cell f_psc2
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c10), .ss_so(ss_c11),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (object_tick),
@@ -1317,7 +1456,7 @@ module player
 	wire ena_n_or_go_3 = (ena_n_or_go_2 || f_psc2_q_n);
 
 	f_cell f_psc3
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c11), .ss_so(ss_c12),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (object_tick),
@@ -1332,6 +1471,7 @@ endmodule
 /////////////////////////////////////////////////////////////////////////////////////////
 module priority_encoder
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           p0,
 	input           m0,
@@ -1345,6 +1485,11 @@ module priority_encoder
 	input           score,
 	output [3:0]    col_select // {bk, pf, p1, p0}
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 
 	// Normal priority:
 	// 0: P0, M0
@@ -1365,7 +1510,7 @@ module priority_encoder
 	logic rs_qn;
 
 	sr_latch center_delayed
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk    (clk),
 		.reset  (),
 		.r      (blank),
@@ -1397,6 +1542,7 @@ endmodule
 /////////////////////////////////////////////////////////////////////////////////////////
 module audio_channel
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           aud0,
@@ -1406,6 +1552,11 @@ module audio_channel
 	input  [3:0]    audc,
 	output [3:0]    audio
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4, ss_c5, ss_c6, ss_c7, ss_c8, ss_c9;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c9;
+
 
 	// Audio is quite a lot of convoluted wide nors and odd shifting, so
 	// I just got sick of trying to simplify it and did it at gate level.
@@ -1438,8 +1589,8 @@ module audio_channel
 	assign freq_div = (aud1 ? (~freq_div2 ? 5'd0 : freq_next) : freq_latch);
 	assign freq_match = (freq == freq_div);
 
-	inverter_reg freq_div01(clk, reset, aud0, ~freq_match, freq_div1);
-	inverter_reg freq_div02(clk, reset, aud1, freq_div1, freq_div2);
+	inverter_reg freq_div01(ss_en, ss_frz, ss_c0, ss_c1, clk, reset, aud0, ~freq_match, freq_div1);
+	inverter_reg freq_div02(ss_en, ss_frz, ss_c1, ss_c2, clk, reset, aud1, freq_div1, freq_div2);
 
 	assign T1 = ~|{~aud0, freq_div2};
 	assign T2 = ~|{~aud1, freq_div1};
@@ -1478,15 +1629,15 @@ module audio_channel
 	assign pulse_wnor_1 = ~|{pulse3_qn, pulse2_q, pulse1_qn, pulse0_q};
 	assign pulse_wnor_2 = ~|{pulse3_q, pulse2_q, pulse1_q};
 
-	inverter_reg noise0_latch(clk, reset, T1, ~noise[0], noise0_latch_n);
-	inverter_reg nor2_l(clk, reset, T1, nor2, nor2_latch);
+	inverter_reg noise0_latch(ss_en, ss_frz, ss_c2, ss_c3, clk, reset, T1, ~noise[0], noise0_latch_n);
+	inverter_reg nor2_l(ss_en, ss_frz, ss_c3, ss_c4, clk, reset, T1, nor2, nor2_latch);
 
 	wire pulse_clock = ~|{~T2, nor2_latch};
 
 	assign noise = T2 ? noise_next : noise_latch;
 
 	f_cell pulse_3
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c4), .ss_so(ss_c5),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (pulse_clock),
@@ -1496,7 +1647,7 @@ module audio_channel
 		.q_n        (pulse3_qn)
 	);
 	f_cell pulse_2
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c5), .ss_so(ss_c6),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (pulse_clock),
@@ -1506,7 +1657,7 @@ module audio_channel
 		.q_n        (pulse2_qn)
 	);
 	f_cell pulse_1
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c6), .ss_so(ss_c7),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (pulse_clock),
@@ -1516,7 +1667,7 @@ module audio_channel
 		.q_n        (pulse1_qn)
 	);
 	f_cell pulse_0
-	(
+	( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c7), .ss_so(ss_c8),
 		.clk        (clk),
 		.reset      (reset),
 		.tick       (pulse_clock),
@@ -1527,6 +1678,8 @@ module audio_channel
 	);
 
 	always_ff @(posedge clk) begin
+		if (ss_en) {freq_next[4], freq_next[3], freq_next[2], freq_next[1], freq_next[0], freq_latch[4], freq_latch[3], freq_latch[2], freq_latch[1], freq_latch[0], noise_next[4], noise_next[3], noise_next[2], noise_next[1], noise_next[0], noise_latch[4], noise_latch[3], noise_latch[2], noise_latch[1], noise_latch[0]} <= {ss_c8, freq_next[4], freq_next[3], freq_next[2], freq_next[1], freq_next[0], freq_latch[4], freq_latch[3], freq_latch[2], freq_latch[1], freq_latch[0], noise_next[4], noise_next[3], noise_next[2], noise_next[1], noise_next[0], noise_latch[4], noise_latch[3], noise_latch[2], noise_latch[1], noise_latch[0]} >> 1;
+		else if (!ss_frz) begin
 
 		if (aud0)
 			freq_next <= freq_div + 1'd1;
@@ -1545,6 +1698,8 @@ module audio_channel
 		end
 
 	end
+	end
+	assign ss_c9 = {freq_next[4], freq_next[3], freq_next[2], freq_next[1], freq_next[0], freq_latch[4], freq_latch[3], freq_latch[2], freq_latch[1], freq_latch[0], noise_next[4], noise_next[3], noise_next[2], noise_next[1], noise_next[0], noise_latch[4], noise_latch[3], noise_latch[2], noise_latch[1], noise_latch[0]};
 
 	assign audio = ~pulse0_qn ? volume : 4'd0;
 
@@ -1552,6 +1707,7 @@ endmodule
 
 module video_stabilize
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,        // system clock
 	input           reset,      // System reset
 	input clock_t   oclk,       // Oscillator clock aka pixel clock or color clock
@@ -1565,6 +1721,11 @@ module video_stabilize
 	output          auto_pal,
 	output          f1           // Indicates Odd field of interlaced video
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	localparam ntsc_vb_end = 9'd19; // 19
 	localparam pal_vb_end = 9'd23; // 23
 	localparam ntsc_vb_start = 9'd240 + ntsc_vb_end; //9'd262;//9'd243;
@@ -1617,6 +1778,8 @@ module video_stabilize
 	wire [5:0] frame_score = v_count[0] ? {1'b0, score_raw[5:1]} : score_raw;
 
 	always_ff @(posedge clk) begin
+		if (ss_en) {old_hblank, old_vsync, total_lines[8], total_lines[7], total_lines[6], total_lines[5], total_lines[4], total_lines[3], total_lines[2], total_lines[1], total_lines[0], vsync_override, vsync_emulate, v_count[8], v_count[7], v_count[6], v_count[5], v_count[4], v_count[3], v_count[2], v_count[1], v_count[0], vblank_en, vsync_en, vsync_set, vsync_count[7], vsync_count[6], vsync_count[5], vsync_count[4], vsync_count[3], vsync_count[2], vsync_count[1], vsync_count[0], vsync_line[8], vsync_line[7], vsync_line[6], vsync_line[5], vsync_line[4], vsync_line[3], vsync_line[2], vsync_line[1], vsync_line[0], region_frames[5], region_frames[4], region_frames[3], region_frames[2], region_frames[1], region_frames[0], pal_sum[11], pal_sum[10], pal_sum[9], pal_sum[8], pal_sum[7], pal_sum[6], pal_sum[5], pal_sum[4], pal_sum[3], pal_sum[2], pal_sum[1], pal_sum[0], ntsc_sum[11], ntsc_sum[10], ntsc_sum[9], ntsc_sum[8], ntsc_sum[7], ntsc_sum[6], ntsc_sum[5], ntsc_sum[4], ntsc_sum[3], ntsc_sum[2], ntsc_sum[1], ntsc_sum[0], pal_mode, region_done} <= {ss_c0, old_hblank, old_vsync, total_lines[8], total_lines[7], total_lines[6], total_lines[5], total_lines[4], total_lines[3], total_lines[2], total_lines[1], total_lines[0], vsync_override, vsync_emulate, v_count[8], v_count[7], v_count[6], v_count[5], v_count[4], v_count[3], v_count[2], v_count[1], v_count[0], vblank_en, vsync_en, vsync_set, vsync_count[7], vsync_count[6], vsync_count[5], vsync_count[4], vsync_count[3], vsync_count[2], vsync_count[1], vsync_count[0], vsync_line[8], vsync_line[7], vsync_line[6], vsync_line[5], vsync_line[4], vsync_line[3], vsync_line[2], vsync_line[1], vsync_line[0], region_frames[5], region_frames[4], region_frames[3], region_frames[2], region_frames[1], region_frames[0], pal_sum[11], pal_sum[10], pal_sum[9], pal_sum[8], pal_sum[7], pal_sum[6], pal_sum[5], pal_sum[4], pal_sum[3], pal_sum[2], pal_sum[1], pal_sum[0], ntsc_sum[11], ntsc_sum[10], ntsc_sum[9], ntsc_sum[8], ntsc_sum[7], ntsc_sum[6], ntsc_sum[5], ntsc_sum[4], ntsc_sum[3], ntsc_sum[2], ntsc_sum[1], ntsc_sum[0], pal_mode, region_done} >> 1;
+		else if (!ss_frz) begin
 		old_hblank <= hblank_in;
 		old_vsync <= vsync_in;
 		if (&v_count) begin // Something is whack, emulate a signal
@@ -1716,12 +1879,15 @@ module video_stabilize
 		end
 
 	end
+	end
+	assign ss_c1 = {old_hblank, old_vsync, total_lines[8], total_lines[7], total_lines[6], total_lines[5], total_lines[4], total_lines[3], total_lines[2], total_lines[1], total_lines[0], vsync_override, vsync_emulate, v_count[8], v_count[7], v_count[6], v_count[5], v_count[4], v_count[3], v_count[2], v_count[1], v_count[0], vblank_en, vsync_en, vsync_set, vsync_count[7], vsync_count[6], vsync_count[5], vsync_count[4], vsync_count[3], vsync_count[2], vsync_count[1], vsync_count[0], vsync_line[8], vsync_line[7], vsync_line[6], vsync_line[5], vsync_line[4], vsync_line[3], vsync_line[2], vsync_line[1], vsync_line[0], region_frames[5], region_frames[4], region_frames[3], region_frames[2], region_frames[1], region_frames[0], pal_sum[11], pal_sum[10], pal_sum[9], pal_sum[8], pal_sum[7], pal_sum[6], pal_sum[5], pal_sum[4], pal_sum[3], pal_sum[2], pal_sum[1], pal_sum[0], ntsc_sum[11], ntsc_sum[10], ntsc_sum[9], ntsc_sum[8], ntsc_sum[7], ntsc_sum[6], ntsc_sum[5], ntsc_sum[4], ntsc_sum[3], ntsc_sum[2], ntsc_sum[1], ntsc_sum[0], pal_mode, region_done};
 
 endmodule
 
 /////////////////////////////////////////////////////////////////////////////////////////
 module TIA
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	// Original Pins
 	input           clk,
 	output          phi0,
@@ -1775,6 +1941,11 @@ module TIA
 	input           stabilize,
 	output  [3:0]   paddle_read // Helper to let us autodetect paddles
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4, ss_c5, ss_c6, ss_c7, ss_c8, ss_c9, ss_c10, ss_c11, ss_c12, ss_c13, ss_c14, ss_c15, ss_c16, ss_c17, ss_c18, ss_c19, ss_c20, ss_c21, ss_c22;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c22;
+
 
 logic [7:0] wreg[64]; // Write registers. Only 44 are used.
 logic [7:0] rreg[16]; // Read registers.
@@ -1816,7 +1987,7 @@ assign motck = ~oclk.clock & ~hblank_d;
 assign clkp = ~oclk.clock;
 
 f_cell hgap1_out
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 	.clk        (clk),
 	.reset      (rst),
 	.tick       (oclk.level_p1),
@@ -1827,7 +1998,7 @@ f_cell hgap1_out
 );
 
 f_cell hgap_out
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c1), .ss_so(ss_c2),
 	.clk        (clk),
 	.reset      (rst),
 	.tick       (oclk.level_p1),
@@ -1838,7 +2009,7 @@ f_cell hgap_out
 );
 
 f_cell hblank_out
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c2), .ss_so(ss_c3),
 	.clk        (clk),
 	.reset      (rst),
 	.tick       (oclk.level_p1),
@@ -1849,7 +2020,7 @@ f_cell hblank_out
 );
 
 f_cell blank_out
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c3), .ss_so(ss_c4),
 	.clk        (clk),
 	.reset      (rst),
 	.tick       (oclk.level_p1),
@@ -1860,7 +2031,7 @@ f_cell blank_out
 );
 
 video_stabilize stab
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c4), .ss_so(ss_c5),
 	.clk        (clk),
 	.reset      (rst),
 	.oclk       (oclk),
@@ -1877,6 +2048,8 @@ video_stabilize stab
 
 
 always_ff @(posedge clk) begin
+		if (ss_en) {hblank_d} <= {ss_c5, hblank_d} >> 1;
+		else if (!ss_frz) begin
 	old_hblank <= hblank_o;
 	old_vsync <= vsync_o;
 	hblank_d <= hblank_o;
@@ -1889,11 +2062,15 @@ always_ff @(posedge clk) begin
 	if (old_vsync && !vsync_o)
 		row <= 0;
 end
+	end
+	assign ss_c6 = {hblank_d};
 
 // Reads and writes
 // NOTE: A realistic attempt at bus stuffing might need the registers to be set in a combinational
 // way, but otherwise using the clock enable signal keeps the timings valid.
 always_ff @(posedge clk) begin
+		if (ss_en) {phi2_delay, i_out[1], wreg[63][7], wreg[63][6], wreg[63][5], wreg[63][4], wreg[63][3], wreg[63][2], wreg[63][1], wreg[63][0], wreg[62][7], wreg[62][6], wreg[62][5], wreg[62][4], wreg[62][3], wreg[62][2], wreg[62][1], wreg[62][0], wreg[61][1], wreg[41][1], wreg[40][1], wreg[39][0], wreg[38][0], wreg[37][0], wreg[36][7], wreg[36][6], wreg[36][5], wreg[36][4], wreg[35][7], wreg[35][6], wreg[35][5], wreg[35][4], wreg[34][7], wreg[34][6], wreg[34][5], wreg[34][4], wreg[33][7], wreg[33][6], wreg[33][5], wreg[33][4], wreg[32][7], wreg[32][6], wreg[32][5], wreg[32][4], wreg[31][1], wreg[30][1], wreg[29][1], wreg[28][7], wreg[28][6], wreg[28][5], wreg[28][4], wreg[28][3], wreg[28][2], wreg[28][1], wreg[28][0], wreg[27][7], wreg[27][6], wreg[27][5], wreg[27][4], wreg[27][3], wreg[27][2], wreg[27][1], wreg[27][0], wreg[26][3], wreg[26][2], wreg[26][1], wreg[26][0], wreg[25][3], wreg[25][2], wreg[25][1], wreg[25][0], wreg[24][4], wreg[24][3], wreg[24][2], wreg[24][1], wreg[24][0], wreg[23][4], wreg[23][3], wreg[23][2], wreg[23][1], wreg[23][0], wreg[22][3], wreg[22][2], wreg[22][1], wreg[22][0], wreg[21][3], wreg[21][2], wreg[21][1], wreg[21][0], wreg[15][7], wreg[15][6], wreg[15][5], wreg[15][4], wreg[15][3], wreg[15][2], wreg[15][1], wreg[15][0], wreg[14][7], wreg[14][6], wreg[14][5], wreg[14][4], wreg[14][3], wreg[14][2], wreg[14][1], wreg[14][0], wreg[13][7], wreg[13][6], wreg[13][5], wreg[13][4], wreg[12][3], wreg[11][3], wreg[10][5], wreg[10][4], wreg[10][2], wreg[10][1], wreg[10][0], wreg[9][7], wreg[9][6], wreg[9][5], wreg[9][4], wreg[9][3], wreg[9][2], wreg[9][1], wreg[8][7], wreg[8][6], wreg[8][5], wreg[8][4], wreg[8][3], wreg[8][2], wreg[8][1], wreg[7][7], wreg[7][6], wreg[7][5], wreg[7][4], wreg[7][3], wreg[7][2], wreg[7][1], wreg[6][7], wreg[6][6], wreg[6][5], wreg[6][4], wreg[6][3], wreg[6][2], wreg[6][1], wreg[5][5], wreg[5][4], wreg[5][2], wreg[5][1], wreg[5][0], wreg[4][5], wreg[4][4], wreg[4][2], wreg[4][1], wreg[4][0], wreg[1][7], wreg[1][6], wreg[1][1], wreg[0][1], hmclr, cxclr} <= {ss_c6, phi2_delay, i_out[1], wreg[63][7], wreg[63][6], wreg[63][5], wreg[63][4], wreg[63][3], wreg[63][2], wreg[63][1], wreg[63][0], wreg[62][7], wreg[62][6], wreg[62][5], wreg[62][4], wreg[62][3], wreg[62][2], wreg[62][1], wreg[62][0], wreg[61][1], wreg[41][1], wreg[40][1], wreg[39][0], wreg[38][0], wreg[37][0], wreg[36][7], wreg[36][6], wreg[36][5], wreg[36][4], wreg[35][7], wreg[35][6], wreg[35][5], wreg[35][4], wreg[34][7], wreg[34][6], wreg[34][5], wreg[34][4], wreg[33][7], wreg[33][6], wreg[33][5], wreg[33][4], wreg[32][7], wreg[32][6], wreg[32][5], wreg[32][4], wreg[31][1], wreg[30][1], wreg[29][1], wreg[28][7], wreg[28][6], wreg[28][5], wreg[28][4], wreg[28][3], wreg[28][2], wreg[28][1], wreg[28][0], wreg[27][7], wreg[27][6], wreg[27][5], wreg[27][4], wreg[27][3], wreg[27][2], wreg[27][1], wreg[27][0], wreg[26][3], wreg[26][2], wreg[26][1], wreg[26][0], wreg[25][3], wreg[25][2], wreg[25][1], wreg[25][0], wreg[24][4], wreg[24][3], wreg[24][2], wreg[24][1], wreg[24][0], wreg[23][4], wreg[23][3], wreg[23][2], wreg[23][1], wreg[23][0], wreg[22][3], wreg[22][2], wreg[22][1], wreg[22][0], wreg[21][3], wreg[21][2], wreg[21][1], wreg[21][0], wreg[15][7], wreg[15][6], wreg[15][5], wreg[15][4], wreg[15][3], wreg[15][2], wreg[15][1], wreg[15][0], wreg[14][7], wreg[14][6], wreg[14][5], wreg[14][4], wreg[14][3], wreg[14][2], wreg[14][1], wreg[14][0], wreg[13][7], wreg[13][6], wreg[13][5], wreg[13][4], wreg[12][3], wreg[11][3], wreg[10][5], wreg[10][4], wreg[10][2], wreg[10][1], wreg[10][0], wreg[9][7], wreg[9][6], wreg[9][5], wreg[9][4], wreg[9][3], wreg[9][2], wreg[9][1], wreg[8][7], wreg[8][6], wreg[8][5], wreg[8][4], wreg[8][3], wreg[8][2], wreg[8][1], wreg[7][7], wreg[7][6], wreg[7][5], wreg[7][4], wreg[7][3], wreg[7][2], wreg[7][1], wreg[6][7], wreg[6][6], wreg[6][5], wreg[6][4], wreg[6][3], wreg[6][2], wreg[6][1], wreg[5][5], wreg[5][4], wreg[5][2], wreg[5][1], wreg[5][0], wreg[4][5], wreg[4][4], wreg[4][2], wreg[4][1], wreg[4][0], wreg[1][7], wreg[1][6], wreg[1][1], wreg[0][1], hmclr, cxclr} >> 1;
+		else if (!ss_frz) begin
 	phi2_delay <= pclk.level_p2; // Phi2 analog delay
 	i_out <= {4{~wreg[VBLANK][7]}};
 	if (pclk.edge_p2 || pclk.level_p2) begin
@@ -1933,6 +2110,8 @@ always_ff @(posedge clk) begin
 		wreg[VBLANK][1] <= 1;
 	end
 end
+	end
+	assign ss_c7 = {phi2_delay, i_out[1], wreg[63][7], wreg[63][6], wreg[63][5], wreg[63][4], wreg[63][3], wreg[63][2], wreg[63][1], wreg[63][0], wreg[62][7], wreg[62][6], wreg[62][5], wreg[62][4], wreg[62][3], wreg[62][2], wreg[62][1], wreg[62][0], wreg[61][1], wreg[41][1], wreg[40][1], wreg[39][0], wreg[38][0], wreg[37][0], wreg[36][7], wreg[36][6], wreg[36][5], wreg[36][4], wreg[35][7], wreg[35][6], wreg[35][5], wreg[35][4], wreg[34][7], wreg[34][6], wreg[34][5], wreg[34][4], wreg[33][7], wreg[33][6], wreg[33][5], wreg[33][4], wreg[32][7], wreg[32][6], wreg[32][5], wreg[32][4], wreg[31][1], wreg[30][1], wreg[29][1], wreg[28][7], wreg[28][6], wreg[28][5], wreg[28][4], wreg[28][3], wreg[28][2], wreg[28][1], wreg[28][0], wreg[27][7], wreg[27][6], wreg[27][5], wreg[27][4], wreg[27][3], wreg[27][2], wreg[27][1], wreg[27][0], wreg[26][3], wreg[26][2], wreg[26][1], wreg[26][0], wreg[25][3], wreg[25][2], wreg[25][1], wreg[25][0], wreg[24][4], wreg[24][3], wreg[24][2], wreg[24][1], wreg[24][0], wreg[23][4], wreg[23][3], wreg[23][2], wreg[23][1], wreg[23][0], wreg[22][3], wreg[22][2], wreg[22][1], wreg[22][0], wreg[21][3], wreg[21][2], wreg[21][1], wreg[21][0], wreg[15][7], wreg[15][6], wreg[15][5], wreg[15][4], wreg[15][3], wreg[15][2], wreg[15][1], wreg[15][0], wreg[14][7], wreg[14][6], wreg[14][5], wreg[14][4], wreg[14][3], wreg[14][2], wreg[14][1], wreg[14][0], wreg[13][7], wreg[13][6], wreg[13][5], wreg[13][4], wreg[12][3], wreg[11][3], wreg[10][5], wreg[10][4], wreg[10][2], wreg[10][1], wreg[10][0], wreg[9][7], wreg[9][6], wreg[9][5], wreg[9][4], wreg[9][3], wreg[9][2], wreg[9][1], wreg[8][7], wreg[8][6], wreg[8][5], wreg[8][4], wreg[8][3], wreg[8][2], wreg[8][1], wreg[7][7], wreg[7][6], wreg[7][5], wreg[7][4], wreg[7][3], wreg[7][2], wreg[7][1], wreg[6][7], wreg[6][6], wreg[6][5], wreg[6][4], wreg[6][3], wreg[6][2], wreg[6][1], wreg[5][5], wreg[5][4], wreg[5][2], wreg[5][1], wreg[5][0], wreg[4][5], wreg[4][4], wreg[4][2], wreg[4][1], wreg[4][0], wreg[1][7], wreg[1][6], wreg[1][1], wreg[0][1], hmclr, cxclr};
 
 // The bus drivers are asynchronous. Their stored sources live in rreg, but
 // registering the pin value on phase 2 makes it arrive after the CPU closes
@@ -1990,7 +2169,7 @@ end
 
 // Submodules
 clockgen clockgen
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c7), .ss_so(ss_c8),
 	.clk        (clk),
 	.is_7800    (is_7800),
 	.ce         (ce),
@@ -2009,7 +2188,7 @@ clockgen clockgen
 );
 
 horiz_gen h_gen
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c8), .ss_so(ss_c9),
 	.clk        (clk),
 	.rst        (rst),
 	.hclk       (hclk),
@@ -2029,7 +2208,7 @@ horiz_gen h_gen
 );
 
 playfield playfield
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c9), .ss_so(ss_c10),
 	.clk        (clk),
 	.reset      (rst),
 	.clkp       (clkp),
@@ -2042,7 +2221,7 @@ playfield playfield
 );
 
 hmove_gen hmv
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c10), .ss_so(ss_c11),
 	.clk        (clk),
 	.reset      (rst),
 	.sec        (sec),
@@ -2063,7 +2242,7 @@ hmove_gen hmv
 	.bl_mclk    (blec)
 );
 
-player pl1 (
+player pl1 ( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c11), .ss_so(ss_c12),
 	.clk        (clk),
 	.reset      (rst),
 	.clkp       (clkp),
@@ -2080,7 +2259,7 @@ player pl1 (
 	.p          (p0)
 );
 
-player pl2 (
+player pl2 ( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c12), .ss_so(ss_c13),
 	.clk        (clk),
 	.reset      (rst),
 	.clkp       (clkp),
@@ -2097,7 +2276,7 @@ player pl2 (
 	.p          (p1)
 );
 
-missile mis0 (
+missile mis0 ( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c13), .ss_so(ss_c14),
 	.clk        (clk),
 	.reset      (rst),
 	.clkp       (clkp),
@@ -2109,7 +2288,7 @@ missile mis0 (
 	.m          (m0)
 );
 
-missile mis1 (
+missile mis1 ( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c14), .ss_so(ss_c15),
 	.clk        (clk),
 	.reset      (rst),
 	.clkp       (clkp),
@@ -2121,7 +2300,7 @@ missile mis1 (
 	.m          (m1)
 );
 
-ball bal (
+ball bal ( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c15), .ss_so(ss_c16),
 	.clk        (clk),
 	.reset      (rst),
 	.clkp       (clkp),
@@ -2136,7 +2315,7 @@ ball bal (
 );
 
 priority_encoder prior
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c16), .ss_so(ss_c17),
 	.clk        (clk),
 	.p0         (p0),
 	.m0         (m0),
@@ -2152,7 +2331,7 @@ priority_encoder prior
 );
 
 audio_channel audio0
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c17), .ss_so(ss_c18),
 	.clk        (clk),
 	.reset      (rst),
 	.aud0       (aclk0),
@@ -2164,7 +2343,7 @@ audio_channel audio0
 );
 
 audio_channel audio1
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c18), .ss_so(ss_c19),
 	.clk        (clk),
 	.reset      (rst),
 	.aud0       (aclk0),
@@ -2176,7 +2355,9 @@ audio_channel audio1
 );
 
 // Select the correct output register
-always_ff @(posedge clk) if (oclk.edge_p1) begin
+always_ff @(posedge clk) begin
+		if (ss_en) {col[3], col[2], col[1], col[0], lum[2], lum[1], lum[0]} <= {ss_c19, col[3], col[2], col[1], col[0], lum[2], lum[1], lum[0]} >> 1;
+		else if (!ss_frz) if (oclk.edge_p1) begin
 	if ((hblank || vblank_o))
 		{col, lum} <= decomb ? wreg[COLUBK][7:1] : 7'h0; // Blank non-visible areas
 	else begin
@@ -2189,12 +2370,14 @@ always_ff @(posedge clk) if (oclk.edge_p1) begin
 		endcase
 	end
 end
+	end
+	assign ss_c20 = {col[3], col[2], col[1], col[0], lum[2], lum[1], lum[0]};
 
 // WSYNC register controls the RDY signal to the CPU. It is cleared at the start of hblank.
 wire rdy_q;
 assign rdy = ~rdy_q;
 sr_latch in_sr
-(
+( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c20), .ss_so(ss_c21),
 	.clk        (clk),
 	.reset      (rst),
 	.r          (shb),
@@ -2205,7 +2388,9 @@ sr_latch in_sr
 
 // Calculate the collisions
 
-always_ff @(posedge clk) begin : read_reg_block
+always_ff @(posedge clk) begin
+		if (ss_en) {rreg[13][7], rreg[12][7], rreg[11][7], rreg[10][7], rreg[9][7], rreg[8][7], rreg[7][7], rreg[7][6], rreg[6][7], rreg[5][7], rreg[5][6], rreg[4][7], rreg[4][6], rreg[3][7], rreg[3][6], rreg[2][7], rreg[2][6], rreg[1][7], rreg[1][6], rreg[0][7], rreg[0][6]} <= {ss_c21, rreg[13][7], rreg[12][7], rreg[11][7], rreg[10][7], rreg[9][7], rreg[8][7], rreg[7][7], rreg[7][6], rreg[6][7], rreg[5][7], rreg[5][6], rreg[4][7], rreg[4][6], rreg[3][7], rreg[3][6], rreg[2][7], rreg[2][6], rreg[1][7], rreg[1][6], rreg[0][7], rreg[0][6]} >> 1;
+		else if (!ss_frz) begin : read_reg_block
 	if (cxclr) begin
 		{rreg[CXM0P][7:6], rreg[CXM1P][7:6], rreg[CXP0FB][7:6],
 			rreg[CXP1FB][7:6], rreg[CXM0FB][7:6], rreg[CXM1FB][7:6],
@@ -2244,5 +2429,7 @@ always_ff @(posedge clk) begin : read_reg_block
 		rreg <= '{16{8'h00}};
 	end
 end
+	end
+	assign ss_c22 = {rreg[13][7], rreg[12][7], rreg[11][7], rreg[10][7], rreg[9][7], rreg[8][7], rreg[7][7], rreg[7][6], rreg[6][7], rreg[5][7], rreg[5][6], rreg[4][7], rreg[4][6], rreg[3][7], rreg[3][6], rreg[2][7], rreg[2][6], rreg[1][7], rreg[1][6], rreg[0][7], rreg[0][6]};
 
 endmodule

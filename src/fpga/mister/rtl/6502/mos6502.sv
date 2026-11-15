@@ -41,6 +41,7 @@ module mos6502
 	//     sets, clears, pushes and pulls normally.
 	parameter bit BCD_EN = 1'b1
 ) (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	// ---- fabric clocking. Not chip pins; these replace phi0 -------------
 	input  logic        clk_sys,   // free running, at least 2x the target phi0
 	input  logic        phi1_en,   // one clk_sys pulse at the start of phase 1
@@ -77,6 +78,11 @@ module mos6502
 	output logic        dbg_hold, dbg_int_active, dbg_take_int, dbg_res_active,
 	output logic [15:0] dbg_tg
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2, ss_c3, ss_c4;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c4;
+
 
 	ctl_t       c;
 	logic       sync_ctl;
@@ -84,7 +90,7 @@ module mos6502
 	logic [7:0] a, x, y, s, p, dl, pcl, pch;
 	logic       acr_now;
 
-	mos6502_ctl #(.BCD_EN(BCD_EN)) ctl (
+	mos6502_ctl #(.BCD_EN(BCD_EN)) ctl ( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c0), .ss_so(ss_c1),
 		.clk_sys(clk_sys), .phi1_en(phi1_en), .phi2_en(phi2_en),
 		.res_n(res_n), .rdy(rdy), .irq_n(irq_n), .nmi_n(nmi_n), .so_n(so_n),
 		.data_in(data_in), .p(p), .acr_now(acr_now), .dl(dl),
@@ -94,7 +100,7 @@ module mos6502
 		.dbg_res_active(dbg_res_active), .dbg_tg(dbg_tg)
 	);
 
-	mos6502_dp #(.BCD_EN(BCD_EN)) dp (
+	mos6502_dp #(.BCD_EN(BCD_EN)) dp ( .ss_en(ss_en), .ss_frz(ss_frz), .ss_si(ss_c1), .ss_so(ss_c2),
 		.clk_sys(clk_sys), .phi1_en(phi1_en), .phi2_en(phi2_en),
 		.c(c), .ir(ir), .data_in(data_in),
 		.a(a), .x(x), .y(y), .s(s), .p(p), .dl(dl),
@@ -110,9 +116,13 @@ module mos6502
 	// look like the real pins to anything downstream.
 	logic phase2;
 	always_ff @(posedge clk_sys) begin
+		if (ss_en) {phase2} <= {ss_c2, phase2} >> 1;
+		else if (!ss_frz) begin
 		if      (phi1_en) phase2 <= 1'b0;
 		else if (phi2_en) phase2 <= 1'b1;
 	end
+	end
+	assign ss_c3 = {phase2};
 
 	assign phi1_out = ~phase2;
 	assign phi2_out =  phase2;
@@ -128,11 +138,15 @@ module mos6502
 	// and the control word quiet while a reset is recognised.
 	logic wr_pin, sync_pin;
 	always_ff @(posedge clk_sys) begin
+		if (ss_en) {wr_pin} <= {ss_c3, wr_pin} >> 1;
+		else if (!ss_frz) begin
 		if (phi1_en) begin
 			wr_pin   <= c.wr;
 			sync_pin <= sync_ctl;
 		end
 	end
+	end
+	assign ss_c4 = {wr_pin};
 
 	assign rw_n = ~wr_pin;
 	assign sync = sync_pin;
