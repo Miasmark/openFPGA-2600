@@ -833,24 +833,21 @@ wire [15:0] gun_my = gun_y * gun_ky;
 wire [7:0] gun_x  = gun_mx[15:8];
 wire [7:0] gun_yl = gun_my[15:8] + 8'd8;
 
-// Paddles: MiSTer's paddle_timer charges the pot line to the position, with
-// the same polarity as its analog path (right = lower resistance).
+// Paddles: four of MiSTer's paddle_timer, clock for clock, with one shared
+// calibration engine (paddle_timer4.sv): each charges the pot line to the
+// position, with the same polarity as its analog path (right = lower
+// resistance).
 wire [3:0] paddle_en = {(portb_type == 8'd3) ? 2'b11 : 2'b00, (porta_type == 8'd3) ? 2'b11 : 2'b00};
 wire [3:0] pad_wire;
-generate
-	for (vi = 0; vi < 4; vi = vi + 1) begin : paddle
-		paddle_timer pt (
-			.clk        (clk_sys),
-			.ce         (1'b1),
-			.reset      (reset || ~paddle_en[vi]),
-			.kohms      ({2'b00, ~vx_pos[vi]}),
-			.clear      (~iout[1]),
-			.read       (i_read[vi]),
-			.charged    (pad_wire[vi]),
-			.difference ()
-		);
-	end
-endgenerate
+paddle_timer4 pads (
+	.clk     (clk_sys),
+	.ce      (1'b1),
+	.reset   ({4{reset}} | ~paddle_en),
+	.kohms   ({~vx_pos[3], ~vx_pos[2], ~vx_pos[1], ~vx_pos[0]}),
+	.clear   (~iout[1]),
+	.read    (i_read),
+	.charged (pad_wire)
+);
 
 // Driving controller: the gray code Stella uses (3, 1, 0, 2 turning right),
 // on the up (bit 0) and down (bit 1) lines.

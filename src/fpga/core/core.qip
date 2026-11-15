@@ -9,12 +9,15 @@
 # Pocket glue. virtual_axis.sv is not listed: since virtual_axis5.sv nothing
 # in the build instantiates it. It stays as the reference model that
 # tb_virtual_axis and tb_vaxis5 name themselves (sim/run_sim.sh,
-# sim/run_vaxis5.sh).
+# sim/run_vaxis5.sh). Likewise ../mister/rtl/paddles.sv since
+# paddle_timer4.sv: its paddle_timer is tb_paddles4's reference
+# (sim/run_paddles4.sh).
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) core_top.v]
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) core_bridge_cmd.v]
 set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) pll_region.v]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) atari2600_pocket.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) virtual_axis5.sv]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) paddle_timer4.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) sram_ctrl.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) stick_dirs.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) audio_filter.sv]
@@ -58,7 +61,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) .
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/banks2600.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/video_mux.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/lightgun.sv]
-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/paddles.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/mouse_st.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/EEPROM_24LC256.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ../mister/rtl/detect2600.sv]

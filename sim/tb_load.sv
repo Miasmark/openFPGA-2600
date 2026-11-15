@@ -1263,11 +1263,49 @@ module tb_load;
 		forever begin
 			repeat (longint'(14318) * 100) @(posedge clk_sys);
 			$display("PAD %5d ms: knob %3d  lowest %0d highest %0d difference %0d read_count %0d charged %b  reads/100ms %0d  cart var %0d",
-				$time / 1000000, dut.vx_pos[0], dut.paddle[0].pt.lowest, dut.paddle[0].pt.highest,
-				dut.paddle[0].pt.difference, dut.paddle[0].pt.read_count, dut.pad_wire[0], pad_reads, pad_val);
+				$time / 1000000, dut.vx_pos[0], dut.pads.pd[0].lowest, dut.pads.pd[0].highest,
+				dut.pads.pd[0].difference, dut.pads.pd[0].read_count, dut.pad_wire[0], pad_reads, pad_val);
 			pad_reads = 0;
 		end
 	end
+
+	// ---------------- paddle shadow (+padshadow) ----------------
+	// MiSTer's four paddle_timer (mister/rtl/paddles.sv), fed as the wrapper
+	// fed them before paddle_timer4.sv, beside the core: their `charged`
+	// outputs (INPT0-3) and the engine's must agree on every clock. The
+	// result is an INPUT line at the end (extra_tests.sh's inputs runs).
+	wire [3:0] shadow_charged;
+	genvar psi;
+	generate
+		for (psi = 0; psi < 4; psi = psi + 1) begin : padshadow
+			paddle_timer pt (
+				.clk        (clk_sys),
+				.ce         (dut.pads.ce),
+				.reset      (dut.reset || ~dut.paddle_en[psi]),
+				.kohms      ({2'b00, ~dut.vx_pos[psi]}),
+				.clear      (~dut.iout[1]),
+				.read       (dut.i_read[psi]),
+				.charged    (shadow_charged[psi]),
+				.difference ()
+			);
+		end
+	endgenerate
+	bit pad_shadow = 1'b0;
+	longint ps_clocks = 0, ps_mism = 0, ps_rises = 0;
+	logic [3:0] ps_d = 4'd0;
+	initial pad_shadow = $test$plusargs("padshadow");
+	always @(posedge clk_sys) if (pad_shadow) begin
+		ps_clocks <= ps_clocks + 1;
+		ps_d <= shadow_charged;
+		ps_rises <= ps_rises + $countones(shadow_charged & ~ps_d);
+		if (shadow_charged != dut.pad_wire) begin
+			ps_mism <= ps_mism + 1;
+			if (ps_mism < 5)
+				$display("INPUT paddle shadow MISMATCH at %0t: paddle_timer %b, paddle_timer4 %b", $time, shadow_charged, dut.pad_wire);
+		end
+	end
+	final if (pad_shadow)
+		$display("INPUT paddle shadow: clocks %0d, INPT0-3 rises %0d, mismatches %0d", ps_clocks, ps_rises, ps_mism);
 
 	// The cart's tone is counted on the console's own mix, before the
 	// AtariVox voice. With POCKET_ATARIVOX the voice runs whenever the SaveKey

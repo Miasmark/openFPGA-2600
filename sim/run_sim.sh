@@ -94,7 +94,7 @@ SRCS=(
 	"$RTL/top.sv"
 	"$RTL/EEPROM_24LC256.sv" "$FPGA/core/atari2600_pocket.sv"
 	"$FPGA/core/atarivox/avox_rx.sv" "$FPGA/core/atarivox/avox_engine.sv" "$FPGA/core/atarivox/atarivox.sv"
-	"$FPGA/core/virtual_axis.sv" "$FPGA/core/virtual_axis5.sv" "$FPGA/core/stick_dirs.sv" "$FPGA/core/sram_ctrl.sv" "$PATCHED/paddles.sv" "$RTL/lightgun.sv"
+	"$FPGA/core/virtual_axis.sv" "$FPGA/core/virtual_axis5.sv" "$FPGA/core/stick_dirs.sv" "$FPGA/core/sram_ctrl.sv" "$PATCHED/paddles.sv" "$FPGA/core/paddle_timer4.sv" "$RTL/lightgun.sv"
 	"$FPGA/pocket_utils/data_loader.sv"
 	"$FPGA/core/audio_filter.sv"
 	"$RTL/bupchip_peripheral.sv" "$FPGA/pocket_utils/psram.sv"
@@ -471,3 +471,6 @@ sim ./obj_va/vtb | grep AXIS
 
 echo "-- the five virtual axes as one engine (virtual_axis5.sv, tb_vaxis5):"
 WORK="$WORK/vaxis5" bash "$HERE/run_vaxis5.sh" | grep -E "^VAXIS5 (seed|planted|pass|FAIL|build)|^MISMATCH" || true
+
+echo "-- the four paddle timers with one engine (paddle_timer4.sv, tb_paddles4):"
+WORK="$WORK/paddles4" bash "$HERE/run_paddles4.sh" | grep -E "^PADDLES4 (seed|planted|pass|FAIL|build)|^MISMATCH" || true

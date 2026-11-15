@@ -151,6 +151,14 @@ become `logic`), builds two testbenches, and runs them:
   builds as one time-shared engine, against five `virtual_axis.sv` whose ticks
   are delayed 0-4 clocks as the engine staggers them, on every clock of four
   random-stimulus seeds (4 x 10^7 clocks), and a planted fault it must catch.
+- `tb_paddles4` (`run_paddles4.sh`): `paddle_timer4.sv`, the four paddle
+  timers with one shared calibration engine, against four of MiSTer's
+  `paddle_timer` (`mister/rtl/paddles.sv`) on every clock (each `charged`
+  and every register behind it) of four random-stimulus seeds (two with the
+  clock enable dropping; 8 x 10^7 clocks), and two planted faults it must
+  catch. `tb_load +padshadow` runs the four `paddle_timer` beside the core
+  and compares them with the engine on every clock (extra_tests.sh's inputs
+  runs).
 - `tb_region` (`run_region.sh`): the wrapper's region logic (`region_pll`
   and, with DARIA, `daria_rgn`), cut out of `atari2600_pocket.sv` as the
   tree has it by `region_unit.py`, with `pll_region.v` in the load sequences
