@@ -1,0 +1,123 @@
+# chain map: module, item, clock, names (source order)
+lfsr_6	block@123	clk	lfsr_next[5], lfsr_next[4], lfsr_next[3], lfsr_next[2], lfsr_next[1], lfsr_next[0], lfsr_latch1[5], lfsr_latch1[4], lfsr_latch1[3], lfsr_latch1[2], lfsr_latch1[1], lfsr_latch1[0]
+sr_latch	block@181	clk	sr_val
+f_cell	block@215	clk	slave, master
+f_counter_ll	inst	f_cell f_left
+f_counter_ll	inst	f_cell f_right
+f_counter_ll	inst	sr_latch q_1l
+d_cell	block@296	clk	out_next, out_latch
+inverter_reg	block@324	clk	inv_latch
+f_counter	block@380	clk	old_tick, old_reset, f_count[1], f_count[0], f1_qn_reg
+cpuclk	inst	sr_latch q_1l
+cpuclk	inst	sr_latch q_2l
+cpuclk	inst	sr_latch q_3l
+cpuclk	inst	sr_latch q_4l
+clockgen	inst	f_counter hclk_counter
+clockgen	block@543	clk	oclk_tog, oclk_clock, pclk_div[2], pclk_div[1], pclk_div[0], pclk_clock
+horiz_gen	inst	lfsr_6 timing_lfsr
+horiz_gen	inst	sr_latch sec_l
+horiz_gen	inst	inverter_reg rsynd_ir
+horiz_gen	inst	inverter_reg shb_ir
+horiz_gen	inst	d_cell aud1_d
+horiz_gen	inst	d_cell aud2_d
+horiz_gen	inst	d_cell rhs_db
+horiz_gen	inst	d_cell hsync_dl
+horiz_gen	inst	d_cell hblank_dl
+horiz_gen	inst	d_cell hgap_dl
+horiz_gen	inst	d_cell cb_dl
+horiz_gen	inst	d_cell cnt_d
+hmove_gen	inst	sr_latch hmove_l
+hmove_gen	inst	inverter_reg s0_ir
+hmove_gen	inst	inverter_reg sec_ir
+hmove_gen	inst	inverter_reg sec1_ir
+hmove_gen	block@788	clk	hmove_cnt[3], hmove_cnt[2], hmove_cnt[1], hmove_cnt[0], p0ec[1], p0ec[0], p1ec[1], p1ec[0], m0ec[1], m0ec[0], m1ec[1], m1ec[0], blec[1], blec[0]
+playfield	inst	f_cell pf_out
+playfield	inst	sr_latch dir_l
+playfield	inst	inverter_reg pf1_ir
+playfield	inst	inverter_reg pf2_ir
+playfield	block@894	clk	pf_latch1[4], pf_latch1[3], pf_latch1[2], pf_latch1[1], pf_latch1[0], pf_latch2[4], pf_latch2[3], pf_latch2[2], pf_latch2[1], pf_latch2[0]
+object_tick	block@923	clk	old_motck, old_ec
+ball	inst	object_tick bl_tick
+ball	inst	f_counter_ll object_counter
+ball	inst	lfsr_6 object_lfsr
+ball	inst	f_cell ball_out
+ball	inst	d_cell obj_1
+ball	inst	d_cell obj_2
+missile	inst	object_tick m_tick
+missile	inst	f_counter_ll object_counter
+missile	inst	lfsr_6 object_lfsr
+missile	inst	f_cell mis_out
+missile	inst	d_cell obj_1
+missile	inst	d_cell obj_2
+missile	inst	d_cell obj_3
+player	inst	object_tick p_tick
+player	inst	f_counter_ll object_counter
+player	inst	lfsr_6 object_lfsr
+player	inst	f_cell pl_out
+player	inst	d_cell obj_reset
+player	inst	d_cell obj_start
+player	inst	d_cell obj_fstob
+player	inst	f_cell f_ena
+player	inst	f_cell f_go
+player	inst	f_cell f_psc1
+player	inst	f_cell f_psc2
+player	inst	f_cell f_psc3
+priority_encoder	inst	sr_latch center_delayed
+audio_channel	inst	inverter_reg freq_div01
+audio_channel	inst	inverter_reg freq_div02
+audio_channel	inst	inverter_reg noise0_latch
+audio_channel	inst	inverter_reg nor2_l
+audio_channel	inst	f_cell pulse_3
+audio_channel	inst	f_cell pulse_2
+audio_channel	inst	f_cell pulse_1
+audio_channel	inst	f_cell pulse_0
+audio_channel	block@1529	clk	freq_next[4], freq_next[3], freq_next[2], freq_next[1], freq_next[0], freq_latch[4], freq_latch[3], freq_latch[2], freq_latch[1], freq_latch[0], noise_next[4], noise_next[3], noise_next[2], noise_next[1], noise_next[0], noise_latch[4], noise_latch[3], noise_latch[2], noise_latch[1], noise_latch[0]
+video_stabilize	block@1619	clk	old_hblank, old_vsync, total_lines[8], total_lines[7], total_lines[6], total_lines[5], total_lines[4], total_lines[3], total_lines[2], total_lines[1], total_lines[0], vsync_override, vsync_emulate, v_count[8], v_count[7], v_count[6], v_count[5], v_count[4], v_count[3], v_count[2], v_count[1], v_count[0], vblank_en, vsync_en, vsync_set, vsync_count[7], vsync_count[6], vsync_count[5], vsync_count[4], vsync_count[3], vsync_count[2], vsync_count[1], vsync_count[0], vsync_line[8], vsync_line[7], vsync_line[6], vsync_line[5], vsync_line[4], vsync_line[3], vsync_line[2], vsync_line[1], vsync_line[0], region_frames[5], region_frames[4], region_frames[3], region_frames[2], region_frames[1], region_frames[0], pal_sum[11], pal_sum[10], pal_sum[9], pal_sum[8], pal_sum[7], pal_sum[6], pal_sum[5], pal_sum[4], pal_sum[3], pal_sum[2], pal_sum[1], pal_sum[0], ntsc_sum[11], ntsc_sum[10], ntsc_sum[9], ntsc_sum[8], ntsc_sum[7], ntsc_sum[6], ntsc_sum[5], ntsc_sum[4], ntsc_sum[3], ntsc_sum[2], ntsc_sum[1], ntsc_sum[0], pal_mode, region_done	not chained: dot_count
+TIA	inst	f_cell hgap1_out
+TIA	inst	f_cell hgap_out
+TIA	inst	f_cell hblank_out
+TIA	inst	f_cell blank_out
+TIA	inst	video_stabilize stab
+TIA	block@1879	clk	hblank_d	not chained: old_hblank,old_vsync,column,row
+TIA	block@1896	clk	phi2_delay, i_out[1], wreg[63][7], wreg[63][6], wreg[63][5], wreg[63][4], wreg[63][3], wreg[63][2], wreg[63][1], wreg[63][0], wreg[62][7], wreg[62][6], wreg[62][5], wreg[62][4], wreg[62][3], wreg[62][2], wreg[62][1], wreg[62][0], wreg[61][1], wreg[41][1], wreg[40][1], wreg[39][0], wreg[38][0], wreg[37][0], wreg[36][7], wreg[36][6], wreg[36][5], wreg[36][4], wreg[35][7], wreg[35][6], wreg[35][5], wreg[35][4], wreg[34][7], wreg[34][6], wreg[34][5], wreg[34][4], wreg[33][7], wreg[33][6], wreg[33][5], wreg[33][4], wreg[32][7], wreg[32][6], wreg[32][5], wreg[32][4], wreg[31][1], wreg[30][1], wreg[29][1], wreg[28][7], wreg[28][6], wreg[28][5], wreg[28][4], wreg[28][3], wreg[28][2], wreg[28][1], wreg[28][0], wreg[27][7], wreg[27][6], wreg[27][5], wreg[27][4], wreg[27][3], wreg[27][2], wreg[27][1], wreg[27][0], wreg[26][3], wreg[26][2], wreg[26][1], wreg[26][0], wreg[25][3], wreg[25][2], wreg[25][1], wreg[25][0], wreg[24][4], wreg[24][3], wreg[24][2], wreg[24][1], wreg[24][0], wreg[23][4], wreg[23][3], wreg[23][2], wreg[23][1], wreg[23][0], wreg[22][3], wreg[22][2], wreg[22][1], wreg[22][0], wreg[21][3], wreg[21][2], wreg[21][1], wreg[21][0], wreg[15][7], wreg[15][6], wreg[15][5], wreg[15][4], wreg[15][3], wreg[15][2], wreg[15][1], wreg[15][0], wreg[14][7], wreg[14][6], wreg[14][5], wreg[14][4], wreg[14][3], wreg[14][2], wreg[14][1], wreg[14][0], wreg[13][7], wreg[13][6], wreg[13][5], wreg[13][4], wreg[12][3], wreg[11][3], wreg[10][5], wreg[10][4], wreg[10][2], wreg[10][1], wreg[10][0], wreg[9][7], wreg[9][6], wreg[9][5], wreg[9][4], wreg[9][3], wreg[9][2], wreg[9][1], wreg[8][7], wreg[8][6], wreg[8][5], wreg[8][4], wreg[8][3], wreg[8][2], wreg[8][1], wreg[7][7], wreg[7][6], wreg[7][5], wreg[7][4], wreg[7][3], wreg[7][2], wreg[7][1], wreg[6][7], wreg[6][6], wreg[6][5], wreg[6][4], wreg[6][3], wreg[6][2], wreg[6][1], wreg[5][5], wreg[5][4], wreg[5][2], wreg[5][1], wreg[5][0], wreg[4][5], wreg[4][4], wreg[4][2], wreg[4][1], wreg[4][0], wreg[1][7], wreg[1][6], wreg[1][1], wreg[0][1], hmclr, cxclr
+TIA	inst	clockgen clockgen
+TIA	inst	horiz_gen h_gen
+TIA	inst	playfield playfield
+TIA	inst	hmove_gen hmv
+TIA	inst	player pl1
+TIA	inst	player pl2
+TIA	inst	missile mis0
+TIA	inst	missile mis1
+TIA	inst	ball bal
+TIA	inst	priority_encoder prior
+TIA	inst	audio_channel audio0
+TIA	inst	audio_channel audio1
+TIA	block@2179	clk	col[3], col[2], col[1], col[0], lum[2], lum[1], lum[0]
+TIA	inst	sr_latch in_sr
+TIA	block@2208	clk	rreg[13][7], rreg[12][7], rreg[11][7], rreg[10][7], rreg[9][7], rreg[8][7], rreg[7][7], rreg[7][6], rreg[6][7], rreg[5][7], rreg[5][6], rreg[4][7], rreg[4][6], rreg[3][7], rreg[3][6], rreg[2][7], rreg[2][6], rreg[1][7], rreg[1][6], rreg[0][7], rreg[0][6]
+M6532	block@144	clk	ram_read_r, d_out_reg[7], d_out_reg[6], d_out_reg[5], d_out_reg[4], d_out_reg[3], d_out_reg[2], d_out_reg[1], d_out_reg[0]
+M6532	block@178	clk	init_addr[6], init_addr[5], init_addr[4], init_addr[3], init_addr[2], init_addr[1], init_addr[0], out_a[7], out_a[6], out_a[5], out_a[4], out_a[3], out_a[2], out_a[1], out_a[0], out_b[7], out_b[6], out_b[5], out_b[4], out_b[3], out_b[2], out_b[1], out_b[0], dir_a[7], dir_a[6], dir_a[5], dir_a[4], dir_a[3], dir_a[2], dir_a[1], dir_a[0], dir_b[7], dir_b[6], dir_b[5], dir_b[4], dir_b[3], dir_b[2], dir_b[1], dir_b[0], interrupt[6], edge_detect, old_pa7, incr[1], incr[0], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], prescaler[9], prescaler[8], prescaler[7], prescaler[6], prescaler[5], prescaler[4], prescaler[3], prescaler[2], prescaler[1], prescaler[0], rollover	not chained: irq_en
+maria	block@85	clk_sys	pclk0, pclk1, men_count[2], men_count[1], men_count[0], tia_enable_count[2], tia_enable_count[1], tia_enable_count[0], slow_clk_latch, clk_toggle, clock_div[1], clock_div[0], pclk_toggle	not chained: mclk1,mclk0,ready_int,old_men,pclk
+mos6502_ctl	block@878	clk_sys	rdy_q
+mos6502_ctl	block@1287	clk_sys	res_c2, res_g, res_p, sync_short, brk_done_q, tg_c2[3], tg_c2[2], tg_c2[0], sync_c2, end_x_q	not chained: irq_p,nmi_p,nmi_l,nmig_c2,vec_n_c2,ext_t5_r,ext_t6_r
+mos6502_ctl	block@1382	clk_sys	wr_q, sync_q, t[3], t[2], t[1], t[0], c_reg.zero_v, c_reg.zero_adl1, c_reg.zero_adl0, c_reg.zero_adh17, c_reg.zero_adh0, c_reg.zero_add, c_reg.y_sb, c_reg.x_sb, c_reg.wr, c_reg.sums, c_reg.srs, c_reg.sb_y, c_reg.sb_x, c_reg.sb_s, c_reg.sb_db, c_reg.sb_adh, c_reg.sb_add, c_reg.sb_ac, c_reg.s_sb, c_reg.s_inc, c_reg.s_dec, c_reg.s_adl, c_reg.pcl_db, c_reg.pcl_adl, c_reg.pch_db, c_reg.pch_adh, c_reg.p_db, c_reg.ors, c_reg.one_i, c_reg.ndb_add, c_reg.ir5_i, c_reg.ir5_d, c_reg.ir5_c, c_reg.ipc, c_reg.eors, c_reg.dsa, c_reg.dl_db, c_reg.dl_adl, c_reg.dl_adh, c_reg.dbz_z, c_reg.db_add, c_reg.db7_n, c_reg.db7_c, c_reg.db6_v, c_reg.db0_c, c_reg.daa, c_reg.b_out, c_reg.avr_v, c_reg.arr_flags, c_reg.arr_daa, c_reg.arr_d, c_reg.ands, c_reg.alucin, c_reg.adl_pcl, c_reg.adl_add, c_reg.adl_abl, c_reg.adh_pch, c_reg.adh_abh, c_reg.add_sb7, c_reg.add_sb06, c_reg.add_adl, c_reg.acr_c, c_reg.ac_sb, c_reg.ac_db, br_back_q, ir[7], ir[6], ir[5], ir[4], ir[3], ir[2], ir[1], ir[0], pgx, idx_cross_q	not chained: so_last,so_edge_q,int_g,int_armed
+mos6502_dp	block@201	clk_sys	x[7], x[6], x[5], x[4], x[3], x[2], x[1], x[0], y[7], y[6], y[5], y[4], y[3], y[2], y[1], y[0], a[7], a[6], a[5], a[4], a[3], a[2], a[1], a[0], s_in[7], s_in[6], s_in[5], s_in[4], s_in[3], s_in[2], s_in[1], s_in[0], ai[7], ai[6], ai[5], ai[4], ai[3], ai[2], ai[1], ai[0], bi[7], bi[6], bi[5], bi[4], bi[3], bi[2], bi[1], bi[0], pcls[7], pcls[6], pcls[5], pcls[4], pcls[3], pcls[2], pcls[1], pcls[0], pchs[7], pchs[6], pchs[5], pchs[4], pchs[3], pchs[2], pchs[1], pchs[0], abl[7], abl[6], abl[5], abl[4], abl[3], abl[2], abl[1], abl[0], abh[4], abh[3], abh[2], abh[1], abh[0], dor[7], dor[6], dor[5], dor[4], dor[3], dor[2], dor[1], dor[0], p_v, p_z, p_i, p_d, p_c, p_n, arr_lo_q, arr_hi_q, add[7], add[6], add[5], add[4], add[3], add[2], add[1], add[0], acr, avr, hc_held, dl[7], dl[6], dl[5], dl[4], dl[3], dl[2], dl[1], dl[0], pcl[7], pcl[6], pcl[5], pcl[4], pcl[3], pcl[2], pcl[1], pcl[0], pch[7], pch[6], pch[5], pch[4], pch[3], pch[2], pch[1], pch[0], s_out[7], s_out[6], s_out[5], s_out[4], s_out[3], s_out[2], s_out[1], s_out[0]
+mos6502	inst	mos6502_ctl ctl
+mos6502	inst	mos6502_dp dp
+mos6502	block@112	clk_sys	phase2
+mos6502	block@130	clk_sys	wr_pin	not chained: sync_pin
+sally	inst	mos6502 core
+Atari7800	block@232	clk_sys	reset_hold	not chained: reset_phase_wait
+Atari7800	block@256	clk_sys	tia_RDY_seen_high
+Atari7800	block@287	clk_sys	stall_cycle_taken
+Atari7800	block@314	clk_sys	open_bus[7], open_bus[6], open_bus[5], open_bus[4], open_bus[3], open_bus[2], open_bus[1], open_bus[0]	not chained: pause_clock,last_address
+Atari7800	inst	cpu_phase_controller phase_controller
+Atari7800	inst	maria maria_inst
+Atari7800	inst	TIA tia_inst
+Atari7800	inst	M6532 riot_inst
+Atari7800	inst	M6502C cpu_inst
+Atari7800	block@617	clk_sys	tia_en
+cpu_phase_controller	block@1050	clk_sys	last_phase2, phase_valid, active_tia, state, target_tia
+M6502C	block@1125	clk_sys	in_phase2
+M6502C	inst	sally cpu
+# stateful modules: Atari7800 M6502C M6532 TIA audio_channel ball clockgen cpu_phase_controller cpuclk d_cell f_cell f_counter f_counter_ll hmove_gen horiz_gen inverter_reg lfsr_6 maria missile mos6502 mos6502_ctl mos6502_dp object_tick player playfield priority_encoder sally sr_latch video_stabilize
