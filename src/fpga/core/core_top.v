@@ -381,7 +381,7 @@ localparam [15:0] SLOT_ARFW = 16'h0107;
     reg     [2:0]   set_port2     = 3'd0;
     reg     [1:0]   set_turbo     = 2'd0;   // X / Y turbo: off, fast, medium, slow
     reg     [1:0]   set_atarivox  = 2'd2;   // AtariVox voice: off, quiet, normal, loud
-    reg             set_nopause   = 1'b0;   // Pause in Menu (save states, the Controllers item's bit 1): on by default
+    reg             set_nopause   = 1'b0;   // save states: bit 1 at 0x260, not in the menu (Pause in Menu always on)
     reg     [7:0]   menu_reset_cnt = 8'd0;
 
 always @(posedge clk_74a) begin
@@ -391,7 +391,9 @@ always @(posedge clk_74a) begin
     if (bridge_wr && bridge_addr[31:24] == 8'h10) begin
         case (bridge_addr[11:0])
             12'h200: menu_reset_cnt <= 8'hFF;
-            12'h260: {set_nopause, set_swap} <= bridge_wr_data[1:0];   // Controllers: bit 1 no menu pause
+            // Swap Controllers (bit 0); bit 1, no menu pause, is not in the menu
+            // (Pause in Menu always on: docs/SAVESTATE.md 1), the check item never sets it
+            12'h260: {set_nopause, set_swap} <= bridge_wr_data[1:0];
             12'h264: set_ldiff_b   <= bridge_wr_data[0];
             12'h268: set_rdiff_b   <= bridge_wr_data[0];
             12'h26C: set_region    <= bridge_wr_data[1:0];

@@ -44,9 +44,10 @@ exception (see *Verification*).
     (the Starpath Supercharger), and the ARM schemes DPC+, CDF, CDFJ and
     CDFJ+ (next item).
   - The multicart schemes MC2K, MC4K and MC8K are reached through the
-    *Mapper (more)* setting only. So is 32-in-1 for a real 32-in-1 image:
-    it is 64 KB, and detection takes a 64 KB image as F0 (or EF). It picks
-    32-in-1 only for an image between 32 and 64 KB long.
+    *Mapper (more)* setting only. 32-in-1 is detected only for an image
+    between 32 and 64 KB long; a real 32-in-1 image is 64 KB, which
+    detection takes as F0 (or EF), and the setting that forced 32-in-1 left
+    the menu for the Pocket's menu limits (*Settings*).
 - **2600 ARM cartridges**: DPC+ and the CDF family (CDF, CDFJ and CDFJ+),
   the Harmony and Melody games such as the Champ Games releases. MiSTer runs
   them on a soft ARM7TDMI that doesn't fit the Pocket; this core runs them on
@@ -163,7 +164,8 @@ exception (see *Verification*).
 ### Save states
 
 The Pocket's Memories (save and load a state), sleep, and a pause while the
-menu is open, for every scheme above but the ARM ones and the Supercharger
+menu is open (always on: the game stands still while the Pocket's menu is
+open), for every scheme above but the ARM ones and the Supercharger
 ([docs/SAVESTATE.md](docs/SAVESTATE.md)). A state holds the whole console:
 the 6507, the TIA, the RIOT and its RAM, the cartridge's bank switching and
 its RAM (up to 32 KB), DPC's counters and music, the paddles with their
@@ -183,7 +185,7 @@ The Pocket shows at most 16 settings; this core uses all 16.
 | *Reset* | | Resets the console |
 | *Left Difficulty*, *Right Difficulty* | A, B (default B) | The console's difficulty switches. Some games use them for options: Chaotic Grill and Elevator Agent turn their music off with A |
 | *TV Type* | Colour, B&W | The console's TV Type switch. It takes this value when you change it and at every cartridge load; L toggles it in between |
-| *Controllers* | Normal, Swapped, Normal, no menu pause, Swapped, no menu pause | Swapped swaps ports 1 and 2. "No menu pause" lets the game run on while the Pocket's menu is open; by default it stands still (*Pause in Menu*, see *Save states*) |
+| *Swap Controllers* | on, off | Swaps ports 1 and 2 |
 | *Port 1 Input* | Joystick, Paddles, Driving, Light Gun, Dual Stick, Booster Grip | The controller on port 1 (see *Controls*) |
 | *Port 2 Input* | Joystick, Paddles, Driving, Light Gun | The controller on port 2 |
 | *Turbo (X/Y)* | Off, Fast, Medium, Slow | X repeats fire while held; Y's half does nothing in this core (see *Controls*) |
@@ -194,12 +196,22 @@ The Pocket shows at most 16 settings; this core uses all 16.
 | *Audio* | Mono TIA; Stereo TIA; Stereo, 25% Blend; Stereo, 50% Blend; Full Mono | |
 | *2600 Video* | Normal, Flicker Blend, De-comb, Blend + De-comb | |
 | *Mapper* | Auto, F8, F6, F4, F0, FA, FE, E0, E7, 3F, 3E, CV, UA, EF, SB | Forces a scheme for the cartridge you load next |
-| *Mapper (more)* | Auto, AR, DPC+, CDF / CDFJ / CDFJ+, FA2, WD, JANE, CTY, 0840, FC, DF / BF, Multicart 2K, 4K and 8K, 32-in-1 | The same, for the other schemes; *Mapper* wins when both are set |
+| *Mapper (more)* | Auto, FA2, WD, JANE, CTY, 0840, FC, DF/BF, Multi 2K, Multi 4K, Multi 8K | The same, for the other schemes; *Mapper* wins when both are set |
 
 The two Mapper settings are not saved: they are back on Auto each time the
 core starts. A forced scheme stays forced for every cartridge loaded until
 you set it back to Auto. BUS cannot be forced (it would get the
 unsupported-cartridge screen), and neither can ELF.
+
+The lists name each scheme by its code only (in 1.0.1 *FA (CBS RAM+)*,
+*Multicart 2K* and so on), and AR (Supercharger), DPC+, CDF / CDFJ / CDFJ+
+and 32-in-1 are no longer in them: the Pocket refuses a menu with more than
+72 options, or with more than about 731 characters in its names (measured
+on the owner's Pocket; Analogue does not document either limit), and the
+composite palettes needed the room. Auto still finds each of the four
+itself: the Supercharger's tapes by their size, the ARM schemes by their
+drivers' signatures, 32-in-1 by its size (between 32 and 64 KB only: a real
+64 KB 32-in-1 image now runs as F0).
 
 ## Controls
 
@@ -253,7 +265,7 @@ no repeat.
 
 Some paddle games read the second paddle of the pair for player 1 (Demons
 to Diamonds, for one; Stella keeps a "swap paddles" list for them). If a
-paddle game ignores the D-pad, set *Controllers* to Swapped.
+paddle game ignores the D-pad, turn on *Swap Controllers*.
 
 Paddles come in pairs: the two paddles on port 1 are controllers 1 and 2,
 the two on port 2 are controllers 3 and 4 (docked). A joystick, driving

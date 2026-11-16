@@ -23,7 +23,7 @@ Intellivision core's protocol, header and benches (openFPGA-Intellivision
 |---|---|
 | 0x00A0 save (bit 0 of the parameter: start; else a query) | freeze at the next frame boundary, write the blob into its staging RAM, answer ok, resume; the host then reads 131,072 bytes from 0x50000000 |
 | 0x00A4 load | the host has already written the blob to 0x50000000; freeze, check it, write it into the machine (or refuse it), answer ok or err, resume |
-| 0x00B0 menu open / closed | with Pause in Menu on (the default), the machine is frozen while the menu is open |
+| 0x00B0 menu open / closed | Pause in Menu: the machine is frozen while the menu is open (always) |
 | sleep (`sleep_supported: true` in core.json) | a save before sleep and a load on wake |
 
 - **The result codes** come from the template's `core_bridge_cmd.v`: 0 idle,
@@ -37,11 +37,13 @@ Intellivision core's protocol, header and benches (openFPGA-Intellivision
   `bridge_rd` until the next read. The staging RAM has a port on each
   clock, so the bridge reads and writes it directly on clk_74a; no access
   waits for the machine.
-- **Pause in Menu** is bit 1 of the Controllers item (0x10000260; bit 0 is
-  Swap Controllers): Normal, Swapped, and the same with "no menu pause".
-  The menu has room for 16 items and had 16, so the setting shares an item;
-  Normal (0) is Pause in Menu on, as the owner chose, and a Pocket that kept
-  the old Swap Controllers value (0 or 1) keeps its swap and gets the pause.
+- **Pause in Menu** is always on: there is no setting, as the menu is at
+  the Pocket's limits (16 entries, 72 list options, about 731 characters of
+  names; DEVELOPING.md, "Add a menu setting"). `core_top.v` still decodes
+  bit 1 of the Swap Controllers address (0x10000260) as "no menu pause"
+  (`set_nopause`, into ss_ctl's `pause_en` inverted); the Swap Controllers
+  check item writes bit 0 only, so bit 1 stays 0 and the pause is on. A
+  later menu with room can offer it without an RTL change.
 - **Wake.** Analogue's documents do not say in what order the Pocket sends
   the load and releases the core's reset on wake. A load asked for while the
   console is held in reset is checked at once, without a freeze, and

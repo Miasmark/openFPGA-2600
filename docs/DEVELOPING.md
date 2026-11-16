@@ -261,7 +261,17 @@ showed only the first 12 entries (to Stereo TIA), and 2.0.14 (21 entries)
 failed to load. From 2.0.16 only the cartridge slot is reloadable; the BIOS
 and firmware slots (fixed filenames, loaded at start) are 0x88, not 0x89.
 
-One more limit, found on hardware and not in the docs: the **total number
+**openFPGA-2600's measured limits (the owner's Pocket, 2026-11-15, with
+menu-only test builds):** at most **72 list options** in all (71 and 72
+load, 73 and every 74-option menu fail with "Load error in interact"), and
+at most about **731 characters** in all the entries' and options' names
+together (731, 1.0.1's menu, loads; 746, with 72 options, fails; 966 with 71
+options fails too). `sim/check/apf_json_check.py` checks both, and that
+every entry keeping a 1.0.1 id is exactly the released entry: an entry whose
+type, options, mask or address change gets a new id (Palette became 33,
+Mapper 34, Mapper (more) 35 in the save-state build).
+
+The 7800 core's note on the same limit: the **total number
 of list options** across the menu. 2.0.12's menu (51 options) loads;
 2.0.16's (16 entries, 69 options) failed with "Load error in 'interact'",
 although each half of it loaded on its own (28 and 41 options). 2.0.17 has

@@ -45,25 +45,33 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 
 SPIRIT_PLATFORM_MD5 = "8e6c9cee02fa7569100e5fee57c0d4c8"   # Spiritualized 2600 1.0.0, Platforms/2600.json
 SPIRIT_IMAGE_MD5 = "151911282233b7f35a2ce650400b5a1c"      # same release, Platforms/_images/2600.bin
 SPIRIT_IMAGE_SIZE = 171930
 
-# The Mapper items' option names and the bss_type each must force
+# The Mapper items' option names and the bss_type each must force. Short
+# names (the scheme's code), as the Pocket's menu limits need (below).
 MAPPER_NAMES = {
-    "2K": "BANK2K", "F8 (8K)": "BANKF8", "F6 (16K)": "BANKF6", "F4 (32K)": "BANKF4",
-    "F0 (64K)": "BANKF0", "FA (CBS RAM+)": "BANKFA", "FE (Activision)": "BANKFE",
-    "E0 (Parker Bros.)": "BANKE0", "E7 (M Network)": "BANKE7", "3F (Tigervision)": "BANK3F",
-    "3E": "BANK3E", "CV (Commavid)": "BANKCV", "UA (UA Ltd.)": "BANKUA", "EF": "BANKEF",
-    "SB": "BANKSB", "AR (Supercharger)": "BANKAR", "DPC (Pitfall II)": "BANKP2",
-    "DPC+": "BANKDPCP", "CDF / CDFJ / CDFJ+": "BANKCDF", "FA2": "BANKFA2",
-    "WD (Pink Panther)": "BANKWD", "JANE (Tarzan)": "BANKJANE", "CTY (Chetiry)": "BANKCTY",
-    "0840": "BANK0840", "FC (Power Play)": "BANKFC", "DF / BF": "BANKDF",
-    "Multicart 2K": "BANKMC2K", "Multicart 4K": "BANKMC4K", "Multicart 8K": "BANKMC8K",
-    "32-in-1": "BANK32",
+    "F8": "BANKF8", "F6": "BANKF6", "F4": "BANKF4", "F0": "BANKF0", "FA": "BANKFA", "FE": "BANKFE",
+    "E0": "BANKE0", "E7": "BANKE7", "3F": "BANK3F", "3E": "BANK3E", "CV": "BANKCV", "UA": "BANKUA",
+    "EF": "BANKEF", "SB": "BANKSB", "FA2": "BANKFA2", "WD": "BANKWD", "JANE": "BANKJANE",
+    "CTY": "BANKCTY", "0840": "BANK0840", "FC": "BANKFC", "DF/BF": "BANKDF",
+    "Multi 2K": "BANKMC2K", "Multi 4K": "BANKMC4K", "Multi 8K": "BANKMC8K",
 }
+# The Pocket's interact.json limits, undocumented, measured on the owner's
+# Pocket on 2026-11-15 (menu-only test zips): at most 72 list options in all
+# (71 and 72 load, 73 and 74 fail), and the characters of every entry's and
+# option's name together: 731 loads (1.0.1's menu), 746 fails (72 options).
+MAX_LIST_OPTIONS = 72
+MAX_NAME_CHARS = 731
+# The released menu an entry must equal while it keeps its id: an entry
+# whose type, options, mask or address change gets a new id (the Pocket keeps
+# each id's value).
+RELEASED_TAG = "1.0.1"
+
 # Port Input names and their menu values. What each value does is read from
 # atari2600_pocket.sv (check_options_rtl), not taken from this table.
 PORT_NAMES = {"Joystick": 0, "Paddles": 2, "Driving": 3, "Light Gun": 4,
@@ -420,6 +428,19 @@ def main():
     check(len(var) <= 16, f"{len(var)} entries (limit 16)")
     isize = os.path.getsize(os.path.join(root, "dist/Cores/Miasmark.2600/interact.json"))
     check(isize <= 8740, f"interact.json is {isize} bytes (the Pocket failed at 10,213; 8,740 is the largest known to work)")
+    ivars = js["Cores/Miasmark.2600/interact.json"][0]["interact"]["variables"]
+    nopt = sum(len(v.get("options", [])) for v in ivars)
+    nch = sum(len(v["name"]) + sum(len(o["name"]) for o in v.get("options", [])) for v in ivars)
+    check(nopt <= MAX_LIST_OPTIONS, f"interact.json: {nopt} list options in all (the Pocket loads at most {MAX_LIST_OPTIONS}: measured 2026-11-15)")
+    check(nch <= MAX_NAME_CHARS, f"interact.json: {nch} characters in the entries' and options' names (731 loads, 746 fails: measured 2026-11-15)")
+    try:
+        rel = json.loads(subprocess.run(["git", "-C", root, "show", RELEASED_TAG + ":dist/Cores/Miasmark.2600/interact.json"],
+                                        capture_output=True, text=True, check=True).stdout)["interact"]["variables"]
+        relv = {v["id"]: v for v in rel}
+        changed = [v["name"] for v in ivars if v["id"] in relv and v != relv[v["id"]]]
+        check(not changed, f"interact.json: entries that keep a {RELEASED_TAG} id equal the released entry (changed: {changed or 'none'}; a changed entry gets a new id)")
+    except (subprocess.CalledProcessError, OSError):
+        check(False, f"interact.json: the released menu ({RELEASED_TAG}) to compare ids with is not in git")
     check(len(var) + reload <= 20, f"{len(var)} entries + {reload} reloadable slots (limit 20)")
     check(len({v['id'] for v in var}) == len(var), "entry ids unique")
     blk = core_top.split("bridge_addr[31:24] == 8'h10", 1)[1].split("endcase", 1)[0]
@@ -462,10 +483,15 @@ def main():
     # BUS is never offered (no released game); 2K and DPC are left out to keep
     # each list at 15 options (the Pocket's real limit), as detect2600.sv
     # finds both by size alone: 2 KiB or less, and 10 KiB to 10 KiB + 256.
-    not_offered = {enum.index("BANKBUS"), enum.index("BANK2K"), enum.index("BANKP2")}
+    # AR, DPC+, CDF and 32-in-1 left the lists for the Pocket's menu limits
+    # (above), as detect2600.sv finds them itself (the Supercharger's sizes,
+    # the ARM drivers' signatures, a 32-in-1's size); their values stay decoded.
+    not_offered = {enum.index(t) for t in ("BANKBUS", "BANK2K", "BANKP2", "BANKAR", "BANKDPCP", "BANKCDF", "BANK32")}
     forcible = set(range(1, 32)) - not_offered
     check(sorted(seen) == sorted(forcible),
-          "the two Mapper lists force each of bss_type 1-31 exactly once, except BUS, 2K and DPC")
+          "the two Mapper lists force each of bss_type 1-31 exactly once, except BUS, 2K, DPC, AR, DPC+, CDF and 32-in-1")
+    check(all(re.search(r"force_bs\s*<=\s*%s\b" % t, detect) for t in ("BANKAR", "BANKDPCP", "BANKCDF", "BANK32")),
+          "AR, DPC+, CDF and 32-in-1 are still detected by detect2600.sv")
     check(re.search(r"cart_size <= 'h0800\) force_bs<=BANK2K", detect) is not None
           and re.search(r"cart_size >= 'h2800 && cart_size <= 'h2900\) force_bs<=BANKP2", detect) is not None,
           "2K and DPC are still detected by size in detect2600.sv")
@@ -695,10 +721,11 @@ def write_vectors(path, var, by_addr):
     The model is what the items mean (names checked above), not core_top's
     case statement: Left/Right Difficulty and TV Type and SaveKey are one bit;
     Audio's value is {stereo, mix[1:0]}, 2600 Video's {de-comb, blend},
-    Palette's {composite, temperature[1:0]}; Controllers' {no menu pause,
-    swap};
+    Palette's {composite, temperature[1:0]}; Pause in Menu (bit 1 of the
+    Swap Controllers address, which the check item never sets) always 1;
     Mapper wins over Mapper (more) when both are set."""
     st = {p: 0 for p in PORTS}
+    st["pause_in_menu"] = 1                 # core_top: ~set_nopause, never written by the menu
     bs = {"Mapper": 0, "Mapper (more)": 0}
     lines = []
 
@@ -706,15 +733,13 @@ def write_vectors(path, var, by_addr):
         if name == "Reset":
             return
         f = {"Left Difficulty": ["diff_left_b"], "Right Difficulty": ["diff_right_b"], "TV Type": ["bw_setting"],
-             "SaveKey (port 2)": ["savekey_setting"],
+             "SaveKey (port 2)": ["savekey_setting"], "Swap Controllers": ["swap_joysticks"],
              "Region": ["region_setting"], "Port 1 Input": ["port1_input"],
              "Port 2 Input": ["port2_input"], "Turbo (X/Y)": ["turbo"], "AtariVox Voice": ["atarivox_setting"]}
         if name in f:
             st[f[name][0]] = val
         elif name == "Palette":
             st["palette_temp"], st["composite"] = val & 3, val >> 2 & 1
-        elif name == "Controllers":       # bit 0 Swap Controllers, bit 1 no menu pause (save states)
-            st["swap_joysticks"], st["pause_in_menu"] = val & 1, 1 - (val >> 1 & 1)
         elif name == "Audio":
             st["stereo_tia"], st["stmix"] = val >> 2 & 1, val & 3
         elif name == "2600 Video":
