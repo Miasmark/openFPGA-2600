@@ -157,8 +157,22 @@ exception (see *Verification*).
 | Keypad, keyboard, trackball, Mindlink | These need input the Pocket doesn't have |
 | SECAM | No SECAM palette or timing. A candidate for a later release |
 | Supercharger demo-unit images (67,584 bytes) | Not detected |
-| Save states | Planned for a later release |
+| Save states for the ARM schemes (DPC+, CDF, CDFJ, CDFJ+) and the Supercharger | Refused with the Pocket's error for now: their state lives in DARIA's CPU and memories, or in the Supercharger's tape machine and RAM. Later steps ([docs/SAVESTATE.md](docs/SAVESTATE.md) 6) |
 | Composite options, PAL composite | MiSTer's Composite Smear, AGC and Comb settings: the menu is full, so *Composite* uses their defaults. PAL: upstream's composite model and decoder are NTSC only |
+
+### Save states
+
+The Pocket's Memories (save and load a state), sleep, and a pause while the
+menu is open, for every scheme above but the ARM ones and the Supercharger
+([docs/SAVESTATE.md](docs/SAVESTATE.md)). A state holds the whole console:
+the 6507, the TIA, the RIOT and its RAM, the cartridge's bank switching and
+its RAM (up to 32 KB), DPC's counters and music, the paddles with their
+knobs' positions and calibration, the light gun, the SaveKey's bus and the
+AtariVox's voice; a save waits for the AtariVox to fall silent. The
+SaveKey's and the FA2 flash's contents stay in their own save files. A
+state is taken at a frame boundary, and a load of another game's state, or
+of one made by a build with another state layout, is refused with the
+Pocket's error message.
 
 ## Settings
 
@@ -169,7 +183,7 @@ The Pocket shows at most 16 settings; this core uses all 16.
 | *Reset* | | Resets the console |
 | *Left Difficulty*, *Right Difficulty* | A, B (default B) | The console's difficulty switches. Some games use them for options: Chaotic Grill and Elevator Agent turn their music off with A |
 | *TV Type* | Colour, B&W | The console's TV Type switch. It takes this value when you change it and at every cartridge load; L toggles it in between |
-| *Swap Controllers* | on, off | Swaps ports 1 and 2 |
+| *Controllers* | Normal, Swapped, Normal, no menu pause, Swapped, no menu pause | Swapped swaps ports 1 and 2. "No menu pause" lets the game run on while the Pocket's menu is open; by default it stands still (*Pause in Menu*, see *Save states*) |
 | *Port 1 Input* | Joystick, Paddles, Driving, Light Gun, Dual Stick, Booster Grip | The controller on port 1 (see *Controls*) |
 | *Port 2 Input* | Joystick, Paddles, Driving, Light Gun | The controller on port 2 |
 | *Turbo (X/Y)* | Off, Fast, Medium, Slow | X repeats fire while held; Y's half does nothing in this core (see *Controls*) |
@@ -239,7 +253,7 @@ no repeat.
 
 Some paddle games read the second paddle of the pair for player 1 (Demons
 to Diamonds, for one; Stella keeps a "swap paddles" list for them). If a
-paddle game ignores the D-pad, turn on *Swap Controllers*.
+paddle game ignores the D-pad, set *Controllers* to Swapped.
 
 Paddles come in pairs: the two paddles on port 1 are controllers 1 and 2,
 the two on port 2 are controllers 3 and 4 (docked). A joystick, driving

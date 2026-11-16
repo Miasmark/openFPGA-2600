@@ -71,6 +71,19 @@ set_multicycle_path -hold 1 \
  -from [get_registers -nowarn {*|sram_ctrl:sram|sk_rdata[*]}] \
  -to [get_registers -nowarn {*|EEPROM_24LC0X:savekey|data[*]}]
 
+# Save states (docs/SAVESTATE.md; core/ss_ctl.sv): clk_74a and the core
+# clocks are asynchronous groups above, so ss_ctl's crossings are not timed.
+# Each is a level through a two- or three-flip-flop synchroniser (the save,
+# load and menu commands, Pause in Menu, the bad-write flag) or a block RAM
+# with a port on each clock (the staging RAM). The eight result bits change
+# one at a time, 4 clk_sys apart, in an order that never shows the host a
+# wrong result code: their nets into st_a are bounded to 10 ns (2.5 x the
+# smallest spacing would do; 10 ns is the Intellivision core's bound), so
+# no two can arrive in the other order.
+set_net_delay -max 10 \
+ -from [get_registers -nowarn {*|a26_ss_ctl:ss_ctl|s_ack *|a26_ss_ctl:ss_ctl|s_busy *|a26_ss_ctl:ss_ctl|s_ok *|a26_ss_ctl:ss_ctl|s_err *|a26_ss_ctl:ss_ctl|l_ack *|a26_ss_ctl:ss_ctl|l_busy *|a26_ss_ctl:ss_ctl|l_ok *|a26_ss_ctl:ss_ctl|l_err}] \
+ -to [get_registers -nowarn {*|a26_ss_ctl:ss_ctl|st_a[*]}]
+
 # Fitter only: more margin than the real constraints, which the Timing
 # Analyzer (quartus_sta) still checks unchanged. The fitter stops improving a
 # path once it meets its constraint, and the padding is only its target: the

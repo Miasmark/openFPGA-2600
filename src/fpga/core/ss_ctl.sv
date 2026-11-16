@@ -132,8 +132,9 @@ module a26_ss_ctl (
 	localparam int LAST_BITS = SS_CHAIN_BITS - 32 * (CHAIN_WORDS - 1);
 
 	// ============================================== the staging RAM
-	// port a: the bridge (clk_74a); port b: the controller (clk_sys)
-	logic [31:0] stg [0:SS_W_END-1];
+	// port a: the bridge (clk_74a); port b: the controller (clk_sys); one
+	// M10K block RAM of 9,216 x 32 (Quartus does not infer a true dual-port
+	// RAM on two clocks this size from an array: altsyncram, as save_ram_dp)
 	logic [WA-1:0] sb_a;
 	logic          sb_we;
 	logic [31:0]   sb_d, sb_q;
@@ -141,16 +142,48 @@ module a26_ss_ctl (
 	wire           b_hit  = bridge_addr[31:24] == 8'h50;
 	wire  [21:0]   b_w    = bridge_addr[23:2];
 	wire           b_live = b_w < 22'(SS_W_END);
-	always_ff @(posedge clk_74a) begin
-		if (bridge_wr && b_hit && b_live)
-			stg[b_w[WA-1:0]] <= bridge_wr_data;
-		sa_q <= stg[b_w[WA-1:0]];
-	end
-	always_ff @(posedge clk) begin
-		if (sb_we)
-			stg[sb_a] <= sb_d;
-		sb_q <= stg[sb_a];
-	end
+	altsyncram #(
+		.operation_mode                 ("BIDIR_DUAL_PORT"),
+		.width_a                        (32),
+		.widthad_a                      (WA),
+		.numwords_a                     (SS_W_END),
+		.width_b                        (32),
+		.widthad_b                      (WA),
+		.numwords_b                     (SS_W_END),
+		.outdata_reg_a                  ("UNREGISTERED"),
+		.outdata_reg_b                  ("UNREGISTERED"),
+		.address_reg_b                  ("CLOCK1"),
+		.indata_reg_b                   ("CLOCK1"),
+		.wrcontrol_wraddress_reg_b      ("CLOCK1"),
+		.clock_enable_input_a           ("BYPASS"),
+		.clock_enable_input_b           ("BYPASS"),
+		.clock_enable_output_a          ("BYPASS"),
+		.clock_enable_output_b          ("BYPASS"),
+		.power_up_uninitialized         ("FALSE"),
+		.read_during_write_mode_port_a  ("NEW_DATA_NO_NBE_READ"),
+		.read_during_write_mode_port_b  ("NEW_DATA_NO_NBE_READ"),
+		.intended_device_family         ("Cyclone V"),
+		.lpm_type                       ("altsyncram")
+	) stg (
+		.clock0    (clk_74a),
+		.address_a (b_w[WA-1:0]),
+		.data_a    (bridge_wr_data),
+		.wren_a    (bridge_wr && b_hit && b_live),
+		.q_a       (sa_q),
+
+		.clock1    (clk),
+		.address_b (sb_a),
+		.data_b    (sb_d),
+		.wren_b    (sb_we),
+		.q_b       (sb_q),
+
+		.aclr0 (1'b0), .aclr1 (1'b0),
+		.addressstall_a (1'b0), .addressstall_b (1'b0),
+		.byteena_a (1'b1), .byteena_b (1'b1),
+		.clocken0 (1'b1), .clocken1 (1'b1), .clocken2 (1'b1), .clocken3 (1'b1),
+		.rden_a (1'b1), .rden_b (1'b1),
+		.eccstatus ()
+	);
 
 	// the bridge's read latch: the word of a read is taken on the clock after
 	// its bridge_rd and held until the next read
@@ -210,7 +243,9 @@ module a26_ss_ctl (
 	assign ss_si = rot ? ss_so : si_q;
 	logic op = 1'b0;                             // a save or load holds the freeze
 	logic rel = 1'b0;                            // the operation's ports are released: may resume
-	wire  want = op || menu_hold;
+	// the menu's pause gives way to a reset (the wrapper keeps it for the
+	// machine until it runs: ss_rst_pend)
+	wire  want = op || (menu_hold && !mreset);
 	logic vs_q = 1'b0, vs_seen = 1'b0;
 	logic [17:0] per = 18'd0;                    // a period of 2^18 clk_sys
 	logic [2:0]  nov = 3'd0;                     // periods without VSync while waiting
@@ -330,7 +365,7 @@ module a26_ss_ctl (
 		if (!start_lv) s_ack <= 1'b0;
 		if (!load_lv) l_ack <= 1'b0;
 		if (dly != 3'd0) dly <= dly - 3'd1;
-		if (fst == F_RUN && op && per == 18'h3FFFF && tmo != 8'hFF) tmo <= tmo + 8'd1;
+		if (ost == O_WAITF && per == 18'h3FFFF && tmo != 8'hFF) tmo <= tmo + 8'd1;
 
 		case (ost)
 			O_IDLE: begin
@@ -358,28 +393,29 @@ module a26_ss_ctl (
 				if (is_load) pend <= 1'b0;                // a new load replaces a staged one
 				staged <= 1'b0;
 				tmo <= 8'd0;
-				if (!cart_ready || refuse)
-					ost <= O_FIN_ERR;                     // nothing to save, or a refused scheme
-				else if (is_load && mreset) begin          // wake: check it now, apply it later
-					staged <= 1'b1;
-					w <= '0; crc <= 32'hFFFFFFFF; bad <= 1'b0;
-					ost <= O_VHDR;
-				end else begin
-					op <= 1'b1;
-					ost <= O_WAITF;
-				end
+				op <= 1'b1;
+				ost <= O_WAITF;
 			end
 
+			// the freeze: wait for it (a frame boundary with the console out of
+			// reset and the peripherals quiet); a load while the console is in
+			// reset (wake) is checked at once and applied at the reset's exit
 			O_WAITF: begin
-				if (settled) begin
+				if (cart_ready && refuse)
+					ost <= O_FIN_ERR;                     // a scheme v1 does not save
+				else if (settled) begin
 					dly <= 3'd7;
 					ost <= O_SETTLE;
 				end else if (silent && mreset) begin      // reset again: wait for its exit
 					op <= 1'b0;
 					silent <= 1'b0;
 					ost <= O_IDLE;
-				end else if (tmo == 8'd128 || refuse || !cart_ready)
-					ost <= O_FIN_ERR;                     // no quiet point (the AtariVox speaks)
+				end else if (is_load && !silent && mreset && cart_ready) begin
+					staged <= 1'b1;
+					w <= '0; crc <= 32'hFFFFFFFF; bad <= 1'b0;
+					ost <= O_VHDR;
+				end else if ((cart_ready && !mreset && tmo >= 8'd128) || tmo == 8'hFF)
+					ost <= O_FIN_ERR;                     // no quiet point (the AtariVox speaks), or no cartridge
 			end
 			O_SETTLE: if (dly == 3'd0) begin
 				w <= is_load ? WA'(0) : WA'(SS_W_CHAIN);

@@ -63,13 +63,13 @@ import savestate as SS  # noqa: E402
 GEN_MAP = ["f8", "f6", "f4", "f0", "ef", "df", "sb", "ua", "jane", "0840"]
 GEN_RAM = ["f8sc", "f4sc", "fa", "cv", "e7", "3e", "wd", "cty"]
 CASES = {}
-CASES["probe"] = dict(img=("py", "ssprobe_test.py"), ms=700, saves=3, kind="rt", F=True, M=True, W=True)
+CASES["probe"] = dict(img=("py", "ssprobe_test.py"), ms=700, saves=3, kind="rt", F=True, M=True, W=True, A=True)
 for m in GEN_MAP:
     CASES["map_" + m] = dict(img=("py", "ss_mapper_test.py", m), bs=True, ms=600, saves=2, kind="rt")
 for m in GEN_RAM:
-    CASES["ram_" + m] = dict(img=("py", "cartram2600_test.py", m), bs=True, ms=600, saves=2, kind="rt")
+    CASES["ram_" + m] = dict(img=("py", "cartram2600_test.py", m), bs=True, ms=600, saves=2, kind="rt", A=m in ("e7", "3e", "f8sc"))
 CASES["fa2"] = dict(img=("py", "fa2_test.py", "image"), ms=700, saves=2, kind="rt")
-CASES["paddles"] = dict(img=("py", "input_test.py"), ms=900, saves=3, kind="rt",
+CASES["paddles"] = dict(img=("py", "input_test.py"), ms=900, saves=3, kind="rt", A=True,
                         args=["+port1=2", "+port2=2", "+joyscript=@paddles"])
 # the SaveKey round trip runs in the first frames: saves inside it (2-40 ms)
 CASES["savekey"] = dict(img=("py", "console_test.py", "savekey"), ms=600, saves=3, kind="rt", win=(2, 40),
@@ -81,6 +81,9 @@ CASES["gun"] = dict(img=("py", "input_test.py"), ms=700, saves=2, kind="rt",
                     args=["+port1=4", "+joyscript=@gun"])
 CASES["driving"] = dict(img=("py", "input_test.py"), ms=700, saves=2, kind="rt",
                         args=["+port1=3", "+joyscript=@driving"])
+# the AtariVox: a phrase at 50 ms, another at 1 s; saves wait for silence
+CASES["vox"] = dict(img=("py", "vox_test.py"), ms=1500, saves=2, kind="rt", win=(60, 400), A=True,
+                    args=["+sk_on", "+joyscript=@vox"])
 CASES["refuse_dpcp"] = dict(img=("py", "bupchip/daria/fe_dir/mkimg.py", "smoke_dpc"), ms=300, kind="refuse")
 CASES["refuse_ar"] = dict(img=("py", "ar_test.py", "full"), ms=300, kind="refuse")
 CASES["refuse_a78"] = dict(img=("py", "make_a78.py", "7"), ms=300, kind="refuse")
@@ -97,13 +100,14 @@ for k, f in GAMES.items():
     a = ["+joyscript=@game"]
     if k.startswith("g_paddle"):
         a = ["+port1=2", "+port2=2", "+joyscript=@paddlegame"]
-    CASES[k] = dict(img=("game", f), ms=1200, saves=2, kind="rt", args=a)
+    CASES[k] = dict(img=("game", f), ms=1200, saves=2, kind="rt", args=a, A=True)
 
 SCRIPTS = {
     "paddles": ["0 types", "100 joy0=1", "300 joy0=0", "320 joy1=2", "500 joy1=0", "520 joy2=801", "700 joy2=0",
                 "720 joy3=1002", "880 joy3=0"],
     "gun": ["0 types", "100 joy0=6", "300 joy0=200", "360 joy0=0", "400 joy0=9", "600 joy0=0"],
     "driving": ["0 types", "100 joy0=1", "350 joy0=0", "400 joy0=2", "650 joy0=0"],
+    "vox": ["50 joy0=200", "120 joy0=0", "900 joy0=80", "950 joy0=0", "1000 joy0=200", "1070 joy0=0"],
     "mc": ["80 reset", "160 reset", "240 reset", "320 reset", "400 reset"],
     "game": ["100 joy0=100", "150 joy0=0", "200 joy0=10", "260 joy0=0", "300 joy0=1", "600 joy0=0", "620 joy0=12",
              "800 joy0=2", "1000 joy0=0", "1050 joy0=10", "1100 joy0=0"],
@@ -271,12 +275,40 @@ class Bench:
                          bool(m) and m.group(1) == "ok")
                 self.compare(R, self.frames(os.path.join(d, "%s.csv" % tag)), f0,
                              "%s %s: frames after the saved one (%d) as R" % (name, tag, f0))
+        if c.get("A"):
+            self.anywhere(name, d, base, c, R)
         if c.get("F"):
             self.bad_blobs(name, d, base, blobs[0][0], R)
         if c.get("M"):
             self.menu(name, d, base, R)
         if c.get("W"):
             self.wake(name, d, base, blobs[0], R)
+
+    def anywhere(self, name, d, base, c, R):
+        """A: saves frozen at the first CPU cycle after the request (mid-frame,
+        mid-line), and the first blob loaded: as S and L"""
+        lo, hi = c.get("win", (60, c["ms"] // 2))
+        times = sorted(self.rng.sample(range(lo, hi), 2))
+        _, alog = self.sim(d, base + ["+ssfp=A.csv", "+ss_anywhere", "+ss_save=" + ",".join(map(str, times))], "A.log")
+        saves = re.findall(r"SS save (\d+) at (\d+) ms: +(ok|err), (\d+) clk_sys, frozen in machine frame (\d+) at machine clock (\d+)", alog)
+        self.say("%s A: saves anywhere at %s ms: %s" % (name, ",".join(map(str, times)),
+                 " ".join("%s(frame %s, clock %s)" % (s_[2], s_[4], s_[5]) for s_ in saves)),
+                 len(saves) == 2 and all(s_[2] == "ok" for s_ in saves))
+        self.compare(R, self.frames(os.path.join(d, "A.csv")), 0, "%s A: every frame as R" % name)
+        if not saves:
+            return
+        b = os.path.join(d, "ss_save_1.bin")
+        f0 = int(saves[0][4])
+        mt = int(open(os.path.join(d, "ss_save_1.txt")).read().split()[3])
+        os.replace(b, os.path.join(d, "a_save_1.bin"))
+        _, llog = self.sim(d, base[:1] + ["+wav=%d" % (c["ms"] + 60)] + base[2:] + [
+            "+ssfp=AL.csv", "+ss_load=a_save_1.bin", "+ss_load_at=60", "+ss_load_frame=%d" % f0,
+            "+ss_load_mclk=%d" % mt], "AL.log")
+        m = re.search(r"SS load \S+ at \d+ ms: +(ok|err)", llog)
+        self.say("%s AL: a_save_1.bin loaded at 60 ms: %s" % (name, m.group(1) if m else "none"),
+                 bool(m) and m.group(1) == "ok")
+        # the saved frame itself is partial in AL (it resumes mid-frame): compare from the next
+        self.compare(R, self.frames(os.path.join(d, "AL.csv")), f0, "%s AL: frames after the saved one (%d) as R" % (name, f0))
 
     def bad_blobs(self, name, d, base, good, R):
         blob = bytearray(open(good, "rb").read())
@@ -317,6 +349,11 @@ class Bench:
             f2 = ex.submit(self.sim, d, base + ["+ssfp=M0.csv", "+ss_menu=150:60", "+ss_nopause"], "M0.log")
             _, m1 = f1.result()
             _, m0 = f2.result()
+        # MR: the Pocket's Reset while the menu holds the machine: it must reset
+        _, mr = self.sim(d, base + ["+ss_menu=150:120", "+ss_reset=200"], "MR.log")
+        boots = re.findall(r"BOOT (\d+) at (\d+) ms", mr)
+        self.say("%s MR: Reset at 200 ms with the menu open (150-270 ms): console resets %s" % (
+            name, ", ".join("%s at %s ms" % b_ for b_ in boots)), len(boots) >= 2)
         for tag, log, want in (("M", m1, True), ("M0", m0, False)):
             o = re.findall(r"SS menu open at (\d+) ms \(machine clock (\d+)", log)
             cl = re.findall(r"SS menu closed at (\d+) ms \(machine clock (\d+)", log)
@@ -332,11 +369,68 @@ class Bench:
         _, log = self.sim(d, base[:1] + ["+wav=900"] + base[2:] + [
             "+ssfp=W.csv", "+ss_load=%s" % os.path.basename(b), "+ss_load_at=60", "+ss_load_reset=0",
             "+ss_load_frame=%d" % f0, "+ss_load_mclk=%d" % mt], "W.log")
-        m = re.search(r"SS load in reset: (ok|err)", log)
-        a = re.search(r"SS load \S+ (applied|not applied) after the reset's exit", log)
+        m = re.search(r"SS load in reset: +(ok|err)", log)
+        a = re.search(r"SS load \S+ +(applied|not applied) after the reset's exit", log)
         self.say("%s W: load in reset %s, %s" % (name, m.group(1) if m else "none", a.group(1) if a else "none"),
                  bool(m) and m.group(1) == "ok" and bool(a) and a.group(1) == "applied")
         self.compare(R, self.frames(os.path.join(d, "W.csv")), f0, "%s W: frames after the saved one (%d) as R" % (name, f0))
+
+
+# Planted faults (docs/SAVESTATE.md 7): one change each, in a copy of the
+# tree; the case must fail, and with the check the plant is aimed at (a
+# pattern of the failing SSBENCH line), so a plant is not counted caught by
+# an unrelated failure. (file, old, new, case, pattern)
+PLANTS = {
+    "chain_short": ("src/fpga/core/ss_pkg.sv", "SS_CHAIN_BITS    = {n};", "SS_CHAIN_BITS    = {m};",
+                    "probe", r"probe S: every frame"),
+    "paddles_bypassed": ("src/fpga/core/atari2600_pocket.sv", "\t.ss_si    (ss_c_pd),", "\t.ss_si    (ss_c_main),",
+                         "probe", r"probe S: every frame"),
+    "riot_ram_not_saved": ("src/fpga/core/ss_ctl.sv", "\t\t\t\t\tv <= {v[23:0], ss_rq8};", "\t\t\t\t\tv <= {v[23:0], 8'd0};",
+                           "probe", r"probe L1: frames after"),
+    "cart_ram_one_off": ("src/fpga/core/ss_ctl.sv", "wire [16:0] cr_i  = 17'({w - WA'(SS_W_CRAM), 2'b00});",
+                         "wire [16:0] cr_i  = 17'({w - WA'(SS_W_CRAM), 2'b00}) + 17'd1;", "ram_f8sc", r"ram_f8sc L1: frames after"),
+    "payload_crc_unchecked": ("src/fpga/core/ss_ctl.sv", "if (bad || wbad_s || ~crc != hdr_crc)", "if (bad || wbad_s)",
+                              "probe", r"probe F payload: ok"),
+    "cart_crc_unchecked": ("src/fpga/core/ss_ctl.sv", "\t\t\t4'(SS_H_CRC):   hdr_mask = 32'd0;",
+                           "\t\t\t4'(SS_H_CRC):   hdr_mask = 32'd0;\n\t\t\t4'(SS_H_CART_CRC): hdr_mask = 32'd0;",
+                           "probe", r"probe F foreign: ok"),
+    "chain_sig_unchecked": ("src/fpga/core/ss_ctl.sv", "\t\t\t4'(SS_H_CRC):   hdr_mask = 32'd0;",
+                            "\t\t\t4'(SS_H_CRC):   hdr_mask = 32'd0;\n\t\t\t4'(SS_H_CHAIN_SIG): hdr_mask = 32'd0;",
+                            "probe", r"probe F chainsig: ok"),
+    "pal_unchecked": ("src/fpga/core/ss_pkg.sv", "SS_FLAGS_CHECKED = 32'h00000001;", "SS_FLAGS_CHECKED = 32'h00000000;",
+                      "probe", r"probe F pal: ok"),
+    "paddles_not_frozen": ("src/fpga/core/atari2600_pocket.sv", "\t.ss_frz  (ss_frz),\n\t.ss_si   (ss_c_main),",
+                           "\t.ss_frz  (1'b0),\n\t.ss_si   (ss_c_main),", "paddles", r"paddles S: every frame"),
+    "vox_ram_address_unheld": ("src/fpga/core/atarivox/avox_engine.sv",
+                               "wire  [7:0] rfa_a  = ss_ram ? ss_ra : ss_hold ? a_rfa : rfa_addr;",
+                               "wire  [7:0] rfa_a  = ss_ram ? ss_ra : rfa_addr;", "vox", r"vox S: every frame"),
+    "fa2_ram_not_loaded": ("src/fpga/core/ss_ctl.sv", "\t\t\t\t\tss_rsel <= in_riot ? 2'd0 : 2'd1;\n\t\t\t\t\tss_ra <= rb_i;\n\t\t\t\t\tost <= O_ARAM;",
+                           "\t\t\t\t\tss_rsel <= in_riot ? 2'd0 : 2'd2;\n\t\t\t\t\tss_ra <= rb_i;\n\t\t\t\t\tost <= O_ARAM;",
+                           "fa2", r"fa2 L1: frames after"),
+}
+
+
+def plant_tree(work, name):
+    """a copy of the tree (HEAD and the working changes) with the plant"""
+    f, old, new, case, pat = PLANTS[name]
+    n = SS.chain_bits()
+    old, new = old.replace("{n}", str(n)), new.replace("{n}", str(n)).replace("{m}", str(n - 1))
+    d = os.path.join(work, "plants", name, "tree")
+    if os.path.exists(d):
+        shutil.rmtree(d)
+    os.makedirs(d)
+    subprocess.run("git -C %s archive HEAD | tar -x -C %s" % (ROOT, d), shell=True, check=True)
+    ch = subprocess.run(["git", "-C", ROOT, "status", "--porcelain"], capture_output=True, text=True).stdout
+    for l in ch.splitlines():
+        p_ = l[3:].split(" -> ")[-1]
+        if os.path.isfile(os.path.join(ROOT, p_)):
+            os.makedirs(os.path.dirname(os.path.join(d, p_)), exist_ok=True)
+            shutil.copy(os.path.join(ROOT, p_), os.path.join(d, p_))
+    t = open(os.path.join(d, f)).read()
+    if t.count(old) != 1:
+        raise SystemExit("plant %s: its line is not in %s exactly once" % (name, f))
+    open(os.path.join(d, f), "w").write(t.replace(old, new))
+    return d, case, pat
 
 
 def main():
@@ -351,7 +445,39 @@ def main():
     r.add_argument("--seed", type=int, default=2600)
     r.add_argument("--vtb")
     sub.add_parser("list")
+    pl = sub.add_parser("plant")
+    pl.add_argument("--work", required=True)
+    pl.add_argument("--only")
+    pl.add_argument("--games")
+    pl.add_argument("--seed", type=int, default=2600)
     a = ap.parse_args()
+    if a.cmd == "plant":
+        names = a.only.split(",") if a.only else list(PLANTS)
+        caught = 0
+        for name in names:
+            tree, case, pat = plant_tree(os.path.abspath(a.work), name)
+            pw = os.path.join(os.path.abspath(a.work), "plants", name)
+            env = dict(os.environ, SS_BENCH="1", BUILD_TOP="tb_load", WORK=pw, RTL_TREE=tree)
+            r = subprocess.run(["bash", os.path.join(tree, "sim", "run_sim.sh")], env=env, capture_output=True, text=True)
+            if r.returncode:
+                print("SSBENCH plant %s: build failed" % name)
+                continue
+            sub_a = argparse.Namespace(work=pw, vtb=os.path.join(pw, "obj_load", "vtb"), games=a.games, seed=a.seed,
+                                       jobs=2, only=case, build=False)
+            b = Bench(sub_a)
+            import io
+            import contextlib
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                b.run_case(case)
+            hit = [l for l in out.getvalue().splitlines() if "FAIL" in l and re.search(pat, l)]
+            ok = bool(hit)
+            caught += ok
+            print("SSBENCH plant %s (case %s): %s" % (name, case, ("caught: " + hit[0].replace("SSBENCH ", "")) if ok
+                                                       else "NOT caught (%d failed checks, none matching %s)" % (b.bad, pat)),
+                  flush=True)
+        print("SSBENCH plants %s (%d of %d caught)" % ("pass" if caught == len(names) else "FAIL", caught, len(names)))
+        return 0 if caught == len(names) else 1
     if a.cmd == "list":
         for k, c in CASES.items():
             print(k, c["kind"], c["img"])

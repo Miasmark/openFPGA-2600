@@ -73,7 +73,7 @@ PORT_NAMES = {"Joystick": 0, "Paddles": 2, "Driving": 3, "Light Gun": 4,
 PORTS = ["bs_override", "diff_left_b", "diff_right_b", "bw_setting", "savekey_setting",
          "swap_joysticks", "region_setting", "palette_temp", "port1_input", "port2_input",
          "turbo", "atarivox_setting", "stereo_tia", "stmix", "decomb", "flicker_blend",
-         "composite", "menu_reset"]
+         "composite", "menu_reset", "pause_in_menu"]
 
 # Analogue's documented fields and limits, from the APF developer pages
 # https://www.analogue.co/developer/docs/core-definition-files/<file>-json
@@ -695,7 +695,8 @@ def write_vectors(path, var, by_addr):
     The model is what the items mean (names checked above), not core_top's
     case statement: Left/Right Difficulty and TV Type and SaveKey are one bit;
     Audio's value is {stereo, mix[1:0]}, 2600 Video's {de-comb, blend},
-    Palette's {composite, temperature[1:0]};
+    Palette's {composite, temperature[1:0]}; Controllers' {no menu pause,
+    swap};
     Mapper wins over Mapper (more) when both are set."""
     st = {p: 0 for p in PORTS}
     bs = {"Mapper": 0, "Mapper (more)": 0}
@@ -705,13 +706,15 @@ def write_vectors(path, var, by_addr):
         if name == "Reset":
             return
         f = {"Left Difficulty": ["diff_left_b"], "Right Difficulty": ["diff_right_b"], "TV Type": ["bw_setting"],
-             "SaveKey (port 2)": ["savekey_setting"], "Swap Controllers": ["swap_joysticks"],
+             "SaveKey (port 2)": ["savekey_setting"],
              "Region": ["region_setting"], "Port 1 Input": ["port1_input"],
              "Port 2 Input": ["port2_input"], "Turbo (X/Y)": ["turbo"], "AtariVox Voice": ["atarivox_setting"]}
         if name in f:
             st[f[name][0]] = val
         elif name == "Palette":
             st["palette_temp"], st["composite"] = val & 3, val >> 2 & 1
+        elif name == "Controllers":       # bit 0 Swap Controllers, bit 1 no menu pause (save states)
+            st["swap_joysticks"], st["pause_in_menu"] = val & 1, 1 - (val >> 1 & 1)
         elif name == "Audio":
             st["stereo_tia"], st["stmix"] = val >> 2 & 1, val & 3
         elif name == "2600 Video":

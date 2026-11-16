@@ -159,6 +159,13 @@ become `logic`), builds two testbenches, and runs them:
   catch. `tb_load +padshadow` runs the four `paddle_timer` beside the core
   and compares them with the engine on every clock (extra_tests.sh's inputs
   runs).
+- Save states ([SAVESTATE.md](SAVESTATE.md) 7): `sim/ss_bench.py run`
+  (round trips, refusals, menu and wake in the whole core against its own
+  straight run; `--games DIR` adds the owner's games, copied into the work
+  folder) and `sim/ss_bench.py plant` (planted faults), on `tb_load` built
+  with `SS_BENCH=1`; `sim/run_sschain.sh` measures the scan chain against
+  `tools/savestate/chain_bits.txt`; `tools/savestate/completeness.py` checks
+  a `quartus_map` of the tree against the chain.
 - `tb_region` (`run_region.sh`): the wrapper's region logic (`region_pll`
   and, with DARIA, `daria_rgn`), cut out of `atari2600_pocket.sv` as the
   tree has it by `region_unit.py`, with `pll_region.v` in the load sequences

@@ -235,7 +235,18 @@ paddle engine (`paddle_timer4.sv`) and the virtual axes are saved whole, so
 a paddle or driving game resumes with its knob where it was, and the
 paddles' learned calibration with it (D9).
 
-### 5.2 Not in the state
+### 5.2 The completeness check
+
+`tools/savestate/completeness.py REGS` reads the post-map register names of
+a `quartus_map` of the chained tree and fails on any register below a
+chained module that is neither in the chain nor on its list of what is not
+state (with the reason): a register a later change adds, or one Quartus
+keeps that the base build had removed, cannot go unsaved unnoticed. A
+register Quartus names after a chain wire (`ss_c20`, `ss_so`) is a chained
+one, and a name chained whole (an enum the base kept one-hot) counts in
+whatever form the build keeps it.
+
+### 5.3 Not in the state
 
 - the Pocket's controllers and their conditioning (the dual-stick last-wins
   latches, the analog sticks' direction filter, the turbo counter, the TV
@@ -262,4 +273,54 @@ Pocket shows its own failure message.
 
 ## 7 Verification
 
-See `sim/tb_load.sv`'s `+ss_*` options and the save-state benches.
+The oracle is the core itself: a straight run of the same image and inputs
+(RTL against RTL). `sim/tb_load.sv`'s save-state host (`+ss_save`,
+`+ss_load`, `+ss_load_reset`, `+ss_menu`) drives the commands and the blob
+as the Pocket does (one bridge access every 88 clk_74a), and its machine
+fingerprint (`+ssfp`) gives, per machine frame, the frame's machine clocks
+and hashes of the RIOT RAM, the picture, the sound and the CPU's bus, all
+counted on the clocks the machine is not held, so a freeze of any length
+leaves it unchanged. The joyscript's inputs run on machine time too, and a
+load moves it to the saved machine's, so inputs land on the same machine
+clock in every run. Benches are built with `SS_BENCH=1` (`sim/run_sim.sh`:
+the 6507's `unique case` checks fire while its control word shifts).
+
+`sim/ss_bench.py run` runs, per case (synthetic images from the repo's
+scripts, and with `--games` the owner's games, copied into the work folder):
+
+- **R** a straight run; **S** the same with saves at seeded random moments:
+  every frame equal to R's, every blob passing `savestate.py verify`;
+- **L** the first blob loaded into a core that has run 60 ms on its own,
+  and the last into one that has run long past it: every frame after the
+  saved one equal to R's;
+- **F** (the probe image) nine bad blobs, each refused, the run untouched
+  (every frame as R): a payload byte, the header CRC, the version, the chain
+  signature, a reserved word, the gap with its CRC made right, a word past
+  the live part, another cartridge's CRC, the PAL flag;
+- **X** the refused schemes (DPC+, the Supercharger, an A78): err at once,
+  never frozen, the run as R;
+- **M** the menu twice with Pause in Menu (the machine held while it is
+  open) and once without (never held), every frame as R;
+- **W** wake: the load asked for in reset, applied at the reset's exit,
+  every frame after the saved one as R.
+
+`sim/ss_bench.py plant` builds the tree with one planted fault each and
+runs the case aimed at it, which must fail on the check aimed at it: the
+chain one bit short, the paddles' segment bypassed, the RIOT RAM not saved,
+the cartridge RAM one byte off, the payload CRC, the cartridge CRC, the
+chain signature and the PAL flag not checked, the paddles not frozen, the
+AtariVox's RAM address not held, the FA2 work RAM not loaded.
+
+`sim/run_sschain.sh` measures the chain (it must equal `chain_bits.txt`),
+and `tb_paddles4` saves and loads the paddle engine's own segment against
+four `paddle_timer`. With no save made, `sim/run_sim.sh` and the repo's
+gates give exactly the frames they gave before save states.
+
+## 8 Open points for the Pocket
+
+- The host's order on wake (load before or after the reset's exit) is not
+  documented; the core serves both (section 1).
+- How the Pocket's scaler takes the substitute raster at a freeze and a
+  load's resume, and the black picture while frozen.
+- Whether the Pocket greys out Memories for a refused scheme (it answers
+  err; the study's option of `supported = 0` per game is not built).

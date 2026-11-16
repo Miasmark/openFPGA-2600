@@ -190,6 +190,15 @@ wire        ss_t_own, ss_t_rd, ss_t_wr;
 wire [16:0] ss_t_addr;
 wire  [7:0] ss_t_wdata;
 wire        main_cpu_ce, vox_quiet, vox_on_f;
+// A reset that comes while the machine is held (the menu's pause: the
+// Pocket's Reset, a cartridge load) would find every flip-flop holding and
+// be lost; ss_rst_pend keeps it for the chained modules until 16 clk_sys
+// after the machine runs again (ss_ctl drops a menu's freeze on a reset).
+/* verilator lint_off PROCASSINIT */
+reg         ss_rst_pend = 1'b0;
+reg   [4:0] ss_rst_cnt = 5'd0;
+/* verilator lint_on PROCASSINIT */
+wire        reset_m;
 
 reg old_cart_download = 1'b0;
 wire mapper_init_busy;
@@ -231,6 +240,17 @@ always @(posedge clk_sys) begin
 		daria_rt_cnt <= daria_rt_cnt - 4'd1;
 end
 `endif
+
+always @(posedge clk_sys) begin
+	if (reset && ss_hold) begin
+		ss_rst_pend <= 1'b1;
+		ss_rst_cnt  <= 5'd16;
+	end else if (!ss_hold && ss_rst_cnt != 5'd0)
+		ss_rst_cnt  <= ss_rst_cnt - 5'd1;
+	else if (!ss_hold)
+		ss_rst_pend <= 1'b0;
+end
+assign reset_m = reset | ss_rst_pend;
 
 always @(posedge clk_sys) begin
 	old_cart_download <= cart_download;
@@ -534,7 +554,7 @@ EEPROM_24LC0X #(
 	.ss_so          (ss_c_sk),
 	.clk            (clk_sys),
 	.ce             (1'b1),
-	.reset          (reset | ~use_sk),
+	.reset          (reset_m | ~use_sk),
 	.SCL            (PAout[3]),
 	.SDA_in         (PAout[2]),
 	.SDA_out        (sk_sda),
@@ -901,7 +921,7 @@ paddle_timer4 pads (
 	.ss_so   (ss_c_pd),
 	.clk     (clk_sys),
 	.ce      (1'b1),
-	.reset   ({4{reset}} | ~paddle_en),
+	.reset   ({4{reset_m}} | ~paddle_en),
 	.kohms   ({~vx_pos[3], ~vx_pos[2], ~vx_pos[1], ~vx_pos[0]}),
 	.clear   (~iout[1]),
 	.read    (i_read),
@@ -929,7 +949,7 @@ lightgun lightgun (
 	.ss_si        (ss_c_va),
 	.ss_so        (ss_c_lg),
 	.CLK          (clk_sys),
-	.RESET        (reset),
+	.RESET        (reset_m),
 	.MOUSE        (25'd0),
 	.MOUSE_XY     (1'b0),
 	.LIGHT        (|core_r[7:4] || |core_g[7:4] || |core_b[7:4]),
@@ -1149,6 +1169,20 @@ wire        [15:0] core_audio_l, core_audio_r, audio_live_l, audio_live_r;
 // Off. A console reset leaves it running, as the real one, powered from the
 // port; a cart load resets it.
 wire vox_on = use_sk && (atarivox_setting != 2'd0);
+// its reset, kept while the machine is held as the console's is (ss_rst_pend)
+wire vox_reset = reset_in | cart_download | ~vox_on;
+/* verilator lint_off PROCASSINIT */
+reg  vox_rst_pend = 1'b0;
+reg  [4:0] vox_rst_cnt = 5'd0;
+/* verilator lint_on PROCASSINIT */
+always @(posedge clk_sys)
+	if (vox_reset && ss_hold) begin
+		vox_rst_pend <= 1'b1;
+		vox_rst_cnt  <= 5'd16;
+	end else if (!ss_hold && vox_rst_cnt != 5'd0)
+		vox_rst_cnt  <= vox_rst_cnt - 5'd1;
+	else if (!ss_hold)
+		vox_rst_pend <= 1'b0;
 assign vox_on_f = vox_on;
 wire signed [15:0] vox_sample;
 atarivox atarivox (
@@ -1163,7 +1197,7 @@ atarivox atarivox (
 	.ss_rq  (ss_rq_vox),
 	.quiet  (vox_quiet),
 	.clk    (clk_sys),
-	.reset  (reset_in | cart_download | ~vox_on),
+	.reset  (vox_reset | vox_rst_pend),
 	.pal    (region_pll),
 	.line   (PAout[0]),
 	.down_n (vox_down_n),
@@ -1248,7 +1282,7 @@ Atari7800 main
 	.fw_addr      (ioctl_addr[10:0]),
 	.fw_data      (ioctl_dout),
 	.clk_sys      (clk_sys),
-	.reset        (reset),
+	.reset        (reset_m),
 `ifdef POCKET_DARIA
 	.loading      (cart_download || mapper_init_busy || daria_hold),
 `else

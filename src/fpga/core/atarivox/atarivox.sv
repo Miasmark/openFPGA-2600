@@ -96,14 +96,17 @@ module atarivox (
 	assign down_n = ~half_full;
 	assign ss_so  = ss_c2;
 
-	// quiet: rx idle and the sample 0 for 4,096 ticks; not a machine
-	// register (not chained), it follows the voice whatever the freeze.
+	// quiet: rx idle and the sample 0 for 4,096 ticks. Not machine state
+	// (not chained): it holds while the voice is held (a shifting chain
+	// shows it arbitrary samples), so a save does not restart it.
 	/* verilator lint_off PROCASSINIT */
 	logic [12:0] qcnt = 13'd0;
 	/* verilator lint_on PROCASSINIT */
 	always_ff @(posedge clk)
 		if (reset)
 			qcnt <= 13'h1000;
+		else if (ss_en || ss_frz)
+			qcnt <= qcnt;
 		else if (!rx_idle || sample != 16'sd0)
 			qcnt <= 13'd0;
 		else if (tick && !qcnt[12])

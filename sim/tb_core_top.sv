@@ -128,13 +128,14 @@ module tb_core_top;
 			15: port_val = 32'(dut.atari.flicker_blend);
 			16: port_val = 32'(dut.atari.composite);
 			17: port_val = 32'(dut.atari.reset_in);
+			18: port_val = 32'(dut.atari.pause_in_menu);
 			default: port_val = 32'hDEADBEEF;
 		endcase
 	endfunction
-	string port_name [0:17] = '{"bs_override", "diff_left_b", "diff_right_b", "bw_setting",
+	string port_name [0:18] = '{"bs_override", "diff_left_b", "diff_right_b", "bw_setting",
 		"savekey_setting", "swap_joysticks", "region_setting", "palette_temp", "port1_input",
 		"port2_input", "turbo", "atarivox_setting", "stereo_tia", "stmix", "decomb",
-		"flicker_blend", "composite", "menu_reset"};
+		"flicker_blend", "composite", "menu_reset", "pause_in_menu"};
 
 	// Scaler slot monitor (clk_sys, as core_top sends it)
 	integer ntsc_slot = 7, pal_slot = 7;

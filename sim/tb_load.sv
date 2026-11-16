@@ -1340,10 +1340,14 @@ module tb_load;
 	//                          applied at the reset's exit)
 	//   +ss_menu=MS:LEN[,..]   the menu open LEN ms; +ss_nopause: Pause in
 	//                          Menu off
+	//   +ss_reset=MS           a 64 clk_sys reset (the Pocket's menu Reset)
 	//   +ssfp=FILE             the machine's frames, counted on the clocks it
 	//                          is not held (dut.ss_hold low): frame, clocks,
 	//                          RIOT RAM, picture (main's RGB), sound (main's),
 	//                          CPU bus hashes; one line per machine VSync rise
+	//   +ss_anywhere           freeze at the first CPU cycle after the request,
+	//                          not at a frame boundary (a bench's wider net:
+	//                          the machine saved mid-frame, mid-line)
 	//   +ss_measure            fill the chain with 0, shift a 1 through it and
 	//                          print each segment's length (destroys the
 	//                          state), then finish
@@ -1421,7 +1425,7 @@ module tb_load;
 	endtask
 	initial begin
 		automatic string arg, path;
-		automatic int ms[$], rc, fd, at_ms, nsave = 0, f0, rst_ms;
+		automatic int ms[$], rc, fd, at_ms, nsave = 0, f0, rst_ms, rst_at;
 		automatic longint mt0;
 		automatic longint clocks;
 		automatic logic [31:0] w;
@@ -1429,6 +1433,17 @@ module tb_load;
 		if ($test$plusargs("ss_nopause")) ss_pause_en = 1'b0;
 		wait (reset_in == 1'b0);
 		ss_t0 = $time;
+		// +ss_reset=MS: a short reset (64 clk_sys, as the Pocket's menu Reset:
+		// core_top.v's 255 clk_74a) MS after the start, on the wall clock
+		if ($value$plusargs("ss_reset=%d", rst_at)) fork
+			begin
+				ss_wait_ms(rst_at);
+				reset_in = 1'b1;
+				$display("SS reset at %0d ms (machine clock %0d, held %0d)", rst_at, ss_mclk, dut.ss_hold);
+				repeat (64) @(posedge clk_sys);
+				reset_in = 1'b0;
+			end
+		join_none
 		if ($value$plusargs("ss_menu=%s", arg)) fork
 			begin
 				automatic int a = 0, b = 0, i = 0;
@@ -1569,6 +1584,17 @@ module tb_load;
 	end
 	final if (ssfp_fd != 0) $fclose(ssfp_fd);
 
+	initial if ($test$plusargs("ss_anywhere")) force dut.ss_ctl.nov = 3'd4;
+	// +ss_trace: the freeze's conditions as they change
+	bit ss_trace = 0;
+	logic [3:0] ss_tr_q = 4'hF;
+	initial ss_trace = $test$plusargs("ss_trace");
+	always @(posedge clk_sys) if (ss_trace && {dut.sk_idle, dut.fa2_quiet_cnt[3], dut.vox_quiet, dut.ss_frz} != ss_tr_q) begin
+		ss_tr_q <= {dut.sk_idle, dut.fa2_quiet_cnt[3], dut.vox_quiet, dut.ss_frz};
+		$display("SS trace %0.3f ms: SaveKey idle %0d, FA2 quiet %0d, AtariVox quiet %0d, frozen %0d",
+			($time - ss_t0) / 1.0e6, dut.sk_idle, dut.fa2_quiet_cnt[3], dut.vox_quiet, dut.ss_frz);
+	end
+
 	// +ss_measure: each segment's length
 	initial if ($test$plusargs("ss_measure")) begin
 		automatic int pos[7], n = 0;
@@ -1642,9 +1668,40 @@ module tb_load;
 	//                      1:0; "-" for none)
 	// and print each switch change as "SWITCH at N ms: ...".
 	longint t_run = 0;
+	// a state word of the script (the controllers, the stick, the switch
+	// items), applied; quiet: a save-state load's replay (no SWITCH line)
+	function automatic bit js_state(input string word, input int ms, input bit quiet);
+		automatic string key, val;
+		automatic int eq = -1;
+		for (int i = 0; i < word.len(); i++) if (word[i] == "=") begin eq = i; break; end
+		key = eq < 0 ? word : word.substr(0, eq - 1);
+		val = eq < 0 ? "" : word.substr(eq + 1, word.len() - 1);
+		if (key == "joy0") joy0 = 16'(val.atohex());
+		else if (key == "joy1") joy1 = 16'(val.atohex());
+		else if (key == "joy2") joy2 = 16'(val.atohex());
+		else if (key == "joy3") joy3 = 16'(val.atohex());
+		else if (key == "ana0") ana0 = 16'(val.atohex());
+		else if (key == "ldiff" || key == "rdiff" || key == "bw") begin
+			if (key == "ldiff") ldiff_b = (val == "B");
+			if (key == "rdiff") rdiff_b = (val == "B");
+			if (key == "bw") bw_set = (val == "1");
+			if (!quiet)
+				$display("SWITCH at %0d ms: %0s (left %0s, right %0s, TV type item %0s)", ms, word,
+					ldiff_b ? "B" : "A", rdiff_b ? "B" : "A", bw_set ? "B&W" : "Colour");
+		end
+		else if (eq < 0 && word != "dump" && word != "show" && word != "drive" && word != "types" && word != "reset")
+			joy0 = 16'(word.atohex());
+		else return 0;
+		return 1;
+	endfunction
 	initial begin
-		automatic string jpath, line, word, key, val;
-		automatic int jf, ms, at = 0, eq;
+		automatic string jpath, line, word;
+		automatic int jf, ms, at = 0;
+		automatic int js_ms[$];
+		automatic string js_word[$];
+		automatic logic [15:0] j0, j1, j2, j3, a0;
+		automatic logic l0, r0, b0;
+		automatic bit js_done = 1'b0;
 		wait (reset_in == 1'b0);
 		t_run = $time;
 		if ($value$plusargs("joyscript=%s", jpath)) begin
@@ -1653,19 +1710,40 @@ module tb_load;
 			capture = 1;                     // fb always holds the last whole frame
 			while ($fgets(line, jf) > 0) begin
 				if ($sscanf(line, "%d %s", ms, word) != 2 || word.substr(0, 0) == "#") continue;
+				js_ms.push_back(ms);
+				js_word.push_back(word);
+			end
+			$fclose(jf);
+			// the inputs before the script, for a load's replay
+			j0 = joy0; j1 = joy1; j2 = joy2; j3 = joy3; a0 = ana0; l0 = ldiff_b; r0 = rdiff_b; b0 = bw_set;
+			for (int e = 0; e < js_ms.size(); e++) begin
+				ms = js_ms[e];
+				word = js_word[e];
 				// machine time: clk_sys while the machine is not held for a
 				// save state (dut.ss_hold), and a load moves it to the saved
-				// machine's (js_jump); without save states, every clk_sys
+				// machine's (js_jump): the inputs are then those the script
+				// gives at that time (its state words replayed from the start),
+				// and it goes on from the first word after it; without save
+				// states, every clk_sys
 				while (js_t < longint'(ms) * 14318) begin
 					@(posedge clk_sys);
 					if (!dut.ss_hold) js_t++;
-					if (js_jump >= 0) begin js_t = js_jump; js_jump = -1; end
+					if (js_jump >= 0) begin
+						js_t = js_jump;
+						js_jump = -1;
+						joy0 = j0; joy1 = j1; joy2 = j2; joy3 = j3; ana0 = a0; ldiff_b = l0; rdiff_b = r0; bw_set = b0;
+						e = 0;
+						while (e < js_ms.size() && longint'(js_ms[e]) * 14318 <= js_t) begin
+							void'(js_state(js_word[e], js_ms[e], 1'b1));
+							e++;
+						end
+						if (e >= js_ms.size()) begin js_done = 1'b1; break; end
+						ms = js_ms[e];
+						word = js_word[e];
+					end
 				end
+				if (js_done) break;                       // the script ended in a replay
 				at = ms;
-				eq = -1;
-				for (int i = 0; i < word.len(); i++) if (word[i] == "=") begin eq = i; break; end
-				key = eq < 0 ? word : word.substr(0, eq - 1);
-				val = eq < 0 ? "" : word.substr(eq + 1, word.len() - 1);
 				if (word == "dump") dump_frames = dumped + 1;
 				else if (word == "show") show($sformatf("at %0d ms", ms));
 				else if (word == "drive") begin
@@ -1683,22 +1761,8 @@ module tb_load;
 					at += 10;
 					js_t += 14318 * 10;
 				end
-				else if (key == "joy0") joy0 = 16'(val.atohex());
-				else if (key == "joy1") joy1 = 16'(val.atohex());
-				else if (key == "joy2") joy2 = 16'(val.atohex());
-				else if (key == "joy3") joy3 = 16'(val.atohex());
-				else if (key == "ana0") ana0 = 16'(val.atohex());
-				else if (key == "ldiff" || key == "rdiff" || key == "bw") begin
-					if (key == "ldiff") ldiff_b = (val == "B");
-					if (key == "rdiff") rdiff_b = (val == "B");
-					if (key == "bw") bw_set = (val == "1");
-					$display("SWITCH at %0d ms: %0s (left %0s, right %0s, TV type item %0s)", ms, word,
-						ldiff_b ? "B" : "A", rdiff_b ? "B" : "A", bw_set ? "B&W" : "Colour");
-				end
-				else if (eq < 0) joy0 = 16'(word.atohex());
-				else begin $display("joyscript: unknown word %s", word); $fatal(1, "joyscript"); end
+				else if (!js_state(word, ms, 1'b0)) begin $display("joyscript: unknown word %s", word); $fatal(1, "joyscript"); end
 			end
-			$fclose(jf);
 		end
 	end
 
