@@ -57,7 +57,7 @@ SPIRIT_IMAGE_SIZE = 171930
 MAPPER_NAMES = {
     "F8": "BANKF8", "F6": "BANKF6", "F4": "BANKF4", "F0": "BANKF0", "FA": "BANKFA", "FE": "BANKFE",
     "E0": "BANKE0", "E7": "BANKE7", "3F": "BANK3F", "3E": "BANK3E", "CV": "BANKCV", "UA": "BANKUA",
-    "EF": "BANKEF", "SB": "BANKSB", "FA2": "BANKFA2", "WD": "BANKWD", "JANE": "BANKJANE",
+    "EF": "BANKEF", "SB": "BANKSB", "32-in-1": "BANK32", "WD": "BANKWD", "JANE": "BANKJANE",
     "CTY": "BANKCTY", "0840": "BANK0840", "FC": "BANKFC", "DF/BF": "BANKDF",
     "Multi 2K": "BANKMC2K", "Multi 4K": "BANKMC4K", "Multi 8K": "BANKMC8K",
 }
@@ -483,15 +483,16 @@ def main():
     # BUS is never offered (no released game); 2K and DPC are left out to keep
     # each list at 15 options (the Pocket's real limit), as detect2600.sv
     # finds both by size alone: 2 KiB or less, and 10 KiB to 10 KiB + 256.
-    # AR, DPC+, CDF and 32-in-1 left the lists for the Pocket's menu limits
+    # AR, DPC+, CDF and FA2 left the lists for the Pocket's menu limits
     # (above), as detect2600.sv finds them itself (the Supercharger's sizes,
-    # the ARM drivers' signatures, a 32-in-1's size); their values stay decoded.
-    not_offered = {enum.index(t) for t in ("BANKBUS", "BANK2K", "BANKP2", "BANKAR", "BANKDPCP", "BANKCDF", "BANK32")}
+    # the ARM drivers' signatures, FA2's sizes and padding); their values
+    # stay decoded. 32-in-1 stays: a real one is 64 KB, which detects as F0.
+    not_offered = {enum.index(t) for t in ("BANKBUS", "BANK2K", "BANKP2", "BANKAR", "BANKDPCP", "BANKCDF", "BANKFA2")}
     forcible = set(range(1, 32)) - not_offered
     check(sorted(seen) == sorted(forcible),
-          "the two Mapper lists force each of bss_type 1-31 exactly once, except BUS, 2K, DPC, AR, DPC+, CDF and 32-in-1")
-    check(all(re.search(r"force_bs\s*<=\s*%s\b" % t, detect) for t in ("BANKAR", "BANKDPCP", "BANKCDF", "BANK32")),
-          "AR, DPC+, CDF and 32-in-1 are still detected by detect2600.sv")
+          "the two Mapper lists force each of bss_type 1-31 exactly once, except BUS, 2K, DPC, AR, DPC+, CDF and FA2")
+    check(all(re.search(r"force_bs\s*<=\s*%s\b" % t, detect) for t in ("BANKAR", "BANKDPCP", "BANKCDF", "BANKFA2")),
+          "AR, DPC+, CDF and FA2 are still detected by detect2600.sv")
     check(re.search(r"cart_size <= 'h0800\) force_bs<=BANK2K", detect) is not None
           and re.search(r"cart_size >= 'h2800 && cart_size <= 'h2900\) force_bs<=BANKP2", detect) is not None,
           "2K and DPC are still detected by size in detect2600.sv")

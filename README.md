@@ -44,10 +44,9 @@ exception (see *Verification*).
     (the Starpath Supercharger), and the ARM schemes DPC+, CDF, CDFJ and
     CDFJ+ (next item).
   - The multicart schemes MC2K, MC4K and MC8K are reached through the
-    *Mapper (more)* setting only. 32-in-1 is detected only for an image
-    between 32 and 64 KB long; a real 32-in-1 image is 64 KB, which
-    detection takes as F0 (or EF), and the setting that forced 32-in-1 left
-    the menu for the Pocket's menu limits (*Settings*).
+    *Mapper (more)* setting only. So is 32-in-1 for a real 32-in-1 image:
+    it is 64 KB, and detection takes a 64 KB image as F0 (or EF). It picks
+    32-in-1 only for an image between 32 and 64 KB long.
 - **2600 ARM cartridges**: DPC+ and the CDF family (CDF, CDFJ and CDFJ+),
   the Harmony and Melody games such as the Champ Games releases. MiSTer runs
   them on a soft ARM7TDMI that doesn't fit the Pocket; this core runs them on
@@ -196,7 +195,7 @@ The Pocket shows at most 16 settings; this core uses all 16.
 | *Audio* | Mono TIA; Stereo TIA; Stereo, 25% Blend; Stereo, 50% Blend; Full Mono | |
 | *2600 Video* | Normal, Flicker Blend, De-comb, Blend + De-comb | |
 | *Mapper* | Auto, F8, F6, F4, F0, FA, FE, E0, E7, 3F, 3E, CV, UA, EF, SB | Forces a scheme for the cartridge you load next |
-| *Mapper (more)* | Auto, FA2, WD, JANE, CTY, 0840, FC, DF/BF, Multi 2K, Multi 4K, Multi 8K | The same, for the other schemes; *Mapper* wins when both are set |
+| *Mapper (more)* | Auto, WD, JANE, CTY, 0840, FC, DF/BF, Multi 2K, Multi 4K, Multi 8K, 32-in-1 | The same, for the other schemes; *Mapper* wins when both are set |
 
 The two Mapper settings are not saved: they are back on Auto each time the
 core starts. A forced scheme stays forced for every cartridge loaded until
@@ -205,13 +204,13 @@ unsupported-cartridge screen), and neither can ELF.
 
 The lists name each scheme by its code only (in 1.0.1 *FA (CBS RAM+)*,
 *Multicart 2K* and so on), and AR (Supercharger), DPC+, CDF / CDFJ / CDFJ+
-and 32-in-1 are no longer in them: the Pocket refuses a menu with more than
+and FA2 are no longer in them: the Pocket refuses a menu with more than
 72 options, or with more than about 731 characters in its names (measured
 on the owner's Pocket; Analogue does not document either limit), and the
 composite palettes needed the room. Auto still finds each of the four
 itself: the Supercharger's tapes by their size, the ARM schemes by their
-drivers' signatures, 32-in-1 by its size (between 32 and 64 KB only: a real
-64 KB 32-in-1 image now runs as F0).
+drivers' signatures, FA2 by its sizes and padding. 32-in-1 stays in the
+list: a real 32-in-1 image is 64 KB, which detection takes as F0.
 
 ## Controls
 
