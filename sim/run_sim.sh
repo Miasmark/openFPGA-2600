@@ -168,7 +168,7 @@ VL_OPT=(-O2)
 # Save states (docs/SAVESTATE.md 6): while the scan chain shifts, the 6507's
 # control word holds arbitrary patterns, and its `unique case` checks fire;
 # the save-state benches build with SS_BENCH=1, without them.
-[ "${SS_BENCH:-0}" = 1 ] && VL_OPT+=(--no-assert-case)
+[ "${SS_BENCH:-0}" = 1 ] && VL_OPT=(-O3 --x-assign fast --x-initial fast --no-assert-case)
 build() {   # build <top> <objdir> [more bench sources]
 	local top="$1" obj="$2"; shift 2
 	"${VERILATOR:-verilator}" --binary --timing -j "${VL_JOBS:-4}" "${VL_OPT[@]}" -Wno-fatal -Wno-lint -Wno-style -Wno-MULTIDRIVEN \

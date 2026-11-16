@@ -1343,7 +1343,8 @@ module tb_load;
 	//   +ss_reset=MS           a 64 clk_sys reset (the Pocket's menu Reset)
 	//   +ssfp=FILE             the machine's frames, counted on the clocks it
 	//                          is not held (dut.ss_hold low): frame, clocks,
-	//                          RIOT RAM, picture (main's RGB), sound (main's),
+	//                          RIOT RAM, picture (main's RGB), sound (main's
+	//                          and the AtariVox's mix),
 	//                          CPU bus hashes; one line per machine VSync rise
 	//   +ss_anywhere           freeze at the first CPU cycle after the request,
 	//                          not at a frame boundary (a bench's wider net:
@@ -1573,8 +1574,9 @@ module tb_load;
 				ssfp_t0 = ss_mclk;
 			end
 			if (dut.rgb_ce && !dut.rgb_hb && !dut.rgb_vb) ssfp_video = fnv(fnv(fnv(ssfp_video, dut.rgb_r), dut.rgb_g), dut.rgb_b);
-			if ({dut.core_audio_l, dut.core_audio_r} != ssfp_last) begin
-				ssfp_last = {dut.core_audio_l, dut.core_audio_r};
+			// the sound with the AtariVox's voice mixed in (the wrapper's, before its hold)
+			if ({dut.audio_live_l, dut.audio_live_r} != ssfp_last) begin
+				ssfp_last = {dut.audio_live_l, dut.audio_live_r};
 				for (int i = 0; i < 4; i++) ssfp_audio = fnv(ssfp_audio, ssfp_last[i*8 +: 8]);
 			end
 			if (`FP_CPU.core_phi2_en)

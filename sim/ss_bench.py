@@ -127,6 +127,10 @@ class Bench:
         self.lines = []
         self.bad = 0
         self.rng = random.Random(a.seed)
+        self.focus = getattr(a, "focus", None)      # a plant's: only these parts (S always)
+
+    def part(self, p):
+        return self.focus is None or p in self.focus
 
     def say(self, s, ok=True):
         print("SSBENCH " + s + ("" if ok else "  <-- FAIL"), flush=True)
@@ -258,8 +262,21 @@ class Bench:
             self.say("%s blob %s: %s" % (name, s[0], v.stdout.strip().splitlines()[-1] if v.stdout else "no output"),
                      v.returncode == 0)
             blobs.append((b, int(s[4]), mts.get(s[0], -1)))
-        if not blobs:
-            return
+        blobs_all = list(blobs)
+        if not blobs or not self.part("L"):
+            blobs = blobs if self.part("L") else []
+        if blobs:
+            self.loads(name, d, base, c, R, blobs)
+        if c.get("A") and self.part("A"):
+            self.anywhere(name, d, base, c, R)
+        if c.get("F") and self.part("F") and blobs_all:
+            self.bad_blobs(name, d, base, blobs_all[0][0], R)
+        if c.get("M") and self.part("M"):
+            self.menu(name, d, base, R)
+        if c.get("W") and self.part("W") and blobs_all:
+            self.wake(name, d, base, blobs_all[0], R)
+
+    def loads(self, name, d, base, c, R, blobs):
         # L: the first blob into a core that ran 60 ms; the last into one that ran long past it
         loads = [("L1", blobs[0], 60), ("L2", blobs[-1], max(c["ms"] // 2 + 100, 300))]
         with cf.ThreadPoolExecutor(2) as ex:
@@ -275,14 +292,6 @@ class Bench:
                          bool(m) and m.group(1) == "ok")
                 self.compare(R, self.frames(os.path.join(d, "%s.csv" % tag)), f0,
                              "%s %s: frames after the saved one (%d) as R" % (name, tag, f0))
-        if c.get("A"):
-            self.anywhere(name, d, base, c, R)
-        if c.get("F"):
-            self.bad_blobs(name, d, base, blobs[0][0], R)
-        if c.get("M"):
-            self.menu(name, d, base, R)
-        if c.get("W"):
-            self.wake(name, d, base, blobs[0], R)
 
     def anywhere(self, name, d, base, c, R):
         """A: saves frozen at the first CPU cycle after the request (mid-frame,
@@ -410,6 +419,12 @@ PLANTS = {
 }
 
 
+# the parts of its case a plant runs (S always; the rest only if listed)
+PLANT_FOCUS = {"payload_crc_unchecked": {"F"}, "cart_crc_unchecked": {"F"}, "chain_sig_unchecked": {"F"},
+               "pal_unchecked": {"F"}, "vox_ram_address_unheld": {"S"}, "paddles_not_frozen": {"S"},
+               "chain_short": {"S"}, "paddles_bypassed": {"S"}}
+
+
 def plant_tree(work, name):
     """a copy of the tree (HEAD and the working changes) with the plant"""
     f, old, new, case, pat = PLANTS[name]
@@ -463,7 +478,7 @@ def main():
                 print("SSBENCH plant %s: build failed" % name)
                 continue
             sub_a = argparse.Namespace(work=pw, vtb=os.path.join(pw, "obj_load", "vtb"), games=a.games, seed=a.seed,
-                                       jobs=2, only=case, build=False)
+                                       jobs=2, only=case, build=False, focus=PLANT_FOCUS.get(name, {"S", "L"}))
             b = Bench(sub_a)
             import io
             import contextlib
