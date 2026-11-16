@@ -202,8 +202,12 @@ answer is err and the machine resumes where it was, untouched:
 
 The other flags (SaveKey and AtariVox on, the port types, a forced mapper)
 are kept for information and not checked: a state loads with other
-settings. `python3 tools/savestate/savestate.py verify BLOB --cart-crc X
---cart-len N --mapper W --flags W` makes the same checks on a file.
+settings. `python3 tools/savestate/savestate.py verify BLOB --image FILE`
+(or `--cart-crc X --cart-len N`, and `--mapper W --flags W`) makes the same
+checks on a file. The cartridge's CRC32 and length cover the bytes the
+loader takes: the file rounded up to whole 32-bit bridge words (Pitfall II's
+10,495 bytes are 10,496), with the host's pad bytes (`--pad`, default $FF
+as `sim/tb_load.sv` sends them).
 
 ## 5 The chain
 

@@ -68,7 +68,9 @@ for m in GEN_MAP:
     CASES["map_" + m] = dict(img=("py", "ss_mapper_test.py", m), bs=True, ms=600, saves=2, kind="rt")
 for m in GEN_RAM:
     CASES["ram_" + m] = dict(img=("py", "cartram2600_test.py", m), bs=True, ms=600, saves=2, kind="rt", A=m in ("e7", "3e", "f8sc"))
-CASES["fa2"] = dict(img=("py", "fa2_test.py", "image"), ms=700, saves=2, kind="rt")
+# the FA2 work RAM read and changed on and on (image-loop), so a work RAM
+# not restored by a load shows (the plant fa2_ram_not_loaded)
+CASES["fa2"] = dict(img=("py", "fa2_test.py", "image-loop"), ms=700, saves=2, kind="rt")
 CASES["paddles"] = dict(img=("py", "input_test.py"), ms=900, saves=3, kind="rt", A=True,
                         args=["+port1=2", "+port2=2", "+joyscript=@paddles"])
 # the SaveKey round trip runs in the first frames: saves inside it (2-40 ms)
@@ -217,7 +219,11 @@ class Bench:
         return ok
 
     def blob_info(self, img, d):
+        """the header's cartridge CRC32 and length: over the bytes the loader
+        takes, the file rounded up to whole 32-bit bridge words (tb_load pads
+        them with $FF; Pitfall II's 10,495 bytes are 10,496)"""
         data = open(img, "rb").read()
+        data += b"\xff" * (-len(data) % 4)
         return zlib.crc32(data), len(data)
 
     def run_case(self, name):

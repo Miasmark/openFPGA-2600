@@ -2,6 +2,9 @@
 """Synthetic FA2 test cartridge and flash files for tb_load's +fa2prog (no game data).
 
   fa2_test.py image          24 KiB FA2 image (6 banks of 4 KiB) on stdout
+  fa2_test.py image-loop     the same, then forever (the save-state bench's
+                             fa2 case): the work RAM's bytes XORed into RIOT
+                             RAM $81, and one byte of it changed, each pass
   fa2_test.py flash SEED     256 pseudo-random bytes (random.Random(SEED))
   fa2_test.py expect [SEED]  what the program leaves in the flash, starting
                              from that file, or from a blank flash ($FF)
@@ -40,7 +43,7 @@ import sys
 ORG = 0x1200
 
 
-def program():
+def program(loop=False):
     code, fix, lab = bytearray(), [], {}
 
     def op(*b):
@@ -81,6 +84,21 @@ def program():
     bne("fill")
     command(1, "load2")
     op(0xA9, 0xA5, 0x85, 0x80)        # LDA #$A5; STA $80
+    if loop:
+        # the work RAM read and changed on and on, so a save state's copy of
+        # it shows in the RIOT RAM (bytes 0-127 only: byte $FF stays the
+        # command byte)
+        label("loop")
+        op(0xA2, 0x00, 0xA9, 0x00)    # LDX #0; LDA #0
+        label("sum")
+        op(0x5D, 0x00, 0x11)          # EOR $1100,X
+        op(0xE8)                      # INX
+        bne("sum")
+        op(0x85, 0x81)                # STA $81
+        op(0xA5, 0x82, 0x29, 0x7F, 0xAA)   # LDA $82; AND #$7F; TAX
+        op(0xBD, 0x00, 0x11, 0x18, 0x69, 0x1B)   # LDA $1100,X; CLC; ADC #$1B
+        op(0x9D, 0x00, 0x10, 0xE6, 0x82)   # STA $1000,X; INC $82
+        op(0x4C, lab["loop"] & 0xFF, lab["loop"] >> 8)   # JMP loop
     label("end")
     op(0x4C, ORG + len(code) & 0xFF, (ORG + len(code)) >> 8)   # JMP end
     for at, n in fix:
@@ -90,9 +108,9 @@ def program():
     return bytes(code)
 
 
-def image():
+def image(loop=False):
     bank = bytearray(b"\xff" * 4096)
-    p = program()
+    p = program(loop)
     bank[ORG - 0x1000:ORG - 0x1000 + len(p)] = p
     for v in (0xFFA, 0xFFC, 0xFFE):   # NMI, reset, IRQ: $1200
         bank[v:v + 2] = bytes((ORG & 0xFF, ORG >> 8))
@@ -136,6 +154,8 @@ def main():
     a = sys.argv[1:]
     if a == ["image"]:
         out = image()
+    elif a == ["image-loop"]:
+        out = image(True)
     elif a == ["a78"]:
         out = a78()
     elif len(a) == 2 and a[0] == "flash":

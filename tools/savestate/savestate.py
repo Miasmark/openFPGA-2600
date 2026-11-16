@@ -7,9 +7,13 @@
       (tools/savestate/chain_map.txt, from apply.sh) and the measured chain
       length (tools/savestate/chain_bits.txt, from sim/run_sschain.sh);
       --check only compares and exits 1 when a file is out of date.
-  savestate.py verify BLOB [--cart-crc X] [--cart-len N] [--mapper W] [--flags W]
+  savestate.py verify BLOB [--image FILE [--pad B]] [--cart-crc X] [--cart-len N]
+                     [--mapper W] [--flags W]
       the checks the core makes on a load (SAVESTATE.md 4), on a file;
-      prints what is wrong, exit 0 when nothing is.
+      prints what is wrong, exit 0 when nothing is. --image takes the
+      cartridge's CRC32 and length from the file as the loader takes it:
+      rounded up to whole 32-bit bridge words, padded with B (default $FF,
+      as sim/tb_load.sv pads; the Pocket's own pad bytes are its host's).
   savestate.py show BLOB
       the header and the areas' summaries.
   savestate.py sig
@@ -236,6 +240,8 @@ def main():
     g.add_argument("--check", action="store_true")
     v = sub.add_parser("verify")
     v.add_argument("blob")
+    v.add_argument("--image")
+    v.add_argument("--pad", type=lambda x: int(x, 0), default=0xFF)
     v.add_argument("--cart-crc", type=lambda x: int(x, 0))
     v.add_argument("--cart-len", type=lambda x: int(x, 0))
     v.add_argument("--mapper", type=lambda x: int(x, 0))
@@ -247,6 +253,10 @@ def main():
     if a.cmd == "gen":
         return gen(a.check)
     if a.cmd == "verify":
+        if a.image:
+            data = open(a.image, "rb").read()
+            data += bytes([a.pad]) * (-len(data) % 4)
+            a.cart_crc, a.cart_len = zlib.crc32(data), len(data)
         return verify(a.blob, a)
     if a.cmd == "show":
         return show(a.blob) or 0
