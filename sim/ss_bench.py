@@ -201,9 +201,12 @@ class Bench:
             a.append("+joyscript=" + x[12:] + ".txt" if x.startswith("+joyscript=@") else x)
         return a
 
-    def compare(self, R, X, after, what):
+    def compare(self, R, X, after, what, video_skip=()):
+        """X's frames after `after` against R's; in the frames video_skip the
+        picture's hash is left out (column 2: a mid-frame freeze, below)"""
         keys = [k for k in sorted(X) if k > after and k in R]
-        diff = [k for k in keys if X[k] != R[k]]
+        diff = [k for k in keys if (X[k] if k not in video_skip else X[k][:2] + X[k][3:]) !=
+                (R[k] if k not in video_skip else R[k][:2] + R[k][3:])]
         ok = bool(keys) and not diff
         self.say("%s: frames %s-%s, %d compared, %d differ%s" % (
             what, keys[0] if keys else "-", keys[-1] if keys else "-", len(keys), len(diff),
@@ -215,6 +218,14 @@ class Bench:
         return zlib.crc32(data), len(data)
 
     def run_case(self, name):
+        try:
+            self.run_case_(name)
+        except Exception as e:      # a bench error is a failed check, reported, and the run goes on
+            import traceback
+            self.say("%s: bench error %s: %s" % (name, type(e).__name__, e), False)
+            traceback.print_exc()
+
+    def run_case_(self, name):
         c = CASES[name]
         img, bs, d = self.image(name, c)
         if img is None:
@@ -298,23 +309,30 @@ class Bench:
         mid-line), and the first blob loaded: as S and L"""
         lo, hi = c.get("win", (60, c["ms"] // 2))
         times = sorted(self.rng.sample(range(lo, hi), 2))
-        _, alog = self.sim(d, base + ["+ssfp=A.csv", "+ss_anywhere", "+ss_save=" + ",".join(map(str, times))], "A.log")
+        _, alog = self.sim(d, base + ["+ssfp=A.csv", "+ss_anywhere", "+ss_prefix=a_", "+ss_save=" + ",".join(map(str, times))], "A.log")
         saves = re.findall(r"SS save (\d+) at (\d+) ms: +(ok|err), (\d+) clk_sys, frozen in machine frame (\d+) at machine clock (\d+)", alog)
         self.say("%s A: saves anywhere at %s ms: %s" % (name, ",".join(map(str, times)),
                  " ".join("%s(frame %s, clock %s)" % (s_[2], s_[4], s_[5]) for s_ in saves)),
                  len(saves) == 2 and all(s_[2] == "ok" for s_ in saves))
-        self.compare(R, self.frames(os.path.join(d, "A.csv")), 0, "%s A: every frame as R" % name)
+        # A freeze mid-frame resumes mid-picture: the pixel being drawn takes
+        # its colour through the Flicker Blend frame's SRAM path (video_mux,
+        # display only, not in the state), so that frame's picture hash is
+        # left out; its RIOT RAM, sound and CPU bus are compared, and every
+        # other frame whole (a frame-boundary freeze, S, has no such frame:
+        # it lands in VSYNC)
+        fz = {int(s_[4]) for s_ in saves}
+        self.compare(R, self.frames(os.path.join(d, "A.csv")), 0,
+                     "%s A: every frame as R (the picture of frames %s, frozen mid-frame, aside)" % (
+                         name, ",".join(map(str, sorted(fz)))), video_skip=fz)
         if not saves:
             return
-        b = os.path.join(d, "ss_save_1.bin")
         f0 = int(saves[0][4])
-        mt = int(open(os.path.join(d, "ss_save_1.txt")).read().split()[3])
-        os.replace(b, os.path.join(d, "a_save_1.bin"))
+        mt = int(open(os.path.join(d, "a_ss_save_1.txt")).read().split()[3])
         _, llog = self.sim(d, base[:1] + ["+wav=%d" % (c["ms"] + 60)] + base[2:] + [
-            "+ssfp=AL.csv", "+ss_load=a_save_1.bin", "+ss_load_at=60", "+ss_load_frame=%d" % f0,
+            "+ssfp=AL.csv", "+ss_load=a_ss_save_1.bin", "+ss_load_at=60", "+ss_load_frame=%d" % f0,
             "+ss_load_mclk=%d" % mt], "AL.log")
         m = re.search(r"SS load \S+ at \d+ ms: +(ok|err)", llog)
-        self.say("%s AL: a_save_1.bin loaded at 60 ms: %s" % (name, m.group(1) if m else "none"),
+        self.say("%s AL: a_ss_save_1.bin loaded at 60 ms: %s" % (name, m.group(1) if m else "none"),
                  bool(m) and m.group(1) == "ok")
         # the saved frame itself is partial in AL (it resumes mid-frame): compare from the next
         self.compare(R, self.frames(os.path.join(d, "AL.csv")), f0, "%s AL: frames after the saved one (%d) as R" % (name, f0))

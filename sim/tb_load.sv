@@ -1354,6 +1354,7 @@ module tb_load;
 	//                          state), then finish
 	// Each operation prints an "SS" line.
 	longint ss_sysclk = 0, ss_mclk = 0, ss_t0 = 0;
+	string  ss_prefix = "";                         // +ss_prefix=P: the saves' files are Pss_save_<n>.*
 	// machine time since reset_in fell, as the joyscript counts it (js_t):
 	// clk_sys while the machine is not held; ss_frz_mt where a freeze landed
 	longint ss_mt = 0, ss_frz_mt = 0;
@@ -1432,6 +1433,7 @@ module tb_load;
 		automatic logic [31:0] w;
 		automatic logic [7:0] blob[];
 		if ($test$plusargs("ss_nopause")) ss_pause_en = 1'b0;
+		void'($value$plusargs("ss_prefix=%s", ss_prefix));
 		wait (reset_in == 1'b0);
 		ss_t0 = $time;
 		// +ss_reset=MS: a short reset (64 clk_sys, as the Pocket's menu Reset:
@@ -1478,11 +1480,11 @@ module tb_load;
 						ss_bridge_read(32'h5000_0000 + 4 * i, w);
 						{blob[4*i], blob[4*i+1], blob[4*i+2], blob[4*i+3]} = w;
 					end
-					path = $sformatf("ss_save_%0d.bin", nsave);
+					path = $sformatf("%0sss_save_%0d.bin", ss_prefix, nsave);
 					fd = $fopen(path, "wb");
 					foreach (blob[i]) $fwrite(fd, "%c", blob[i]);
 					$fclose(fd);
-					fd = $fopen($sformatf("ss_save_%0d.txt", nsave), "w");
+					fd = $fopen($sformatf("%0sss_save_%0d.txt", ss_prefix, nsave), "w");
 					$fwrite(fd, "frame %0d mclk %0d\n", ss_frz_frame, ss_frz_mt);
 					$fclose(fd);
 					$display("SS save %0d: %s written", nsave, path);
