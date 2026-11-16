@@ -361,7 +361,7 @@ def main():
     check(md["platform_ids"] == ["2600"], "platform_ids [\"2600\"]")
     check(md["shortname"] == "2600", "shortname 2600")
     check(md["author"] == "Miasmark", "author Miasmark")
-    check(md["version"] == "1.0.1", "version 1.0.1")
+    check(md["version"] == "1.1.0", "version 1.1.0")
     check(md["url"] == "https://github.com/Miasmark/openFPGA-2600", "url")
     check(bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", md["date_release"])), "date_release is a date")
     check(len(md["description"]) <= 63, f"description {len(md['description'])} characters (limit 63)")

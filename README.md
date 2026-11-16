@@ -9,18 +9,26 @@ An Atari 2600 (VCS) core for the Analogue Pocket (openFPGA). Its TIA, RIOT,
 by **Jamie Blanks (Kitrinx)** and its contributors, through the Pocket port
 [openFPGA-7800](https://github.com/Miasmark/openFPGA-7800).
 
-Version 1.0.1 is openFPGA-7800 2.2.4's 2600 mode on its own. The 7800-only
+Version 1.1.0 adds **save states and sleep** (the Pocket's Memories),
+**composite video** (the Composite palettes), a pause while the menu is
+open, and a shorter menu; its paddles run on one shared calibration engine,
+which behaves as the four separate ones did. See *Save states* for what is
+not covered yet: sleep, like a save state, restarts DPC+/CDF/CDFJ/CDFJ+,
+BUS and Supercharger games, and an AtariVox game that is speaking.
+
+Version 1.0.1 was openFPGA-7800 2.2.4's 2600 mode on its own. The 7800-only
 hardware is gone: MARIA's video and DMA, the 7800 cartridge, POKEY, YM2151
 and the other 7800 sound chips, the 7800 BIOS, the high score cart and the
-BupChip's music. What is left behaves as 2.2.4 does in 2600 mode: in
+BupChip's music. What was left behaved as 2.2.4 does in 2600 mode: in
 simulation the 2600 tests give the same frames, with one explained
 exception (see *Verification*).
 
 ## Why a separate core
 
-- **Room.** The core uses 10,820 of the FPGA's 18,480 ALMs (59%), against
-  14,639 (79%) for the 7800 core, and the menu has room for settings the
-  7800 core had no room for:
+- **Room.** 1.0.1 used 10,820 of the FPGA's 18,480 ALMs (59%), against
+  14,639 (79%) for the 7800 core (1.1.0, with Composite and save states:
+  13,155, 71%), and the menu has room for settings the 7800 core had no
+  room for:
   - **a Mapper setting**, which the 7800 core had wired but not shown. It
     also reaches the multicart schemes, which auto-detection misses;
   - **both difficulty switches and the TV Type switch** as settings of
@@ -31,6 +39,9 @@ exception (see *Verification*).
 
 ## Features
 
+- **Save states and sleep** (new in 1.1.0): the Pocket's Memories save and
+  load the whole console, and sleep keeps the game where it was, for every
+  scheme but the ARM ones and the Supercharger (see *Save states*).
 - **2600 cartridges** (`.a26`, `.bin`) with MiSTer's bankswitch
   auto-detection, from the image's size and code signatures:
   - the standard schemes: 2K, 4K, F8 (8K), F6 (16K), F4 (32K) and F0 (64K).
@@ -117,8 +128,8 @@ exception (see *Verification*).
   Blend, and De-comb, which smooths the comb pattern some games draw by
   alternating lines between frames), and the Pocket's display modes (CRT
   and LCD looks, under *Display Mode* in the Pocket's video settings).
-- **Composite** (the *Warm, Composite*, *Cool, Composite* and *Hot,
-  Composite* palettes): the picture as a TV decodes the console's
+- **Composite** (new in 1.1.0: the *Warm, Composite*, *Cool, Composite* and
+  *Hot, Composite* palettes): the picture as a TV decodes the console's
   composite signal, with a TV's softening and the colour fringes it puts
   on sharp edges. It uses upstream MiSTer's own model of the console's
   video output and its TV decoder (`composite_out.sv`,
@@ -157,7 +168,7 @@ exception (see *Verification*).
 | Keypad, keyboard, trackball, Mindlink | These need input the Pocket doesn't have |
 | SECAM | No SECAM palette or timing. A candidate for a later release |
 | Supercharger demo-unit images (67,584 bytes) | Not detected |
-| Save states for the ARM schemes (DPC+, CDF, CDFJ, CDFJ+) and the Supercharger | Refused with the Pocket's error for now: their state lives in DARIA's CPU and memories, or in the Supercharger's tape machine and RAM. Later steps ([docs/SAVESTATE.md](docs/SAVESTATE.md) 6) |
+| Save states (and so sleep) for the ARM schemes (DPC+, CDF, CDFJ, CDFJ+), BUS and the Supercharger | Refused with the Pocket's error for now, and sleep restarts these games (see *Save states*): their state lives in DARIA's CPU and memories, or in the Supercharger's tape machine and RAM. The Supercharger, then the ARM schemes on DARIA, are planned for later releases ([docs/SAVESTATE.md](docs/SAVESTATE.md) 6) |
 | Composite options, PAL composite | MiSTer's Composite Smear, AGC and Comb settings: the menu is full, so *Composite* uses their defaults. PAL: upstream's composite model and decoder are NTSC only |
 
 ### Save states
@@ -174,6 +185,17 @@ SaveKey's and the FA2 flash's contents stay in their own save files. A
 state is taken at a frame boundary, and a load of another game's state, or
 of one made by a build with another state layout, is refused with the
 Pocket's error message.
+
+**Known limit: sleep restarts the games that save states don't cover.**
+The Pocket's sleep is a save state: it saves one when the Pocket goes to
+sleep and loads it on wake. Where a save is refused, the wake is a cold
+start of the game instead (the cartridge is loaded again, the console
+reset). That is the case for DPC+, CDF, CDFJ and CDFJ+ games (DARIA), BUS
+images (which get the unsupported-cartridge screen anyway), Supercharger
+games, and an AtariVox game that is still speaking when the Pocket sleeps
+(a save waits up to about 2.3 seconds for the voice to stop). A Memory saved
+in those games gets the Pocket's error message, and the game goes on
+untouched.
 
 ## Settings
 
@@ -207,10 +229,17 @@ The lists name each scheme by its code only (in 1.0.1 *FA (CBS RAM+)*,
 and FA2 are no longer in them: the Pocket refuses a menu with more than
 72 options, or with more than about 731 characters in its names (measured
 on the owner's Pocket; Analogue does not document either limit), and the
-composite palettes needed the room. Auto still finds each of the four
+composite palettes needed the room. *Pause in Menu* is not a setting
+either: the game always stands still while the Pocket's menu is open, which
+the save states need. Auto still finds each of the four
 itself: the Supercharger's tapes by their size, the ARM schemes by their
 drivers' signatures, FA2 by its sizes and padding. 32-in-1 stays in the
 list: a real 32-in-1 image is 64 KB, which detection takes as F0.
+
+*Palette*, *Mapper* and *Mapper (more)* changed in 1.1.0, so they have new
+ids, and the Pocket shows them at their defaults once after the update
+(Warm and Auto): set *Palette* again if you had chosen Cool or Hot. The
+other settings keep their 1.0.1 values.
 
 ## Controls
 
@@ -274,7 +303,7 @@ picture to shoot off-screen (to reload in some games).
 
 ## Installing
 
-Copy the contents of a release zip (`M_Atari2600_Pocket_1.0.1.zip`) to the
+Copy the contents of a release zip (`M_Atari2600_Pocket_1.1.0.zip`) to the
 root of the SD card. Cartridges go in `/Assets/2600/common/`.
 
 The zip holds `Platforms/2600.json` and `Platforms/_images/2600.bin`. Both
@@ -326,9 +355,30 @@ frame length, RIOT RAM, picture, audio, the CPU's bus and the reset times
 | Composite | A 2600 test pattern (colour bands, playfield stripes, a missile) with Composite on (`tb_load +composite`) gives the same frame byte for byte as openFPGA-7800 2.2.6's 2600 mode, and with it off the same RGB frame; the decoded picture trails the RGB one by 12 clk_sys, which the light gun's crosshair delay follows. The menu checker reads Palette's bit 2 as Composite from `core_top.v`, and `run_core_top.sh` writes every Palette option and checks the wrapper's `composite` port |
 | The Pocket files | `sim/check/apf_json_check.py`: every JSON file within the limits of Analogue's documentation, and every menu option checked against the RTL. `sim/run_core_top.sh`: 134 menu writes, the 18 setting ports after each, the data slots and the save bridges, through `core_top.v`. 12 planted faults in the core and its files, and 10 more for the checker alone, are all caught |
 
+1.1.0's changes were checked the same way against the tree before them
+(1.0.1 with Composite):
+
+| Check | Result |
+|---|---|
+| No save made | With save states built in but never used, `sim/run_sim.sh` and `sim/extra_tests.sh` give the earlier build's fingerprints byte for byte (15 and 40 fingerprint files), so the scan chain and its holds change nothing while the game runs |
+| Shared paddle engine | `sim/run_paddles4.sh`: the new engine against the four old paddle timers, clock by clock, on four random seeds of 20 million clocks each: no difference, and its planted faults are caught. Five paddle games (four paddles included) give the old engine's frames |
+| Save and load | `sim/ss_bench.py`, RTL against RTL: 43 cases (the mappers, the cartridge RAMs up to 32 KB, FA2, DPC, the multicarts, paddles, driving, the light gun, the SaveKey, the AtariVox, and 14 games), each saved at random frames and mid-frame and loaded into a fresh core, which must then give the uninterrupted run's frames (picture, audio, RIOT RAM, the CPU's bus; a mid-frame save's own frame apart, whose picture is held while frozen): 175 comparisons, no frame different. The header checks, the refusals (DPC+, the Supercharger, A78, another game's state, a damaged state), sleep and the pause in the menu have cases of their own, and 11 planted faults in the core are all caught |
+| The Pocket files | `sim/check/apf_json_check.py` also checks the menu against the Pocket's limits measured on hardware (72 options, about 731 characters of names) and that an entry changed since 1.0.1 has a new id |
+
 The test benches and gates are in `sim/` ([docs/DEVELOPING.md](docs/DEVELOPING.md)).
 
 ### Build figures
+
+The 1.1.0 release build (seed 3, fitted on e03028f, the tree of the
+hardware test build 1.1.0-sstest3, whose bitstream it ships unchanged)
+meets timing on all four corners: +2.743 ns on clk_sdram (gate +1.5 ns),
++2.282 ns on DARIA's CPU clock, +3.342 ns on its phase detector (hold
++0.155 ns), worst hold +0.118 ns, and every check of the step-7 driver
+passes. Seeds 1 and 2 meet timing too, with +2.066 and +2.640 ns on
+clk_sdram; seed 3 has the most, which decides. It uses 13,155 ALMs (71%),
+226 M10K blocks (73%) and 36 DSP blocks: the save states (the scan chain,
+its controller and its 36 M10K staging RAM) add about 1,800 ALMs and 36
+M10K blocks, and the shared paddle engine saves about 240 ALMs.
 
 The build with Composite (after 1.0.1; seed 3, fitted on ab8276f) meets
 timing on all four corners: +3.083 ns on clk_sdram, +2.590 ns on DARIA's CPU
@@ -362,6 +412,14 @@ The SaveKey's read byte has a hold exception in the timing constraints
 openFPGA-7800 2.2.4's debug fits missed hold on that path by 0.504 ns.
 
 ### Hardware testing
+
+The 1.1.0 test build (1.1.0-sstest3, the same bitstream) was tested on the
+owner's Pocket on 2026-11-16: Memories saved and loaded across the mapper
+families (with cartridge RAM, DPC's music and FA2), paddles, driving and the
+light gun, the SaveKey and the AtariVox, the refusals, sleep and wake, the
+pause in the menu, and the new menu. The one thing found is the known limit
+above: sleep restarts the games a save state refuses. Earlier test builds
+found the Pocket's limits on a menu (72 options, about 731 characters).
 
 The 1.0.1 build was tested on the owner's Pocket on 2026-10-25: Pitfall II
 (DPC) with its music, most of the ARM games on DARIA (DPC+ and the CDF

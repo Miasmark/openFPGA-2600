@@ -761,7 +761,18 @@ set_global_assignment -name VERILOG_MACRO "POCKET_ATARIVOX=1"
 # status word, shadow FIFO counters, load probe and its status cells on
 # screen (core/bupchip/bup_status_osd.sv). Releases leave it out
 # (docs/DEVELOPING.md, "Before a release"); sim/run_sim.sh follows this file.
-# Fitter seed. The build with Composite (after 1.0.1) uses seed 3: of seeds
+# Fitter seed. openFPGA-2600 1.1.0 (save states) ships seed 3: of seeds 1-3,
+# fitted on e03028f (the savestates tree of the hardware test build
+# 1.1.0-sstest3, whose bitstream 1.1.0 ships; the release tree's src/fpga
+# differs from it in comments only), every gate passed on all three, every
+# step-7 check passed on seed 3 (its kept database; seeds 1 and 2 were
+# fitted without the driver), and seed 3 has the most clk_sdram margin
+# (P12). Worst setup on clk_arm and clk_sdram, worst hold, and ALMs:
+#   seed 1: clk_arm +2.124, clk_sdram +2.066, hold +0.105, 13,138
+#   seed 2: clk_arm +2.081, clk_sdram +2.640, hold +0.112, 13,167
+#   seed 3: clk_arm +2.282, clk_sdram +2.743, hold +0.118, (h) +6.490 / +0.244, 13,155
+# DARIA's guard pair passes on seed 3 (setup +3.342, hold +0.155 ns).
+# The build with Composite (after 1.0.1) used seed 3: of seeds
 # 1-3, fitted on ab8276f, every gate and every check passed on all three,
 # and seed 3 has the most clk_sdram margin (P12). Worst setup on clk_arm and
 # clk_sdram, worst hold, (h), and ALMs:

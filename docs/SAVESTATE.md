@@ -50,6 +50,12 @@ Intellivision core's protocol, header and benches (openFPGA-Intellivision
   answered ok or err; an ok one is staged and applied at the first frame
   boundary after the reset's exit (checked once more, with no status
   change). A load asked for after the reset's exit is the ordinary one.
+- **Sleep in a refused game.** Where the save before sleep is refused (the
+  ARM schemes, BUS, the Supercharger, an AtariVox still speaking: section
+  6), the Pocket has no state to load on wake and starts the game cold:
+  it loads the cartridge again and resets the console. Seen on the owner's
+  Pocket with 1.1.0-sstest3 (2026-11-16); the README lists it as a known
+  limit.
 
 ## 2 Freezing
 
@@ -333,7 +339,9 @@ gates give exactly the frames they gave before save states.
 ## 8 Open points for the Pocket
 
 - The host's order on wake (load before or after the reset's exit) is not
-  documented; the core serves both (section 1).
+  documented; the core serves both (section 1). On the owner's Pocket
+  (1.1.0-sstest3) sleep and wake keep the game where it was, and restart a
+  game whose save is refused.
 - How the Pocket's scaler takes the substitute raster at a freeze and a
   load's resume, and the black picture while frozen.
 - Whether the Pocket greys out Memories for a refused scheme (it answers

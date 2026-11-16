@@ -95,7 +95,9 @@ module paddle_timer4 (
 	wire        ev_low  = e_go && e_d[33];                // a new lowest (highest and read_count to 0)
 	wire        ev_high = e_go && !e_d[33] && (e_hi < e_h); // a new highest
 	wire        e_lt  = (e_d[32:0] != 33'd0);             // lowest < the new highest
+	/* verilator lint_off UNUSEDSIGNAL */  // bits 7:0 are below pv's resolution
 	wire [33:0] e_w   = {1'b0, e_d[32:0]} + {NS_PER_TICK, 1'b0};
+	/* verilator lint_on UNUSEDSIGNAL */
 
 	// the shared registers (pv: the engine's pending width)
 	always @(posedge clk)
