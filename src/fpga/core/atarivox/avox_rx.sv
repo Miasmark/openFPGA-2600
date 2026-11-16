@@ -63,7 +63,7 @@ module avox_rx #(
 	wire [3:0] ss_c;
 	assign ss_c[0] = ss_si;
 	always_ff @(posedge clk) if (ss_en)
-		{sync, cnt, bitn, sh, got, got_byte} <= {ss_c[0], sync, cnt, bitn, sh, got, got_byte} >> 1;
+		{sync, cnt, bitn, sh, got, got_byte} <= {ss_c[0], sync, cnt, bitn, sh, got, got_byte[7:1]};
 	else if (!ss_frz) begin
 		sync <= {sync[0], line};
 		got  <= 1'b0;
@@ -103,7 +103,7 @@ module avox_rx #(
 	logic push;
 	always_comb push = got && !scp && !esc && (got_byte != 8'h5C);
 	always_ff @(posedge clk) if (ss_en)
-		{abort_set, ready_set, scp, esc} <= {ss_c[1], abort_set, ready_set, scp, esc} >> 1;
+		{abort_set, ready_set, scp, esc} <= {ss_c[1], abort_set, ready_set, scp};
 	else if (!ss_frz) begin
 		abort_set <= 1'b0;
 		ready_set <= 1'b0;
@@ -144,7 +144,7 @@ module avox_rx #(
 	end
 
 	always_ff @(posedge clk) if (ss_en)
-		{wp, rp, count} <= {ss_c[2], wp, rp, count} >> 1;
+		{wp, rp, count} <= {ss_c[2], wp, rp, count[6:1]};
 	else if (!ss_frz) begin
 		if (reset || abort_set) begin
 			wp    <= 6'd0;

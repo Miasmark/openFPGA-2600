@@ -134,7 +134,9 @@ module mapper_fa2
 	end
 
 	always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {timer[18], timer[17], timer[16], timer[15], timer[14], timer[13], timer[12], timer[11], timer[10], timer[9], timer[8], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], ready_response, command_pending, operation_active, copy_addr[7], copy_addr[6], copy_addr[5], copy_addr[4], copy_addr[3], copy_addr[2], copy_addr[1], copy_addr[0], copy_state, bank[2], bank[1], bank[0]} <= {ss_c0, timer[18], timer[17], timer[16], timer[15], timer[14], timer[13], timer[12], timer[11], timer[10], timer[9], timer[8], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], ready_response, command_pending, operation_active, copy_addr[7], copy_addr[6], copy_addr[5], copy_addr[4], copy_addr[3], copy_addr[2], copy_addr[1], copy_addr[0], copy_state, bank[2], bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		nvram_dirty <= 1'b0;
 
@@ -228,5 +230,7 @@ module mapper_fa2
 		end
 	end
 	end
-	assign ss_c1 = {timer[18], timer[17], timer[16], timer[15], timer[14], timer[13], timer[12], timer[11], timer[10], timer[9], timer[8], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], ready_response, command_pending, operation_active, copy_addr[7], copy_addr[6], copy_addr[5], copy_addr[4], copy_addr[3], copy_addr[2], copy_addr[1], copy_addr[0], copy_state, bank[2], bank[1], bank[0]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {timer[18], timer[17], timer[16], timer[15], timer[14], timer[13], timer[12], timer[11], timer[10], timer[9], timer[8], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], ready_response, command_pending, operation_active, copy_addr[7], copy_addr[6], copy_addr[5], copy_addr[4], copy_addr[3], copy_addr[2], copy_addr[1], copy_addr[0], copy_state, bank[2], bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 endmodule

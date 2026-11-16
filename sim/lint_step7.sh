@@ -75,7 +75,7 @@ lint() {
 		$(ls "$RTL"/Pokey/*.sv 2> /dev/null)
 		$(sed -n 's/.*qip_path) \(.*\.sv\) *\].*/\1/p' "$RTL/Minnie/Minnie.qip" 2> /dev/null | sed "s#^#$RTL/Minnie/#")
 		"$RTL/SN76489/sn76489.sv" "$RTL"/jt51/*.v "$RTL/cache_ram.v" "$RTL/bram.v"
-		"$RTL/composite_out.sv" "$RTL/cart_ram_tdp.sv" "$RTL/cdf_fastjump_table.sv"
+		"$RTL/composite_out.sv" $(ls "$RTL/composite_decoder.sv" 2> /dev/null) "$RTL/cart_ram_tdp.sv" "$RTL/cdf_fastjump_table.sv"
 		"$RTL"/arm_mapper_{memory,controller,subsystem,tables,ram_init,writeback,audio}.sv
 		"$RTL"/mapper_{dpcplus,cdf,bus,fa2}.sv "$RTL/fa2_nvram_bridge.sv"
 		"$RTL/ps2_to_pokey.v" "$RTL/souper.v" "$RTL/TIA.sv" "$RTL/cart.sv"
@@ -112,7 +112,7 @@ lint() {
 			# the four paddle timers with one engine (paddle_timer4.sv); trees before it have none
 			[ -f "$FPGA/core/paddle_timer4.sv" ] && SRCS+=("$FPGA/core/paddle_timer4.sv")
 			# the save-state controller and its package (docs/SAVESTATE.md); trees before it have none
-			[ -f "$FPGA/core/ss_ctl.sv" ] && SRCS+=("$FPGA/core/ss_pkg.sv" "$FPGA/core/ss_ctl.sv")
+			[ -f "$FPGA/core/a26_ss_ctl.sv" ] && SRCS+=("$FPGA/core/a26_ss_pkg.sv" "$FPGA/core/a26_ss_ctl.sv" "$FPGA/core/ss_raster.sv")
 			# the AtariVox (32e3ede), in core.qip's order; trees before it have none
 			for f in avox_rx avox_engine atarivox; do
 				[ -f "$FPGA/core/atarivox/$f.sv" ] && SRCS+=("$FPGA/core/atarivox/$f.sv")

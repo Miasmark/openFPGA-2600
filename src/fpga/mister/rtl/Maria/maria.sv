@@ -89,7 +89,9 @@ module maria(
 	assign tia_clk_x2 = tia_clk_en && mclk0;
 
 	always @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {mclk1, mclk0, pclk0, pclk1, men_count[2], men_count[1], men_count[0], tia_enable_count[2], tia_enable_count[1], tia_enable_count[0], slow_clk_latch, clk_toggle, clock_div[1], clock_div[0], pclk_toggle} <= {ss_c0, mclk1, mclk0, pclk0, pclk1, men_count[2], men_count[1], men_count[0], tia_enable_count[2], tia_enable_count[1], tia_enable_count[0], slow_clk_latch, clk_toggle, clock_div[1], clock_div[0], pclk_toggle} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		mclk1 <= 1'b0;
 		mclk0 <= 1'b0;
@@ -165,7 +167,9 @@ module maria(
 		end
 	end
 	end
-	assign ss_c1 = {mclk1, mclk0, pclk0, pclk1, men_count[2], men_count[1], men_count[0], tia_enable_count[2], tia_enable_count[1], tia_enable_count[0], slow_clk_latch, clk_toggle, clock_div[1], clock_div[0], pclk_toggle};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {mclk1, mclk0, pclk0, pclk1, men_count[2], men_count[1], men_count[0], tia_enable_count[2], tia_enable_count[1], tia_enable_count[0], slow_clk_latch, clk_toggle, clock_div[1], clock_div[0], pclk_toggle};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	/* verilator lint_off CASEX */
 	always_comb begin

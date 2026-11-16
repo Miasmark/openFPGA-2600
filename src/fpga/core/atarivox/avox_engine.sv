@@ -220,7 +220,7 @@ module avox_engine (
 		{st, pc, sample_strobe, res, maddr, b_hold, npc, f_tick, f_abort, f_ready, lfsr, sample,
 		 a_irom, a_drom, a_rfa, a_rfb} <=
 			{ss_si, st, pc, sample_strobe, res, maddr, b_hold, npc, f_tick, f_abort, f_ready, lfsr, sample,
-			 a_irom, a_drom, a_rfa, a_rfb} >> 1;
+			 a_irom, a_drom, a_rfa, a_rfb[7:1]};
 	else if (!ss_frz) begin
 		a_irom <= pc;
 		a_drom <= drom_addr;

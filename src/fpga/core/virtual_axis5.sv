@@ -58,7 +58,7 @@ module virtual_axis5 #(
 	wire [5:0] ss_ax;               // the chain after slot (0) and after axis k (k + 1)
 	always @(posedge clk)
 		if (ss_en)
-			slot <= {ss_si, slot} >> 1;
+			slot <= {ss_si, slot[2:1]};
 		else if (!ss_frz)
 			slot <= tick ? 3'd1 : (slot == 3'd0 || slot == 3'd4) ? 3'd0 : slot + 3'd1;
 	assign ss_ax[0] = slot[0];
@@ -145,7 +145,7 @@ module virtual_axis5 #(
 
 		wire ss_mid;                // after this axis's main segment
 		always @(posedge clk) if (ss_en)
-			{pos16, vel, analog_on, rest, rest_valid} <= {ss_ax[k], pos16, vel, analog_on, rest, rest_valid} >> 1;
+			{pos16, vel, analog_on, rest, rest_valid} <= {ss_ax[k], pos16, vel, analog_on, rest};
 		else if (!ss_frz) begin
 			if (reset) begin
 				pos16      <= 16'h8000;
@@ -187,7 +187,7 @@ module virtual_axis5 #(
 			/* verilator lint_on PROCASSINIT */
 			always @(posedge clk)
 				if (ss_en)
-					phase_r <= {ss_mid, phase_r} >> 1;
+					phase_r <= {ss_mid, phase_r[15:1]};
 				else if (!ss_frz && !reset && upd[k] && w_phase)
 					phase_r <= n_phase;
 			assign ss_ax[k + 1] = phase_r[0];

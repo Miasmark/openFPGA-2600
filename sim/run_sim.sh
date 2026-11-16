@@ -97,7 +97,7 @@ SRCS=(
 	"$RTL/EEPROM_24LC256.sv" "$FPGA/core/atari2600_pocket.sv"
 	"$FPGA/core/atarivox/avox_rx.sv" "$FPGA/core/atarivox/avox_engine.sv" "$FPGA/core/atarivox/atarivox.sv"
 	"$FPGA/core/virtual_axis.sv" "$FPGA/core/virtual_axis5.sv" "$FPGA/core/stick_dirs.sv" "$FPGA/core/sram_ctrl.sv" "$PATCHED/paddles.sv" "$FPGA/core/paddle_timer4.sv" "$RTL/lightgun.sv"
-	"$FPGA/core/ss_pkg.sv" "$FPGA/core/ss_ctl.sv"
+	"$FPGA/core/a26_ss_pkg.sv" "$FPGA/core/a26_ss_ctl.sv" "$FPGA/core/ss_raster.sv"
 	"$FPGA/pocket_utils/data_loader.sv"
 	"$FPGA/core/audio_filter.sv"
 	"$RTL/bupchip_peripheral.sv" "$FPGA/pocket_utils/psram.sv"

@@ -71,7 +71,7 @@ set_multicycle_path -hold 1 \
  -from [get_registers -nowarn {*|sram_ctrl:sram|sk_rdata[*]}] \
  -to [get_registers -nowarn {*|EEPROM_24LC0X:savekey|data[*]}]
 
-# Save states (docs/SAVESTATE.md; core/ss_ctl.sv): clk_74a and the core
+# Save states (docs/SAVESTATE.md; core/a26_ss_ctl.sv): clk_74a and the core
 # clocks are asynchronous groups above, so ss_ctl's crossings are not timed.
 # Each is a level through a two- or three-flip-flop synchroniser (the save,
 # load and menu commands, Pause in Menu, the bad-write flag) or a block RAM

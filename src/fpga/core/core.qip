@@ -19,8 +19,9 @@ set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) a
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) virtual_axis5.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) paddle_timer4.sv]
 # Save states (docs/SAVESTATE.md): the generated package, then the controller
-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ss_pkg.sv]
-set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ss_ctl.sv]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) a26_ss_pkg.sv]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) a26_ss_ctl.sv]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) ss_raster.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) sram_ctrl.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) stick_dirs.sv]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) audio_filter.sv]

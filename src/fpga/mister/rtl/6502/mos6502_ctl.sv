@@ -882,13 +882,17 @@ module mos6502_ctl
 	assign hold = ~rdy_cy & ~wr_q;
 
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {rdy_q} <= {ss_c0, rdy_q} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (!res_n)      rdy_q <= 1'b1;
 		else if (phi1_en) rdy_q <= rdy;
 	end
 	end
-	assign ss_c1 = {rdy_q};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {rdy_q};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	// ACRL1 (net 572): the ALU carry the hold-carry path reads. Every page
 	// fix-up carries out of the low byte except a backward branch's, which
@@ -1295,7 +1299,9 @@ module mos6502_ctl
 	assign nmig    = nmi_req | (nmig_c2 & ~brk_done_q);
 
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {res_c2, res_g, res_p, sync_short, brk_done_q, tg_c2[3], tg_c2[2], tg_c2[0], sync_c2, end_x_q} <= {ss_c1, res_c2, res_g, res_p, sync_short, brk_done_q, tg_c2[3], tg_c2[2], tg_c2[0], sync_c2, end_x_q} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (phi1_en) begin
 			irq_p   <= ~irq_n;
@@ -1342,7 +1348,9 @@ module mos6502_ctl
 		end
 	end
 	end
-	assign ss_c2 = {res_c2, res_g, res_p, sync_short, brk_done_q, tg_c2[3], tg_c2[2], tg_c2[0], sync_c2, end_x_q};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c2 = {res_c2, res_g, res_p, sync_short, brk_done_q, tg_c2[3], tg_c2[2], tg_c2[0], sync_c2, end_x_q};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	// NMI is an edge and ignores I; IRQ is a level and does not.
 	logic int_req, poll_now;
@@ -1394,7 +1402,9 @@ module mos6502_ctl
 
 	// ---- registers ---------------------------------------------------------
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {wr_q, sync_q, t[3], t[2], t[1], t[0], c_reg.zero_v, c_reg.zero_adl1, c_reg.zero_adl0, c_reg.zero_adh17, c_reg.zero_adh0, c_reg.zero_add, c_reg.y_sb, c_reg.x_sb, c_reg.wr, c_reg.sums, c_reg.srs, c_reg.sb_y, c_reg.sb_x, c_reg.sb_s, c_reg.sb_db, c_reg.sb_adh, c_reg.sb_add, c_reg.sb_ac, c_reg.s_sb, c_reg.s_inc, c_reg.s_dec, c_reg.s_adl, c_reg.pcl_db, c_reg.pcl_adl, c_reg.pch_db, c_reg.pch_adh, c_reg.p_db, c_reg.ors, c_reg.one_i, c_reg.ndb_add, c_reg.ir5_i, c_reg.ir5_d, c_reg.ir5_c, c_reg.ipc, c_reg.eors, c_reg.dsa, c_reg.dl_db, c_reg.dl_adl, c_reg.dl_adh, c_reg.dbz_z, c_reg.db_p, c_reg.db_add, c_reg.db7_n, c_reg.db7_c, c_reg.db6_v, c_reg.db0_c, c_reg.daa, c_reg.b_out, c_reg.avr_v, c_reg.arr_flags, c_reg.arr_daa, c_reg.arr_d, c_reg.ands, c_reg.alucin, c_reg.adl_pcl, c_reg.adl_add, c_reg.adl_abl, c_reg.adh_pch, c_reg.adh_abh, c_reg.add_sb7, c_reg.add_sb06, c_reg.add_adl, c_reg.acr_c, c_reg.ac_sb, c_reg.ac_db, br_back_q, ir[7], ir[6], ir[5], ir[4], ir[3], ir[2], ir[1], ir[0], pgx, idx_cross_q} <= {ss_c2, wr_q, sync_q, t[3], t[2], t[1], t[0], c_reg.zero_v, c_reg.zero_adl1, c_reg.zero_adl0, c_reg.zero_adh17, c_reg.zero_adh0, c_reg.zero_add, c_reg.y_sb, c_reg.x_sb, c_reg.wr, c_reg.sums, c_reg.srs, c_reg.sb_y, c_reg.sb_x, c_reg.sb_s, c_reg.sb_db, c_reg.sb_adh, c_reg.sb_add, c_reg.sb_ac, c_reg.s_sb, c_reg.s_inc, c_reg.s_dec, c_reg.s_adl, c_reg.pcl_db, c_reg.pcl_adl, c_reg.pch_db, c_reg.pch_adh, c_reg.p_db, c_reg.ors, c_reg.one_i, c_reg.ndb_add, c_reg.ir5_i, c_reg.ir5_d, c_reg.ir5_c, c_reg.ipc, c_reg.eors, c_reg.dsa, c_reg.dl_db, c_reg.dl_adl, c_reg.dl_adh, c_reg.dbz_z, c_reg.db_p, c_reg.db_add, c_reg.db7_n, c_reg.db7_c, c_reg.db6_v, c_reg.db0_c, c_reg.daa, c_reg.b_out, c_reg.avr_v, c_reg.arr_flags, c_reg.arr_daa, c_reg.arr_d, c_reg.ands, c_reg.alucin, c_reg.adl_pcl, c_reg.adl_add, c_reg.adl_abl, c_reg.adh_pch, c_reg.adh_abh, c_reg.add_sb7, c_reg.add_sb06, c_reg.add_adl, c_reg.acr_c, c_reg.ac_sb, c_reg.ac_db, br_back_q, ir[7], ir[6], ir[5], ir[4], ir[3], ir[2], ir[1], ir[0], pgx, idx_cross_q} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		// Nothing here is gated by RES any more. The die stops none of these
 		// latches; what a reset does is raise `t_zero`, which pins the chain at
@@ -1462,6 +1472,8 @@ module mos6502_ctl
 		end
 	end
 	end
-	assign ss_c3 = {wr_q, sync_q, t[3], t[2], t[1], t[0], c_reg.zero_v, c_reg.zero_adl1, c_reg.zero_adl0, c_reg.zero_adh17, c_reg.zero_adh0, c_reg.zero_add, c_reg.y_sb, c_reg.x_sb, c_reg.wr, c_reg.sums, c_reg.srs, c_reg.sb_y, c_reg.sb_x, c_reg.sb_s, c_reg.sb_db, c_reg.sb_adh, c_reg.sb_add, c_reg.sb_ac, c_reg.s_sb, c_reg.s_inc, c_reg.s_dec, c_reg.s_adl, c_reg.pcl_db, c_reg.pcl_adl, c_reg.pch_db, c_reg.pch_adh, c_reg.p_db, c_reg.ors, c_reg.one_i, c_reg.ndb_add, c_reg.ir5_i, c_reg.ir5_d, c_reg.ir5_c, c_reg.ipc, c_reg.eors, c_reg.dsa, c_reg.dl_db, c_reg.dl_adl, c_reg.dl_adh, c_reg.dbz_z, c_reg.db_p, c_reg.db_add, c_reg.db7_n, c_reg.db7_c, c_reg.db6_v, c_reg.db0_c, c_reg.daa, c_reg.b_out, c_reg.avr_v, c_reg.arr_flags, c_reg.arr_daa, c_reg.arr_d, c_reg.ands, c_reg.alucin, c_reg.adl_pcl, c_reg.adl_add, c_reg.adl_abl, c_reg.adh_pch, c_reg.adh_abh, c_reg.add_sb7, c_reg.add_sb06, c_reg.add_adl, c_reg.acr_c, c_reg.ac_sb, c_reg.ac_db, br_back_q, ir[7], ir[6], ir[5], ir[4], ir[3], ir[2], ir[1], ir[0], pgx, idx_cross_q};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c3 = {wr_q, sync_q, t[3], t[2], t[1], t[0], c_reg.zero_v, c_reg.zero_adl1, c_reg.zero_adl0, c_reg.zero_adh17, c_reg.zero_adh0, c_reg.zero_add, c_reg.y_sb, c_reg.x_sb, c_reg.wr, c_reg.sums, c_reg.srs, c_reg.sb_y, c_reg.sb_x, c_reg.sb_s, c_reg.sb_db, c_reg.sb_adh, c_reg.sb_add, c_reg.sb_ac, c_reg.s_sb, c_reg.s_inc, c_reg.s_dec, c_reg.s_adl, c_reg.pcl_db, c_reg.pcl_adl, c_reg.pch_db, c_reg.pch_adh, c_reg.p_db, c_reg.ors, c_reg.one_i, c_reg.ndb_add, c_reg.ir5_i, c_reg.ir5_d, c_reg.ir5_c, c_reg.ipc, c_reg.eors, c_reg.dsa, c_reg.dl_db, c_reg.dl_adl, c_reg.dl_adh, c_reg.dbz_z, c_reg.db_p, c_reg.db_add, c_reg.db7_n, c_reg.db7_c, c_reg.db6_v, c_reg.db0_c, c_reg.daa, c_reg.b_out, c_reg.avr_v, c_reg.arr_flags, c_reg.arr_daa, c_reg.arr_d, c_reg.ands, c_reg.alucin, c_reg.adl_pcl, c_reg.adl_add, c_reg.adl_abl, c_reg.adh_pch, c_reg.adh_abh, c_reg.add_sb7, c_reg.add_sb06, c_reg.add_adl, c_reg.acr_c, c_reg.ac_sb, c_reg.ac_db, br_back_q, ir[7], ir[6], ir[5], ir[4], ir[3], ir[2], ir[1], ir[0], pgx, idx_cross_q};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule

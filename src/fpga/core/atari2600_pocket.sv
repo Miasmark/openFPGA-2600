@@ -103,7 +103,7 @@ module atari2600_pocket
 	input  wire [31:0] sk_bridge_din,   // big endian: [31:24] is the lowest byte
 	output wire [31:0] sk_bridge_dout,  // word latched at the last read strobe
 
-	// Save states (docs/SAVESTATE.md; ss_ctl.sv): the blob at 0x50000000 and
+	// Save states (docs/SAVESTATE.md; a26_ss_ctl.sv): the blob at 0x50000000 and
 	// the template's save-state and menu signals (clk_74a)
 	input  wire [31:0] ss_bridge_addr,
 	input  wire        ss_bridge_rd,
@@ -780,7 +780,7 @@ reg [13:0] ms_div = 14'd0;
 reg        ms_tick = 1'b0;
 always @(posedge clk_sys)
 	if (ss_en)
-		{ms_div, ms_tick} <= {ss_c_vx, ms_div, ms_tick} >> 1;
+		{ms_div, ms_tick} <= {ss_c_vx, ms_div};
 	else if (!ss_frz) begin
 		ms_tick <= 1'b0;
 		if (ms_div == 14'd14317) begin
@@ -1230,7 +1230,9 @@ assign ss_rq_vox = 32'd0;
 // Save states: the sound holds its last sample while the machine is frozen
 // or shifting (the TIA's outputs follow the shift), and goes on from it at
 // the resume.
+/* verilator lint_off PROCASSINIT */
 reg [15:0] audio_held_l = 16'h8000, audio_held_r = 16'h8000;
+/* verilator lint_on PROCASSINIT */
 always @(posedge clk_sys)
 	if (!ss_hold) begin
 		audio_held_l <= audio_live_l;
@@ -1893,7 +1895,7 @@ wire vid_vb = use_comp ? comp_vbo : rgb_vb;
 wire vid_ce = use_comp ? comp_ce  : rgb_ce;
 
 ////////////////////////////  SAVE STATES  ////////////////////////////////
-// docs/SAVESTATE.md; ss_ctl.sv. While the machine is held the Pocket gets
+// docs/SAVESTATE.md; a26_ss_ctl.sv, ss_raster.sv. While the machine is held the Pocket gets
 // the substitute raster's sync and a black picture.
 wire ss_resume_ok;
 ss_raster ss_rast

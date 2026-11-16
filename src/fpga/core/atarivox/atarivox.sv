@@ -44,7 +44,7 @@ module atarivox (
 	logic ss_c1, ss_c2;
 	always_ff @(posedge clk)
 		if (ss_en)
-			div <= {ss_si, div} >> 1;
+			div <= {ss_si, div[9:1]};
 		else if (!ss_frz)
 			div <= (reset || tick) ? 10'd0 : div + 10'd1;
 

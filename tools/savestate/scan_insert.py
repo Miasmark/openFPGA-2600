@@ -662,8 +662,13 @@ def main():
             elif kind == 1:
                 b, k, L = pay
                 stmt = t[pos:b]
-                new = (" begin\n\t\tif (ss_en) {%s} <= {ss_c%d, %s} >> 1;\n"
-                       "\t\telse if (!ss_frz)%s\n\tend\n\tassign ss_c%d = {%s};" % (L, k, L, stmt, k + 1, L))
+                new = (" begin\n\t\t/* verilator lint_off WIDTHTRUNC */\n"
+                       "\t\tif (ss_en) {%s} <= {ss_c%d, %s} >> 1;\n"
+                       "\t\t/* verilator lint_on WIDTHTRUNC */\n"
+                       "\t\telse if (!ss_frz)%s\n\tend\n"
+                       "\t/* verilator lint_off WIDTHTRUNC */\n"
+                       "\tassign ss_c%d = {%s};   // the LSB\n"
+                       "\t/* verilator lint_on WIDTHTRUNC */" % (L, k, L, stmt, k + 1, L))
                 t = t[:pos] + new + t[b:]
             elif kind == 2:
                 stmt = t[pos:pay]

@@ -2,7 +2,7 @@
 """The 2600 core's save-state blob (docs/SAVESTATE.md), written down once.
 
   savestate.py gen [--check]
-      writes src/fpga/core/ss_pkg.sv (the controller's constants) and the
+      writes src/fpga/core/a26_ss_pkg.sv (the controller's constants) and the
       generated tables in docs/SAVESTATE.md from this file, the chain map
       (tools/savestate/chain_map.txt, from apply.sh) and the measured chain
       length (tools/savestate/chain_bits.txt, from sim/run_sschain.sh);
@@ -74,7 +74,7 @@ HAND = [
     ("atari2600_pocket", 15, "{ms_div, ms_tick}: the virtual axes' 1 kHz tick"),
 ]
 
-PKG = os.path.join(ROOT, "src", "fpga", "core", "ss_pkg.sv")
+PKG = os.path.join(ROOT, "src", "fpga", "core", "a26_ss_pkg.sv")
 DOC = os.path.join(ROOT, "docs", "SAVESTATE.md")
 MAP = os.path.join(HERE, "chain_map.txt")
 BITS = os.path.join(HERE, "chain_bits.txt")
@@ -101,6 +101,7 @@ def pkg_text():
            "// The save-state blob's layout (docs/SAVESTATE.md 3).",
            "// SPDX-License-Identifier: MIT",
            "",
+           "/* verilator lint_off UNUSEDPARAM */  // the whole layout, some words for later steps",
            "package a26_ss_pkg;",
            "\tlocalparam logic [31:0] SS_MAGIC         = 32'h%08X;   // \"A26S\"" % MAGIC,
            "\tlocalparam logic [31:0] SS_VERSION       = 32'd%d;" % VERSION,
@@ -120,7 +121,7 @@ def pkg_text():
            "\tlocalparam logic [31:0] SS_FLAGS_CHECKED = 32'h%08X;" % FLAGS_CHECKED]
     for name, w in H.items():
         out.append("\tlocalparam int          SS_H_%-12s = %d;" % (name.upper(), w))
-    out += ["endpackage", ""]
+    out += ["endpackage", "/* verilator lint_on UNUSEDPARAM */", ""]
     return "\n".join(out)
 
 

@@ -149,7 +149,9 @@ assign PA_read = drive && RS_n && ~addr[2] && ~|addr[1:0];
 assign d_out = ram_read_r ? ram_q : d_out_reg;
 
 always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {ram_read_r, d_out_reg[7], d_out_reg[6], d_out_reg[5], d_out_reg[4], d_out_reg[3], d_out_reg[2], d_out_reg[1], d_out_reg[0]} <= {ss_c0, ram_read_r, d_out_reg[7], d_out_reg[6], d_out_reg[5], d_out_reg[4], d_out_reg[3], d_out_reg[2], d_out_reg[1], d_out_reg[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 	// A selected RAM read this cycle puts the wrapper's answer on the bus next
 	// cycle; capturing it as well keeps it there once the selection goes away.
@@ -184,10 +186,14 @@ always_ff @(posedge clk) begin
 	end
 end
 	end
-	assign ss_c1 = {ram_read_r, d_out_reg[7], d_out_reg[6], d_out_reg[5], d_out_reg[4], d_out_reg[3], d_out_reg[2], d_out_reg[1], d_out_reg[0]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {ram_read_r, d_out_reg[7], d_out_reg[6], d_out_reg[5], d_out_reg[4], d_out_reg[3], d_out_reg[2], d_out_reg[1], d_out_reg[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {init_addr[6], init_addr[5], init_addr[4], init_addr[3], init_addr[2], init_addr[1], init_addr[0], out_a[7], out_a[6], out_a[5], out_a[4], out_a[3], out_a[2], out_a[1], out_a[0], out_b[7], out_b[6], out_b[5], out_b[4], out_b[3], out_b[2], out_b[1], out_b[0], dir_a[7], dir_a[6], dir_a[5], dir_a[4], dir_a[3], dir_a[2], dir_a[1], dir_a[0], dir_b[7], dir_b[6], dir_b[5], dir_b[4], dir_b[3], dir_b[2], dir_b[1], dir_b[0], interrupt[7], interrupt[6], edge_detect, old_pa7, incr[1], incr[0], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], prescaler[9], prescaler[8], prescaler[7], prescaler[6], prescaler[5], prescaler[4], prescaler[3], prescaler[2], prescaler[1], prescaler[0], rollover} <= {ss_c1, init_addr[6], init_addr[5], init_addr[4], init_addr[3], init_addr[2], init_addr[1], init_addr[0], out_a[7], out_a[6], out_a[5], out_a[4], out_a[3], out_a[2], out_a[1], out_a[0], out_b[7], out_b[6], out_b[5], out_b[4], out_b[3], out_b[2], out_b[1], out_b[0], dir_a[7], dir_a[6], dir_a[5], dir_a[4], dir_a[3], dir_a[2], dir_a[1], dir_a[0], dir_b[7], dir_b[6], dir_b[5], dir_b[4], dir_b[3], dir_b[2], dir_b[1], dir_b[0], interrupt[7], interrupt[6], edge_detect, old_pa7, incr[1], incr[0], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], prescaler[9], prescaler[8], prescaler[7], prescaler[6], prescaler[5], prescaler[4], prescaler[3], prescaler[2], prescaler[1], prescaler[0], rollover} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 	// RES leaves the 128 bytes of RAM alone. This is the console's power up
 	// image instead, and the top level decides when a console applies it. It is
@@ -265,6 +271,8 @@ always_ff @(posedge clk) begin
 	end
 end
 	end
-	assign ss_c2 = {init_addr[6], init_addr[5], init_addr[4], init_addr[3], init_addr[2], init_addr[1], init_addr[0], out_a[7], out_a[6], out_a[5], out_a[4], out_a[3], out_a[2], out_a[1], out_a[0], out_b[7], out_b[6], out_b[5], out_b[4], out_b[3], out_b[2], out_b[1], out_b[0], dir_a[7], dir_a[6], dir_a[5], dir_a[4], dir_a[3], dir_a[2], dir_a[1], dir_a[0], dir_b[7], dir_b[6], dir_b[5], dir_b[4], dir_b[3], dir_b[2], dir_b[1], dir_b[0], interrupt[7], interrupt[6], edge_detect, old_pa7, incr[1], incr[0], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], prescaler[9], prescaler[8], prescaler[7], prescaler[6], prescaler[5], prescaler[4], prescaler[3], prescaler[2], prescaler[1], prescaler[0], rollover};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c2 = {init_addr[6], init_addr[5], init_addr[4], init_addr[3], init_addr[2], init_addr[1], init_addr[0], out_a[7], out_a[6], out_a[5], out_a[4], out_a[3], out_a[2], out_a[1], out_a[0], out_b[7], out_b[6], out_b[5], out_b[4], out_b[3], out_b[2], out_b[1], out_b[0], dir_a[7], dir_a[6], dir_a[5], dir_a[4], dir_a[3], dir_a[2], dir_a[1], dir_a[0], dir_b[7], dir_b[6], dir_b[5], dir_b[4], dir_b[3], dir_b[2], dir_b[1], dir_b[0], interrupt[7], interrupt[6], edge_detect, old_pa7, incr[1], incr[0], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], prescaler[9], prescaler[8], prescaler[7], prescaler[6], prescaler[5], prescaler[4], prescaler[3], prescaler[2], prescaler[1], prescaler[0], rollover};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule

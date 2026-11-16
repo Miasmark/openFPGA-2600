@@ -281,7 +281,9 @@ module cart2600
 	// dropped the store.
 	logic access_taken;
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {access_taken} <= {ss_c0, access_taken} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (reset || address_change || phi1)
 			access_taken <= 1'b0;
@@ -289,15 +291,21 @@ module cart2600
 			access_taken <= 1'b1;
 	end
 	end
-	assign ss_c1 = {access_taken};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {access_taken};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {old_ain[12], old_ain[11], old_ain[10], old_ain[9], old_ain[8], old_ain[7], old_ain[6], old_ain[5], old_ain[4], old_ain[3], old_ain[2], old_ain[1], old_ain[0]} <= {ss_c1, old_ain[12], old_ain[11], old_ain[10], old_ain[9], old_ain[8], old_ain[7], old_ain[6], old_ain[5], old_ain[4], old_ain[3], old_ain[2], old_ain[1], old_ain[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin :reset_2600_cart
 		old_ain <= a_in;
 	end
 	end
-	assign ss_c2 = {old_ain[12], old_ain[11], old_ain[10], old_ain[9], old_ain[8], old_ain[7], old_ain[6], old_ain[5], old_ain[4], old_ain[3], old_ain[2], old_ain[1], old_ain[0]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c2 = {old_ain[12], old_ain[11], old_ain[10], old_ain[9], old_ain[8], old_ain[7], old_ain[6], old_ain[5], old_ain[4], old_ain[3], old_ain[2], old_ain[1], old_ain[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	// Bank CTY is compatible with F4 minus the ARM enhanced music
 	mapper_CTY mapper_CTY

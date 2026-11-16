@@ -57,7 +57,9 @@ module EEPROM_24LC0X
 	wire [7:0] address_bytes = byte_w[7:0];
 	
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {state, command[9], command[8], command[7], command[6], command[5], command[4], command[3], command[2], command[1], command[0], last_SCL, last_SDA, SDA_out, ram_read, address[14], address[13], address[12], address[11], address[10], address[9], address[8], address[7], address[6], address[5], address[4], address[3], address[2], address[1], address[0], ram_write, read_ack_phase, data[8], data[7], data[6], data[5], data[4], data[3], data[2], data[1], data[0], a_bytes_left[7], a_bytes_left[6], a_bytes_left[5], a_bytes_left[4], a_bytes_left[3], a_bytes_left[2], a_bytes_left[1], a_bytes_left[0], address_buffer[13], address_buffer[12], address_buffer[11], address_buffer[10], address_buffer[9], address_buffer[8], address_buffer[7], address_buffer[6], address_buffer[5], address_buffer[4], address_buffer[3], address_buffer[2], address_buffer[1], address_buffer[0]} <= {ss_c0, state, command[9], command[8], command[7], command[6], command[5], command[4], command[3], command[2], command[1], command[0], last_SCL, last_SDA, SDA_out, ram_read, address[14], address[13], address[12], address[11], address[10], address[9], address[8], address[7], address[6], address[5], address[4], address[3], address[2], address[1], address[0], ram_write, read_ack_phase, data[8], data[7], data[6], data[5], data[4], data[3], data[2], data[1], data[0], a_bytes_left[7], a_bytes_left[6], a_bytes_left[5], a_bytes_left[4], a_bytes_left[3], a_bytes_left[2], a_bytes_left[1], a_bytes_left[0], address_buffer[13], address_buffer[12], address_buffer[11], address_buffer[10], address_buffer[9], address_buffer[8], address_buffer[7], address_buffer[6], address_buffer[5], address_buffer[4], address_buffer[3], address_buffer[2], address_buffer[1], address_buffer[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) if (reset) begin
 		state <= STATE_STANDBY;
 		command <= 0;
@@ -154,7 +156,9 @@ module EEPROM_24LC0X
 		end
 	end
 	end
-	assign ss_c1 = {state, command[9], command[8], command[7], command[6], command[5], command[4], command[3], command[2], command[1], command[0], last_SCL, last_SDA, SDA_out, ram_read, address[14], address[13], address[12], address[11], address[10], address[9], address[8], address[7], address[6], address[5], address[4], address[3], address[2], address[1], address[0], ram_write, read_ack_phase, data[8], data[7], data[6], data[5], data[4], data[3], data[2], data[1], data[0], a_bytes_left[7], a_bytes_left[6], a_bytes_left[5], a_bytes_left[4], a_bytes_left[3], a_bytes_left[2], a_bytes_left[1], a_bytes_left[0], address_buffer[13], address_buffer[12], address_buffer[11], address_buffer[10], address_buffer[9], address_buffer[8], address_buffer[7], address_buffer[6], address_buffer[5], address_buffer[4], address_buffer[3], address_buffer[2], address_buffer[1], address_buffer[0]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {state, command[9], command[8], command[7], command[6], command[5], command[4], command[3], command[2], command[1], command[0], last_SCL, last_SDA, SDA_out, ram_read, address[14], address[13], address[12], address[11], address[10], address[9], address[8], address[7], address[6], address[5], address[4], address[3], address[2], address[1], address[0], ram_write, read_ack_phase, data[8], data[7], data[6], data[5], data[4], data[3], data[2], data[1], data[0], a_bytes_left[7], a_bytes_left[6], a_bytes_left[5], a_bytes_left[4], a_bytes_left[3], a_bytes_left[2], a_bytes_left[1], a_bytes_left[0], address_buffer[13], address_buffer[12], address_buffer[11], address_buffer[10], address_buffer[9], address_buffer[8], address_buffer[7], address_buffer[6], address_buffer[5], address_buffer[4], address_buffer[3], address_buffer[2], address_buffer[1], address_buffer[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 	
 	assign ram_addr = address[ADDR_WIDTH-1:0];
 	assign data_to_ram = data[8:1];

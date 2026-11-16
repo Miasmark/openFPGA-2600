@@ -100,7 +100,7 @@ module paddle_timer4 (
 	// the shared registers (pv: the engine's pending width)
 	always @(posedge clk)
 		if (ss_en)
-			{cc, old_clear, pv} <= {ss_si, cc, old_clear, pv} >> 1;
+			{cc, old_clear, pv} <= {ss_si, cc, old_clear, pv[25:1]};
 		else if (!ss_frz && ce) begin
 			old_clear <= clear;
 			if (clear) begin
@@ -138,7 +138,7 @@ module paddle_timer4 (
 
 		always @(posedge clk) if (ss_en)
 			{high_count, lowest, highest, difference, m, read_count, chg, cleared, lgh, pend} <=
-				{ss_c[p], high_count, lowest, highest, difference, m, read_count, chg, cleared, lgh, pend} >> 1;
+				{ss_c[p], high_count, lowest, highest, difference, m, read_count, chg, cleared, lgh};
 		else if (!ss_frz && ce) begin
 			if (~read_measured && clear_rise)
 				read_count <= read_count + 2'd1;

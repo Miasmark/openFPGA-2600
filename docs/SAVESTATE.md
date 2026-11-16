@@ -10,8 +10,8 @@ Intellivision core's protocol, header and benches (openFPGA-Intellivision
 
 | Part | File |
 |---|---|
-| The controller (ss_ctl) and the substitute raster | `src/fpga/core/ss_ctl.sv` |
-| The blob's layout, written down once | `tools/savestate/savestate.py`, which generates `src/fpga/core/ss_pkg.sv` and the tables below |
+| The controller (ss_ctl) and the substitute raster | `src/fpga/core/a26_ss_ctl.sv` |
+| The blob's layout, written down once | `tools/savestate/savestate.py`, which generates `src/fpga/core/a26_ss_pkg.sv` and the tables below |
 | The scan chain in the vendored files | `tools/savestate/scan_insert.py`, run by `tools/savestate/apply.sh` |
 | The chain in our own modules | `paddle_timer4.sv`, `virtual_axis5.sv`, `atarivox/*.sv`, `atari2600_pocket.sv` (by hand) |
 | The hookup, the hold rule, the cartridge CRC | `atari2600_pocket.sv` ("SAVE STATES" and the `ss hold` lines), `core_top.v` |
@@ -75,7 +75,7 @@ speaking all that time) ends with err and leaves the machine untouched.
 ### 2.2 While frozen
 
 - **The picture.** The Pocket's sync comes straight from the TIA, so a
-  frozen machine would stop it. `ss_raster` (in `ss_ctl.sv`) learns the
+  frozen machine would stop it. `ss_raster` (in `a26_ss_ctl.sv`) learns the
   picture's raster while the machine runs (line length, HSync and HBlank,
   frame length, VSync and VBlank, the pixel strobe's phase) and continues it
   while frozen, with a black picture. The machine resumes on the clock the

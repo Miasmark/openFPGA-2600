@@ -116,13 +116,17 @@ module mos6502
 	// look like the real pins to anything downstream.
 	logic phase2;
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {phase2} <= {ss_c2, phase2} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if      (phi1_en) phase2 <= 1'b0;
 		else if (phi2_en) phase2 <= 1'b1;
 	end
 	end
-	assign ss_c3 = {phase2};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c3 = {phase2};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign phi1_out = ~phase2;
 	assign phi2_out =  phase2;
@@ -138,7 +142,9 @@ module mos6502
 	// and the control word quiet while a reset is recognised.
 	logic wr_pin, sync_pin;
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {wr_pin} <= {ss_c3, wr_pin} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (phi1_en) begin
 			wr_pin   <= c.wr;
@@ -146,7 +152,9 @@ module mos6502
 		end
 	end
 	end
-	assign ss_c4 = {wr_pin};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c4 = {wr_pin};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rw_n = ~wr_pin;
 	assign sync = sync_pin;

@@ -237,7 +237,9 @@ module Atari7800 (
 	// Reset assertion is immediate. Release lands on the phase before the first
 	// one the CPU acts on, so that first visible edge is still source-caused.
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {reset_hold} <= {ss_c0, reset_hold} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (reset) begin
 			reset_hold <= 1'b1;
@@ -260,12 +262,16 @@ module Atari7800 (
 		end
 	end
 	end
-	assign ss_c1 = {reset_hold};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {reset_hold};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	// In 2600 mode SHB and the CPU phase can collapse onto one clk_sys tick.
 	// Require release to survive a phase-1 sample; assertion stays immediate.
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {tia_RDY_seen_high} <= {ss_c1, tia_RDY_seen_high} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (effective_reset)
 			tia_RDY_seen_high <= 1'b1;
@@ -275,7 +281,9 @@ module Atari7800 (
 			tia_RDY_seen_high <= 1'b1;
 	end
 	end
-	assign ss_c2 = {tia_RDY_seen_high};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c2 = {tia_RDY_seen_high};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 	// On a Harmony/Melody the ARM is the cartridge, so while a mapper call
 	// runs the 6507 makes no forward progress; Stella models the same thing
 	// as zero elapsed time. rubyQ writes its parameter block, calls the ARM
@@ -300,7 +308,9 @@ module Atari7800 (
 	//   mapper           take   | take  |  hide |     |  hide |  take
 	logic stall_cycle_taken;
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {stall_cycle_taken} <= {ss_c2, stall_cycle_taken} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (!arm_call_stall)
 			stall_cycle_taken <= 1'b0;
@@ -308,7 +318,9 @@ module Atari7800 (
 			stall_cycle_taken <= 1'b1;
 	end
 	end
-	assign ss_c3 = {stall_cycle_taken};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c3 = {stall_cycle_taken};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 	wire mapper_phi2 = pclk0 && (!arm_call_stall || !stall_cycle_taken);
 	assign RDY = maria_RDY && tia_RDY && (~tia_en || tia_RDY_seen_high) &&
 		!arm_call_stall;
@@ -331,14 +343,18 @@ module Atari7800 (
 	wire [7:0] DB = cpu_DB_oe ? physical_write_DB : read_DB;
 
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {open_bus[7], open_bus[6], open_bus[5], open_bus[4], open_bus[3], open_bus[2], open_bus[1], open_bus[0]} <= {ss_c3, open_bus[7], open_bus[6], open_bus[5], open_bus[4], open_bus[3], open_bus[2], open_bus[1], open_bus[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		pause_clock <= pause ? pause_clock + 1'd1 : {1'b0, mclk1};
 		open_bus <= DB;
 		last_address <= AB;
 	end
 	end
-	assign ss_c4 = {open_bus[7], open_bus[6], open_bus[5], open_bus[4], open_bus[3], open_bus[2], open_bus[1], open_bus[0]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c4 = {open_bus[7], open_bus[6], open_bus[5], open_bus[4], open_bus[3], open_bus[2], open_bus[1], open_bus[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	wire cs_cart = ~|{cs_tia, cs_riot};
 `ifdef POCKET_SRAM
@@ -643,11 +659,15 @@ module Atari7800 (
 	// the reset. Before its first image the 7800 core ran in 7800 mode
 	// (tia_mode 0); the 2600 core has none, so tia_mode does not reach here.
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {tia_en} <= {ss_c10, tia_en} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz)
 		tia_en <= !effective_reset;
 	end
-	assign ss_c11 = {tia_en};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c11 = {tia_en};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	// The 2600 mappers' cartridge RAM request, while the 2600 owns the bus or
 	// a mapper initialises its RAM. The 7800 core merged cart.sv's request in
@@ -1087,7 +1107,9 @@ module cpu_phase_controller
 	end
 
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {last_phase2, phase_valid, active_tia, state, target_tia} <= {ss_c0, last_phase2, phase_valid, active_tia, state, target_tia} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (phi1) begin
 			last_phase2 <= 1'b0;
@@ -1132,7 +1154,9 @@ module cpu_phase_controller
 		endcase
 	end
 	end
-	assign ss_c1 = {last_phase2, phase_valid, active_tia, state, target_tia};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {last_phase2, phase_valid, active_tia, state, target_tia};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -1172,13 +1196,17 @@ module M6502C
 	wire  phi2_en = pclk0 &  in_phase2;
 
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {in_phase2} <= {ss_c0, in_phase2} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if      (phi1_en) in_phase2 <= 1'b1;
 		else if (phi2_en) in_phase2 <= 1'b0;
 	end
 	end
-	assign ss_c1 = {in_phase2};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {in_phase2};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	// SALLY pin 39 is the system clock - TIA, RIOT, both cartridge slots and
 	// MARIA pin 6 all run off it, not off MARIA's own divider. So the rest of

@@ -127,7 +127,9 @@ module lfsr_6
 	assign lfsr = reset ? 6'd0 : (phi2 ? lfsr_next : lfsr_latch1);
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {lfsr_next[5], lfsr_next[4], lfsr_next[3], lfsr_next[2], lfsr_next[1], lfsr_next[0], lfsr_latch1[5], lfsr_latch1[4], lfsr_latch1[3], lfsr_latch1[2], lfsr_latch1[1], lfsr_latch1[0]} <= {ss_c0, lfsr_next[5], lfsr_next[4], lfsr_next[3], lfsr_next[2], lfsr_next[1], lfsr_next[0], lfsr_latch1[5], lfsr_latch1[4], lfsr_latch1[3], lfsr_latch1[2], lfsr_latch1[1], lfsr_latch1[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 
 		if (phi1)
@@ -141,7 +143,9 @@ module lfsr_6
 		end
 	end
 	end
-	assign ss_c1 = {lfsr_next[5], lfsr_next[4], lfsr_next[3], lfsr_next[2], lfsr_next[1], lfsr_next[0], lfsr_latch1[5], lfsr_latch1[4], lfsr_latch1[3], lfsr_latch1[2], lfsr_latch1[1], lfsr_latch1[0]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {lfsr_next[5], lfsr_next[4], lfsr_next[3], lfsr_next[2], lfsr_next[1], lfsr_next[0], lfsr_latch1[5], lfsr_latch1[4], lfsr_latch1[3], lfsr_latch1[2], lfsr_latch1[1], lfsr_latch1[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -198,14 +202,18 @@ module sr_latch
 	assign q = i_val;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {sr_val} <= {ss_c0, sr_val} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		sr_val <= i_val;
 		if (reset)
 			sr_val <= 1'd0;
 	end
 	end
-	assign ss_c1 = {sr_val};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {sr_val};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -242,7 +250,9 @@ module f_cell
 	assign q_n = ~q;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {slave, master} <= {ss_c0, slave, master} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (tick)
 			slave  <= ~master;
@@ -255,7 +265,9 @@ module f_cell
 		end
 	end
 	end
-	assign ss_c1 = {slave, master};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {slave, master};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -339,7 +351,9 @@ module d_cell
 	assign out = reset ? 1'd0 : (phi2 ? out_next : out_latch);
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {out_next, out_latch} <= {ss_c0, out_next, out_latch} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (phi1)
 			out_next <= in;
@@ -353,7 +367,9 @@ module d_cell
 		end
 	end
 	end
-	assign ss_c1 = {out_next, out_latch};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {out_next, out_latch};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 endmodule
 
 module inverter_reg
@@ -377,7 +393,9 @@ module inverter_reg
 	assign out = /*set ? in : */inv_latch;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {inv_latch} <= {ss_c0, inv_latch} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		if (set)
 			inv_latch <= in;
@@ -385,7 +403,9 @@ module inverter_reg
 			inv_latch <= 0;
 	end
 	end
-	assign ss_c1 = {inv_latch};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {inv_latch};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 endmodule
 
 
@@ -443,7 +463,9 @@ assign f1_q_l = reset ? 1'd1 : (~f1_qn ? 1'd0 : f1_qn_reg);
 assign clock.clock = 0; // Clock is unused for ripple counters!!
 
 always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {old_tick, old_reset, f_count[1], f_count[0], f1_qn_reg} <= {ss_c0, old_tick, old_reset, f_count[1], f_count[0], f1_qn_reg} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 	old_tick <= tick;
 	old_reset <= reset;
@@ -464,7 +486,9 @@ always_ff @(posedge clk) begin
 
 end
 	end
-	assign ss_c1 = {old_tick, old_reset, f_count[1], f_count[0], f1_qn_reg};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {old_tick, old_reset, f_count[1], f_count[0], f1_qn_reg};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -622,7 +646,9 @@ wire resp0 = (hclk.level_p2 && rsynd) || reset;
 assign phi0_ll = 0;
 
 always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {oclk_tog, oclk_clock, pclk_div[2], pclk_div[1], pclk_div[0], pclk_clock} <= {ss_c1, oclk_tog, oclk_clock, pclk_div[2], pclk_div[1], pclk_div[0], pclk_clock} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin : phi0_gen
 	// Oscillator Clock
 	if (ce) begin
@@ -657,7 +683,9 @@ always_ff @(posedge clk) begin
 	end
 end
 	end
-	assign ss_c2 = {oclk_tog, oclk_clock, pclk_div[2], pclk_div[1], pclk_div[0], pclk_clock};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c2 = {oclk_tog, oclk_clock, pclk_div[2], pclk_div[1], pclk_div[0], pclk_clock};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -883,7 +911,9 @@ module hmove_gen
 	inverter_reg sec1_ir(ss_en, ss_frz, ss_c3, ss_c4, clk, reset, hclk.level_p1, sec, sec_1);
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {hmove_cnt[3], hmove_cnt[2], hmove_cnt[1], hmove_cnt[0], p0ec[1], p0ec[0], p1ec[1], p1ec[0], m0ec[1], m0ec[0], m1ec[1], m1ec[0], blec[1], blec[0]} <= {ss_c4, hmove_cnt[3], hmove_cnt[2], hmove_cnt[1], hmove_cnt[0], p0ec[1], p0ec[0], p1ec[1], p1ec[0], m0ec[1], m0ec[0], m1ec[1], m1ec[0], blec[1], blec[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin : hmove_block
 		if (hclk.edge_p2) begin
 			if (sec || |hmove_cnt)
@@ -913,7 +943,9 @@ module hmove_gen
 		end
 	end
 	end
-	assign ss_c5 = {hmove_cnt[3], hmove_cnt[2], hmove_cnt[1], hmove_cnt[0], p0ec[1], p0ec[0], p1ec[1], p1ec[0], m0ec[1], m0ec[0], m1ec[1], m1ec[0], blec[1], blec[0]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c5 = {hmove_cnt[3], hmove_cnt[2], hmove_cnt[1], hmove_cnt[0], p0ec[1], p0ec[0], p1ec[1], p1ec[0], m0ec[1], m0ec[0], m1ec[1], m1ec[0], blec[1], blec[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -999,7 +1031,9 @@ module playfield
 	inverter_reg pf2_ir(ss_en, ss_frz, ss_c3, ss_c4, clk, reset, hclk.level_p2, pf_2, pf_3);
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {pf_latch1[4], pf_latch1[3], pf_latch1[2], pf_latch1[1], pf_latch1[0], pf_latch2[4], pf_latch2[3], pf_latch2[2], pf_latch2[1], pf_latch2[0]} <= {ss_c4, pf_latch1[4], pf_latch1[3], pf_latch1[2], pf_latch1[1], pf_latch1[0], pf_latch2[4], pf_latch2[3], pf_latch2[2], pf_latch2[1], pf_latch2[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin : pf_block
 		if (hclk.level_p1) begin
 			pf_latch1 <= pf_next;
@@ -1010,7 +1044,9 @@ module playfield
 		end
 	end
 	end
-	assign ss_c5 = {pf_latch1[4], pf_latch1[3], pf_latch1[2], pf_latch1[1], pf_latch1[0], pf_latch2[4], pf_latch2[3], pf_latch2[2], pf_latch2[1], pf_latch2[0]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c5 = {pf_latch1[4], pf_latch1[3], pf_latch1[2], pf_latch1[1], pf_latch1[0], pf_latch2[4], pf_latch2[3], pf_latch2[2], pf_latch2[1], pf_latch2[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -1038,7 +1074,9 @@ module object_tick
 	wire edge_miss = (old_motck && ~motck) && (~old_ec && ec);
 	assign tick = (motck || ec) && ~edge_miss;
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {old_motck, old_ec} <= {ss_c0, old_motck, old_ec} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		old_motck <= motck;
 		old_ec <= ec;
@@ -1048,7 +1086,9 @@ module object_tick
 		end
 	end
 	end
-	assign ss_c1 = {old_motck, old_ec};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {old_motck, old_ec};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -1678,7 +1718,9 @@ module audio_channel
 	);
 
 	always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {freq_next[4], freq_next[3], freq_next[2], freq_next[1], freq_next[0], freq_latch[4], freq_latch[3], freq_latch[2], freq_latch[1], freq_latch[0], noise_next[4], noise_next[3], noise_next[2], noise_next[1], noise_next[0], noise_latch[4], noise_latch[3], noise_latch[2], noise_latch[1], noise_latch[0]} <= {ss_c8, freq_next[4], freq_next[3], freq_next[2], freq_next[1], freq_next[0], freq_latch[4], freq_latch[3], freq_latch[2], freq_latch[1], freq_latch[0], noise_next[4], noise_next[3], noise_next[2], noise_next[1], noise_next[0], noise_latch[4], noise_latch[3], noise_latch[2], noise_latch[1], noise_latch[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 
 		if (aud0)
@@ -1699,7 +1741,9 @@ module audio_channel
 
 	end
 	end
-	assign ss_c9 = {freq_next[4], freq_next[3], freq_next[2], freq_next[1], freq_next[0], freq_latch[4], freq_latch[3], freq_latch[2], freq_latch[1], freq_latch[0], noise_next[4], noise_next[3], noise_next[2], noise_next[1], noise_next[0], noise_latch[4], noise_latch[3], noise_latch[2], noise_latch[1], noise_latch[0]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c9 = {freq_next[4], freq_next[3], freq_next[2], freq_next[1], freq_next[0], freq_latch[4], freq_latch[3], freq_latch[2], freq_latch[1], freq_latch[0], noise_next[4], noise_next[3], noise_next[2], noise_next[1], noise_next[0], noise_latch[4], noise_latch[3], noise_latch[2], noise_latch[1], noise_latch[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign audio = ~pulse0_qn ? volume : 4'd0;
 
@@ -1778,7 +1822,9 @@ module video_stabilize
 	wire [5:0] frame_score = v_count[0] ? {1'b0, score_raw[5:1]} : score_raw;
 
 	always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {old_hblank, old_vsync, total_lines[8], total_lines[7], total_lines[6], total_lines[5], total_lines[4], total_lines[3], total_lines[2], total_lines[1], total_lines[0], vsync_override, vsync_emulate, v_count[8], v_count[7], v_count[6], v_count[5], v_count[4], v_count[3], v_count[2], v_count[1], v_count[0], vblank_en, vsync_en, vsync_set, vsync_count[7], vsync_count[6], vsync_count[5], vsync_count[4], vsync_count[3], vsync_count[2], vsync_count[1], vsync_count[0], vsync_line[8], vsync_line[7], vsync_line[6], vsync_line[5], vsync_line[4], vsync_line[3], vsync_line[2], vsync_line[1], vsync_line[0], region_frames[5], region_frames[4], region_frames[3], region_frames[2], region_frames[1], region_frames[0], pal_sum[11], pal_sum[10], pal_sum[9], pal_sum[8], pal_sum[7], pal_sum[6], pal_sum[5], pal_sum[4], pal_sum[3], pal_sum[2], pal_sum[1], pal_sum[0], ntsc_sum[11], ntsc_sum[10], ntsc_sum[9], ntsc_sum[8], ntsc_sum[7], ntsc_sum[6], ntsc_sum[5], ntsc_sum[4], ntsc_sum[3], ntsc_sum[2], ntsc_sum[1], ntsc_sum[0], pal_mode, region_done} <= {ss_c0, old_hblank, old_vsync, total_lines[8], total_lines[7], total_lines[6], total_lines[5], total_lines[4], total_lines[3], total_lines[2], total_lines[1], total_lines[0], vsync_override, vsync_emulate, v_count[8], v_count[7], v_count[6], v_count[5], v_count[4], v_count[3], v_count[2], v_count[1], v_count[0], vblank_en, vsync_en, vsync_set, vsync_count[7], vsync_count[6], vsync_count[5], vsync_count[4], vsync_count[3], vsync_count[2], vsync_count[1], vsync_count[0], vsync_line[8], vsync_line[7], vsync_line[6], vsync_line[5], vsync_line[4], vsync_line[3], vsync_line[2], vsync_line[1], vsync_line[0], region_frames[5], region_frames[4], region_frames[3], region_frames[2], region_frames[1], region_frames[0], pal_sum[11], pal_sum[10], pal_sum[9], pal_sum[8], pal_sum[7], pal_sum[6], pal_sum[5], pal_sum[4], pal_sum[3], pal_sum[2], pal_sum[1], pal_sum[0], ntsc_sum[11], ntsc_sum[10], ntsc_sum[9], ntsc_sum[8], ntsc_sum[7], ntsc_sum[6], ntsc_sum[5], ntsc_sum[4], ntsc_sum[3], ntsc_sum[2], ntsc_sum[1], ntsc_sum[0], pal_mode, region_done} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 		old_hblank <= hblank_in;
 		old_vsync <= vsync_in;
@@ -1880,7 +1926,9 @@ module video_stabilize
 
 	end
 	end
-	assign ss_c1 = {old_hblank, old_vsync, total_lines[8], total_lines[7], total_lines[6], total_lines[5], total_lines[4], total_lines[3], total_lines[2], total_lines[1], total_lines[0], vsync_override, vsync_emulate, v_count[8], v_count[7], v_count[6], v_count[5], v_count[4], v_count[3], v_count[2], v_count[1], v_count[0], vblank_en, vsync_en, vsync_set, vsync_count[7], vsync_count[6], vsync_count[5], vsync_count[4], vsync_count[3], vsync_count[2], vsync_count[1], vsync_count[0], vsync_line[8], vsync_line[7], vsync_line[6], vsync_line[5], vsync_line[4], vsync_line[3], vsync_line[2], vsync_line[1], vsync_line[0], region_frames[5], region_frames[4], region_frames[3], region_frames[2], region_frames[1], region_frames[0], pal_sum[11], pal_sum[10], pal_sum[9], pal_sum[8], pal_sum[7], pal_sum[6], pal_sum[5], pal_sum[4], pal_sum[3], pal_sum[2], pal_sum[1], pal_sum[0], ntsc_sum[11], ntsc_sum[10], ntsc_sum[9], ntsc_sum[8], ntsc_sum[7], ntsc_sum[6], ntsc_sum[5], ntsc_sum[4], ntsc_sum[3], ntsc_sum[2], ntsc_sum[1], ntsc_sum[0], pal_mode, region_done};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {old_hblank, old_vsync, total_lines[8], total_lines[7], total_lines[6], total_lines[5], total_lines[4], total_lines[3], total_lines[2], total_lines[1], total_lines[0], vsync_override, vsync_emulate, v_count[8], v_count[7], v_count[6], v_count[5], v_count[4], v_count[3], v_count[2], v_count[1], v_count[0], vblank_en, vsync_en, vsync_set, vsync_count[7], vsync_count[6], vsync_count[5], vsync_count[4], vsync_count[3], vsync_count[2], vsync_count[1], vsync_count[0], vsync_line[8], vsync_line[7], vsync_line[6], vsync_line[5], vsync_line[4], vsync_line[3], vsync_line[2], vsync_line[1], vsync_line[0], region_frames[5], region_frames[4], region_frames[3], region_frames[2], region_frames[1], region_frames[0], pal_sum[11], pal_sum[10], pal_sum[9], pal_sum[8], pal_sum[7], pal_sum[6], pal_sum[5], pal_sum[4], pal_sum[3], pal_sum[2], pal_sum[1], pal_sum[0], ntsc_sum[11], ntsc_sum[10], ntsc_sum[9], ntsc_sum[8], ntsc_sum[7], ntsc_sum[6], ntsc_sum[5], ntsc_sum[4], ntsc_sum[3], ntsc_sum[2], ntsc_sum[1], ntsc_sum[0], pal_mode, region_done};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -2048,7 +2096,9 @@ video_stabilize stab
 
 
 always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {hblank_d} <= {ss_c5, hblank_d} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 	old_hblank <= hblank_o;
 	old_vsync <= vsync_o;
@@ -2063,13 +2113,17 @@ always_ff @(posedge clk) begin
 		row <= 0;
 end
 	end
-	assign ss_c6 = {hblank_d};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c6 = {hblank_d};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 // Reads and writes
 // NOTE: A realistic attempt at bus stuffing might need the registers to be set in a combinational
 // way, but otherwise using the clock enable signal keeps the timings valid.
 always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {phi2_delay, i_out[1], wreg[63][7], wreg[63][6], wreg[63][5], wreg[63][4], wreg[63][3], wreg[63][2], wreg[63][1], wreg[63][0], wreg[62][7], wreg[62][6], wreg[62][5], wreg[62][4], wreg[62][3], wreg[62][2], wreg[62][1], wreg[62][0], wreg[61][1], wreg[41][1], wreg[40][1], wreg[39][0], wreg[38][0], wreg[37][0], wreg[36][7], wreg[36][6], wreg[36][5], wreg[36][4], wreg[35][7], wreg[35][6], wreg[35][5], wreg[35][4], wreg[34][7], wreg[34][6], wreg[34][5], wreg[34][4], wreg[33][7], wreg[33][6], wreg[33][5], wreg[33][4], wreg[32][7], wreg[32][6], wreg[32][5], wreg[32][4], wreg[31][1], wreg[30][1], wreg[29][1], wreg[28][7], wreg[28][6], wreg[28][5], wreg[28][4], wreg[28][3], wreg[28][2], wreg[28][1], wreg[28][0], wreg[27][7], wreg[27][6], wreg[27][5], wreg[27][4], wreg[27][3], wreg[27][2], wreg[27][1], wreg[27][0], wreg[26][3], wreg[26][2], wreg[26][1], wreg[26][0], wreg[25][3], wreg[25][2], wreg[25][1], wreg[25][0], wreg[24][4], wreg[24][3], wreg[24][2], wreg[24][1], wreg[24][0], wreg[23][4], wreg[23][3], wreg[23][2], wreg[23][1], wreg[23][0], wreg[22][3], wreg[22][2], wreg[22][1], wreg[22][0], wreg[21][3], wreg[21][2], wreg[21][1], wreg[21][0], wreg[15][7], wreg[15][6], wreg[15][5], wreg[15][4], wreg[15][3], wreg[15][2], wreg[15][1], wreg[15][0], wreg[14][7], wreg[14][6], wreg[14][5], wreg[14][4], wreg[14][3], wreg[14][2], wreg[14][1], wreg[14][0], wreg[13][7], wreg[13][6], wreg[13][5], wreg[13][4], wreg[12][3], wreg[11][3], wreg[10][5], wreg[10][4], wreg[10][2], wreg[10][1], wreg[10][0], wreg[9][7], wreg[9][6], wreg[9][5], wreg[9][4], wreg[9][3], wreg[9][2], wreg[9][1], wreg[8][7], wreg[8][6], wreg[8][5], wreg[8][4], wreg[8][3], wreg[8][2], wreg[8][1], wreg[7][7], wreg[7][6], wreg[7][5], wreg[7][4], wreg[7][3], wreg[7][2], wreg[7][1], wreg[6][7], wreg[6][6], wreg[6][5], wreg[6][4], wreg[6][3], wreg[6][2], wreg[6][1], wreg[5][5], wreg[5][4], wreg[5][2], wreg[5][1], wreg[5][0], wreg[4][5], wreg[4][4], wreg[4][2], wreg[4][1], wreg[4][0], wreg[1][7], wreg[1][6], wreg[1][1], wreg[0][1], hmclr, cxclr} <= {ss_c6, phi2_delay, i_out[1], wreg[63][7], wreg[63][6], wreg[63][5], wreg[63][4], wreg[63][3], wreg[63][2], wreg[63][1], wreg[63][0], wreg[62][7], wreg[62][6], wreg[62][5], wreg[62][4], wreg[62][3], wreg[62][2], wreg[62][1], wreg[62][0], wreg[61][1], wreg[41][1], wreg[40][1], wreg[39][0], wreg[38][0], wreg[37][0], wreg[36][7], wreg[36][6], wreg[36][5], wreg[36][4], wreg[35][7], wreg[35][6], wreg[35][5], wreg[35][4], wreg[34][7], wreg[34][6], wreg[34][5], wreg[34][4], wreg[33][7], wreg[33][6], wreg[33][5], wreg[33][4], wreg[32][7], wreg[32][6], wreg[32][5], wreg[32][4], wreg[31][1], wreg[30][1], wreg[29][1], wreg[28][7], wreg[28][6], wreg[28][5], wreg[28][4], wreg[28][3], wreg[28][2], wreg[28][1], wreg[28][0], wreg[27][7], wreg[27][6], wreg[27][5], wreg[27][4], wreg[27][3], wreg[27][2], wreg[27][1], wreg[27][0], wreg[26][3], wreg[26][2], wreg[26][1], wreg[26][0], wreg[25][3], wreg[25][2], wreg[25][1], wreg[25][0], wreg[24][4], wreg[24][3], wreg[24][2], wreg[24][1], wreg[24][0], wreg[23][4], wreg[23][3], wreg[23][2], wreg[23][1], wreg[23][0], wreg[22][3], wreg[22][2], wreg[22][1], wreg[22][0], wreg[21][3], wreg[21][2], wreg[21][1], wreg[21][0], wreg[15][7], wreg[15][6], wreg[15][5], wreg[15][4], wreg[15][3], wreg[15][2], wreg[15][1], wreg[15][0], wreg[14][7], wreg[14][6], wreg[14][5], wreg[14][4], wreg[14][3], wreg[14][2], wreg[14][1], wreg[14][0], wreg[13][7], wreg[13][6], wreg[13][5], wreg[13][4], wreg[12][3], wreg[11][3], wreg[10][5], wreg[10][4], wreg[10][2], wreg[10][1], wreg[10][0], wreg[9][7], wreg[9][6], wreg[9][5], wreg[9][4], wreg[9][3], wreg[9][2], wreg[9][1], wreg[8][7], wreg[8][6], wreg[8][5], wreg[8][4], wreg[8][3], wreg[8][2], wreg[8][1], wreg[7][7], wreg[7][6], wreg[7][5], wreg[7][4], wreg[7][3], wreg[7][2], wreg[7][1], wreg[6][7], wreg[6][6], wreg[6][5], wreg[6][4], wreg[6][3], wreg[6][2], wreg[6][1], wreg[5][5], wreg[5][4], wreg[5][2], wreg[5][1], wreg[5][0], wreg[4][5], wreg[4][4], wreg[4][2], wreg[4][1], wreg[4][0], wreg[1][7], wreg[1][6], wreg[1][1], wreg[0][1], hmclr, cxclr} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin
 	phi2_delay <= pclk.level_p2; // Phi2 analog delay
 	i_out <= {4{~wreg[VBLANK][7]}};
@@ -2111,7 +2165,9 @@ always_ff @(posedge clk) begin
 	end
 end
 	end
-	assign ss_c7 = {phi2_delay, i_out[1], wreg[63][7], wreg[63][6], wreg[63][5], wreg[63][4], wreg[63][3], wreg[63][2], wreg[63][1], wreg[63][0], wreg[62][7], wreg[62][6], wreg[62][5], wreg[62][4], wreg[62][3], wreg[62][2], wreg[62][1], wreg[62][0], wreg[61][1], wreg[41][1], wreg[40][1], wreg[39][0], wreg[38][0], wreg[37][0], wreg[36][7], wreg[36][6], wreg[36][5], wreg[36][4], wreg[35][7], wreg[35][6], wreg[35][5], wreg[35][4], wreg[34][7], wreg[34][6], wreg[34][5], wreg[34][4], wreg[33][7], wreg[33][6], wreg[33][5], wreg[33][4], wreg[32][7], wreg[32][6], wreg[32][5], wreg[32][4], wreg[31][1], wreg[30][1], wreg[29][1], wreg[28][7], wreg[28][6], wreg[28][5], wreg[28][4], wreg[28][3], wreg[28][2], wreg[28][1], wreg[28][0], wreg[27][7], wreg[27][6], wreg[27][5], wreg[27][4], wreg[27][3], wreg[27][2], wreg[27][1], wreg[27][0], wreg[26][3], wreg[26][2], wreg[26][1], wreg[26][0], wreg[25][3], wreg[25][2], wreg[25][1], wreg[25][0], wreg[24][4], wreg[24][3], wreg[24][2], wreg[24][1], wreg[24][0], wreg[23][4], wreg[23][3], wreg[23][2], wreg[23][1], wreg[23][0], wreg[22][3], wreg[22][2], wreg[22][1], wreg[22][0], wreg[21][3], wreg[21][2], wreg[21][1], wreg[21][0], wreg[15][7], wreg[15][6], wreg[15][5], wreg[15][4], wreg[15][3], wreg[15][2], wreg[15][1], wreg[15][0], wreg[14][7], wreg[14][6], wreg[14][5], wreg[14][4], wreg[14][3], wreg[14][2], wreg[14][1], wreg[14][0], wreg[13][7], wreg[13][6], wreg[13][5], wreg[13][4], wreg[12][3], wreg[11][3], wreg[10][5], wreg[10][4], wreg[10][2], wreg[10][1], wreg[10][0], wreg[9][7], wreg[9][6], wreg[9][5], wreg[9][4], wreg[9][3], wreg[9][2], wreg[9][1], wreg[8][7], wreg[8][6], wreg[8][5], wreg[8][4], wreg[8][3], wreg[8][2], wreg[8][1], wreg[7][7], wreg[7][6], wreg[7][5], wreg[7][4], wreg[7][3], wreg[7][2], wreg[7][1], wreg[6][7], wreg[6][6], wreg[6][5], wreg[6][4], wreg[6][3], wreg[6][2], wreg[6][1], wreg[5][5], wreg[5][4], wreg[5][2], wreg[5][1], wreg[5][0], wreg[4][5], wreg[4][4], wreg[4][2], wreg[4][1], wreg[4][0], wreg[1][7], wreg[1][6], wreg[1][1], wreg[0][1], hmclr, cxclr};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c7 = {phi2_delay, i_out[1], wreg[63][7], wreg[63][6], wreg[63][5], wreg[63][4], wreg[63][3], wreg[63][2], wreg[63][1], wreg[63][0], wreg[62][7], wreg[62][6], wreg[62][5], wreg[62][4], wreg[62][3], wreg[62][2], wreg[62][1], wreg[62][0], wreg[61][1], wreg[41][1], wreg[40][1], wreg[39][0], wreg[38][0], wreg[37][0], wreg[36][7], wreg[36][6], wreg[36][5], wreg[36][4], wreg[35][7], wreg[35][6], wreg[35][5], wreg[35][4], wreg[34][7], wreg[34][6], wreg[34][5], wreg[34][4], wreg[33][7], wreg[33][6], wreg[33][5], wreg[33][4], wreg[32][7], wreg[32][6], wreg[32][5], wreg[32][4], wreg[31][1], wreg[30][1], wreg[29][1], wreg[28][7], wreg[28][6], wreg[28][5], wreg[28][4], wreg[28][3], wreg[28][2], wreg[28][1], wreg[28][0], wreg[27][7], wreg[27][6], wreg[27][5], wreg[27][4], wreg[27][3], wreg[27][2], wreg[27][1], wreg[27][0], wreg[26][3], wreg[26][2], wreg[26][1], wreg[26][0], wreg[25][3], wreg[25][2], wreg[25][1], wreg[25][0], wreg[24][4], wreg[24][3], wreg[24][2], wreg[24][1], wreg[24][0], wreg[23][4], wreg[23][3], wreg[23][2], wreg[23][1], wreg[23][0], wreg[22][3], wreg[22][2], wreg[22][1], wreg[22][0], wreg[21][3], wreg[21][2], wreg[21][1], wreg[21][0], wreg[15][7], wreg[15][6], wreg[15][5], wreg[15][4], wreg[15][3], wreg[15][2], wreg[15][1], wreg[15][0], wreg[14][7], wreg[14][6], wreg[14][5], wreg[14][4], wreg[14][3], wreg[14][2], wreg[14][1], wreg[14][0], wreg[13][7], wreg[13][6], wreg[13][5], wreg[13][4], wreg[12][3], wreg[11][3], wreg[10][5], wreg[10][4], wreg[10][2], wreg[10][1], wreg[10][0], wreg[9][7], wreg[9][6], wreg[9][5], wreg[9][4], wreg[9][3], wreg[9][2], wreg[9][1], wreg[8][7], wreg[8][6], wreg[8][5], wreg[8][4], wreg[8][3], wreg[8][2], wreg[8][1], wreg[7][7], wreg[7][6], wreg[7][5], wreg[7][4], wreg[7][3], wreg[7][2], wreg[7][1], wreg[6][7], wreg[6][6], wreg[6][5], wreg[6][4], wreg[6][3], wreg[6][2], wreg[6][1], wreg[5][5], wreg[5][4], wreg[5][2], wreg[5][1], wreg[5][0], wreg[4][5], wreg[4][4], wreg[4][2], wreg[4][1], wreg[4][0], wreg[1][7], wreg[1][6], wreg[1][1], wreg[0][1], hmclr, cxclr};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 // The bus drivers are asynchronous. Their stored sources live in rreg, but
 // registering the pin value on phase 2 makes it arrive after the CPU closes
@@ -2356,7 +2412,9 @@ audio_channel audio1
 
 // Select the correct output register
 always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {col[3], col[2], col[1], col[0], lum[2], lum[1], lum[0]} <= {ss_c19, col[3], col[2], col[1], col[0], lum[2], lum[1], lum[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) if (oclk.edge_p1) begin
 	if ((hblank || vblank_o))
 		{col, lum} <= decomb ? wreg[COLUBK][7:1] : 7'h0; // Blank non-visible areas
@@ -2371,7 +2429,9 @@ always_ff @(posedge clk) begin
 	end
 end
 	end
-	assign ss_c20 = {col[3], col[2], col[1], col[0], lum[2], lum[1], lum[0]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c20 = {col[3], col[2], col[1], col[0], lum[2], lum[1], lum[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 // WSYNC register controls the RDY signal to the CPU. It is cleared at the start of hblank.
 wire rdy_q;
@@ -2389,7 +2449,9 @@ sr_latch in_sr
 // Calculate the collisions
 
 always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
 		if (ss_en) {rreg[13][7], rreg[12][7], rreg[11][7], rreg[10][7], rreg[9][7], rreg[8][7], rreg[7][7], rreg[7][6], rreg[6][7], rreg[5][7], rreg[5][6], rreg[4][7], rreg[4][6], rreg[3][7], rreg[3][6], rreg[2][7], rreg[2][6], rreg[1][7], rreg[1][6], rreg[0][7], rreg[0][6]} <= {ss_c21, rreg[13][7], rreg[12][7], rreg[11][7], rreg[10][7], rreg[9][7], rreg[8][7], rreg[7][7], rreg[7][6], rreg[6][7], rreg[5][7], rreg[5][6], rreg[4][7], rreg[4][6], rreg[3][7], rreg[3][6], rreg[2][7], rreg[2][6], rreg[1][7], rreg[1][6], rreg[0][7], rreg[0][6]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
 		else if (!ss_frz) begin : read_reg_block
 	if (cxclr) begin
 		{rreg[CXM0P][7:6], rreg[CXM1P][7:6], rreg[CXP0FB][7:6],
@@ -2430,6 +2492,8 @@ always_ff @(posedge clk) begin
 	end
 end
 	end
-	assign ss_c22 = {rreg[13][7], rreg[12][7], rreg[11][7], rreg[10][7], rreg[9][7], rreg[8][7], rreg[7][7], rreg[7][6], rreg[6][7], rreg[5][7], rreg[5][6], rreg[4][7], rreg[4][6], rreg[3][7], rreg[3][6], rreg[2][7], rreg[2][6], rreg[1][7], rreg[1][6], rreg[0][7], rreg[0][6]};
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c22 = {rreg[13][7], rreg[12][7], rreg[11][7], rreg[10][7], rreg[9][7], rreg[8][7], rreg[7][7], rreg[7][6], rreg[6][7], rreg[5][7], rreg[5][6], rreg[4][7], rreg[4][6], rreg[3][7], rreg[3][6], rreg[2][7], rreg[2][6], rreg[1][7], rreg[1][6], rreg[0][7], rreg[0][6]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule

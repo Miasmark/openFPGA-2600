@@ -2,6 +2,7 @@
 // The save-state blob's layout (docs/SAVESTATE.md 3).
 // SPDX-License-Identifier: MIT
 
+/* verilator lint_off UNUSEDPARAM */  // the whole layout, some words for later steps
 package a26_ss_pkg;
 	localparam logic [31:0] SS_MAGIC         = 32'h41323653;   // "A26S"
 	localparam logic [31:0] SS_VERSION       = 32'd1;
@@ -34,3 +35,4 @@ package a26_ss_pkg;
 	localparam int          SS_H_AR_CRC       = 12;
 	localparam int          SS_H_DARIA        = 13;
 endpackage
+/* verilator lint_on UNUSEDPARAM */
