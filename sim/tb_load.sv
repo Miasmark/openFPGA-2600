@@ -1593,6 +1593,13 @@ module tb_load;
 	bit ss_trace = 0;
 	logic [3:0] ss_tr_q = 4'hF;
 	initial ss_trace = $test$plusargs("ss_trace");
+`ifdef POCKET_ATARIVOX
+	initial if ($test$plusargs("ss_trace")) forever begin
+		repeat (14318 * 50) @(posedge clk_sys);
+		$display("SS trace %0.3f ms: AtariVox sample %0d, rx idle %0d", ($time - ss_t0) / 1.0e6,
+			dut.vox_sample, dut.atarivox.rx_idle);
+	end
+`endif
 	always @(posedge clk_sys) if (ss_trace && {dut.sk_idle, dut.fa2_quiet_cnt[3], dut.vox_quiet, dut.ss_frz} != ss_tr_q) begin
 		ss_tr_q <= {dut.sk_idle, dut.fa2_quiet_cnt[3], dut.vox_quiet, dut.ss_frz};
 		$display("SS trace %0.3f ms: SaveKey idle %0d, FA2 quiet %0d, AtariVox quiet %0d, frozen %0d",
@@ -1693,7 +1700,7 @@ module tb_load;
 				$display("SWITCH at %0d ms: %0s (left %0s, right %0s, TV type item %0s)", ms, word,
 					ldiff_b ? "B" : "A", rdiff_b ? "B" : "A", bw_set ? "B&W" : "Colour");
 		end
-		else if (eq < 0 && word != "dump" && word != "show" && word != "drive" && word != "types" && word != "reset")
+		else if (eq < 0 && word != "end" && word != "dump" && word != "show" && word != "drive" && word != "types" && word != "reset")
 			joy0 = 16'(word.atohex());
 		else return 0;
 		return 1;
@@ -1718,6 +1725,11 @@ module tb_load;
 				js_word.push_back(word);
 			end
 			$fclose(jf);
+			// a last word never reached (the run ends first), so the script
+			// waits on to the end and a load after its last word still
+			// replays it (and fires its words after the saved time again)
+			js_ms.push_back(32'h3FFF_FFFF);
+			js_word.push_back("end");
 			// the inputs before the script, for a load's replay
 			j0 = joy0; j1 = joy1; j2 = joy2; j3 = joy3; a0 = ana0; l0 = ldiff_b; r0 = rdiff_b; b0 = bw_set;
 			for (int e = 0; e < js_ms.size(); e++) begin
@@ -1748,7 +1760,8 @@ module tb_load;
 				end
 				if (js_done) break;                       // the script ended in a replay
 				at = ms;
-				if (word == "dump") dump_frames = dumped + 1;
+				if (word == "end") ;
+				else if (word == "dump") dump_frames = dumped + 1;
 				else if (word == "show") show($sformatf("at %0d ms", ms));
 				else if (word == "drive") begin
 					$display("INPUT driving gray codes at %0d ms: port 1 %0s, port 2 %0s", ms,

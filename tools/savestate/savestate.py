@@ -37,7 +37,8 @@ W_CHAIN = 16                # the scan chain, first bit out in bit 31 of the fir
 W_RIOT = 512                # RIOT RAM, 128 bytes, the first in bits 31-24
 W_FA2 = 544                 # FA2 work RAM, 256 bytes
 W_AVOX = 608                # AtariVox register file, 256 words
-W_GAP = 864                 # unused, 0
+W_CDATA = 864               # the SRAM's cartridge byte register at the freeze (bits 7-0; the rest 0)
+W_GAP = 865                 # unused, 0
 W_CRAM = 1024               # cartridge RAM, 32 KiB (the SRAM's cart area, bytes 0-32767)
 W_END = 9216                # the live part ends: 36,864 bytes
 CRAM_BYTES = 32768
@@ -112,6 +113,7 @@ def pkg_text():
            "\tlocalparam int          SS_W_RIOT        = %d;" % W_RIOT,
            "\tlocalparam int          SS_W_FA2         = %d;" % W_FA2,
            "\tlocalparam int          SS_W_AVOX        = %d;" % W_AVOX,
+           "\tlocalparam int          SS_W_CDATA       = %d;" % W_CDATA,
            "\tlocalparam int          SS_W_GAP         = %d;" % W_GAP,
            "\tlocalparam int          SS_W_CRAM        = %d;" % W_CRAM,
            "\tlocalparam int          SS_W_END         = %d;" % W_END,
@@ -140,6 +142,7 @@ def doc_text():
           "| %d-%d | %d-%d | RIOT RAM, 128 bytes, four a word (the first in bits 31-24) |" % (4 * W_RIOT, 4 * W_FA2 - 1, W_RIOT, W_FA2 - 1),
           "| %d-%d | %d-%d | FA2 work RAM, 256 bytes, as the RIOT RAM |" % (4 * W_FA2, 4 * W_AVOX - 1, W_FA2, W_AVOX - 1),
           "| %d-%d | %d-%d | AtariVox register file, 256 words |" % (4 * W_AVOX, 4 * W_GAP - 1, W_AVOX, W_GAP - 1),
+          "| %d-%d | %d | the SRAM controller's cartridge byte (`c_rdata`) at the freeze, bits 7-0 (the rest 0): what the 6507 reads on a cycle that issues no new SRAM access (section 2.2) |" % (4 * W_CDATA, 4 * W_CDATA + 3, W_CDATA),
           "| %d-%d | %d-%d | 0 |" % (4 * W_GAP, 4 * W_CRAM - 1, W_GAP, W_CRAM - 1),
           "| %d-%d | %d-%d | cartridge RAM: the SRAM's cartridge area, bytes 0-%d, as the RIOT RAM |" % (4 * W_CRAM, 4 * W_END - 1, W_CRAM, W_END - 1, CRAM_BYTES - 1),
           "| %d-%d | | not stored: read as 0, and a load refuses a blob with anything else written there |" % (4 * W_END, BLOB_BYTES - 1),
@@ -205,7 +208,7 @@ def verify(path, a):
     last_bits = n - 32 * (cw - 1)
     if cw and last_bits < 32 and w[W_CHAIN + cw - 1] & ((1 << (32 - last_bits)) - 1):
         probs.append("the last chain word's padding is not 0")
-    if any(w[W_CHAIN + cw:W_RIOT]) or any(w[W_GAP:W_CRAM]):
+    if any(w[W_CHAIN + cw:W_RIOT]) or any(w[W_GAP:W_CRAM]) or w[W_CDATA] > 0xFF:
         probs.append("an unused area is not 0")
     if any(blob[W_END * 4:]):
         probs.append("bytes past the live part are not 0")
@@ -221,7 +224,7 @@ def show(path):
     for k, name, _ in HEADER:
         print("  %2d %-10s $%08X" % (k, name, w[k]))
     for name, a, b in (("chain", W_CHAIN, W_RIOT), ("riot", W_RIOT, W_FA2), ("fa2", W_FA2, W_AVOX),
-                       ("avox", W_AVOX, W_GAP), ("cram", W_CRAM, W_END)):
+                       ("avox", W_AVOX, W_CDATA), ("cram", W_CRAM, W_END)):
         seg = blob[4 * a:4 * b]
         print("  %-6s bytes %6d-%6d  crc32 $%08X  nonzero %d" % (name, 4 * a, 4 * b - 1, zlib.crc32(seg), sum(1 for x in seg if x)))
 

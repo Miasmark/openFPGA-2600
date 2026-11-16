@@ -305,7 +305,7 @@ module a26_ss_ctl (
 		O_IDLE, O_HS1, O_HS2, O_WAITF, O_SETTLE,
 		O_SCH, O_SCHW, O_SRAM, O_SRAMR, O_SCRAM, O_SCRAMR, O_SWR, O_SCRC, O_HDR,
 		O_VHDR, O_VHDR2, O_VPAY, O_VPAY2, O_VCRC, O_VCHK,
-		O_AW, O_AW2, O_ACH, O_ARAM, O_ACRAM,
+		O_AW, O_AW2, O_ACH, O_ARAM, O_ACRAM, O_REST,
 		O_FIN_OK, O_FIN_ERR, O_FIN2
 	} ost_t;
 	ost_t        ost = O_IDLE;
@@ -316,6 +316,7 @@ module a26_ss_ctl (
 	logic [1:0]  bq = 2'd0;                       // CRC byte
 	logic [31:0] v = 32'd0, crc = 32'hFFFFFFFF, hdr_crc = 32'd0;
 	logic        bad = 1'b0;
+	logic  [7:0] keep = 8'd0;                     // the SRAM's cartridge byte at the freeze
 	logic [7:0]  tmo = 8'd0;
 	/* verilator lint_off UNUSEDSIGNAL */
 	logic        ld_applied = 1'b0;               // a load's state is in (one clk; the bench)
@@ -325,7 +326,8 @@ module a26_ss_ctl (
 	wire in_cpad  = w >= WA'(SS_W_CHAIN + CHAIN_WORDS) && w < WA'(SS_W_RIOT);
 	wire in_riot  = w >= WA'(SS_W_RIOT) && w < WA'(SS_W_FA2);
 	wire in_fa2   = w >= WA'(SS_W_FA2) && w < WA'(SS_W_AVOX);
-	wire in_avox  = w >= WA'(SS_W_AVOX) && w < WA'(SS_W_GAP);
+	wire in_avox  = w >= WA'(SS_W_AVOX) && w < WA'(SS_W_CDATA);
+	wire in_cdata = w == WA'(SS_W_CDATA);
 	wire in_gap   = w >= WA'(SS_W_GAP) && w < WA'(SS_W_CRAM);
 	wire in_cram  = w >= WA'(SS_W_CRAM);
 	wire w_lastch = w == WA'(SS_W_CHAIN + CHAIN_WORDS - 1);
@@ -424,6 +426,7 @@ module a26_ss_ctl (
 					ost <= O_FIN_ERR;                     // no quiet point (the AtariVox speaks), or no cartridge
 			end
 			O_SETTLE: if (dly == 3'd0) begin
+				keep <= t_rdata;                          // the machine's access done: its byte
 				w <= is_load ? WA'(0) : WA'(SS_W_CHAIN);
 				bi <= 6'd0;
 				crc <= 32'hFFFFFFFF;
@@ -451,6 +454,9 @@ module a26_ss_ctl (
 					end
 				end else if (in_cpad || in_gap) begin
 					v <= 32'd0;
+					ost <= O_SWR;
+				end else if (in_cdata) begin
+					v <= {24'd0, keep};
 					ost <= O_SWR;
 				end else if (in_riot || in_fa2) begin
 					ss_ram <= 1'b1;
@@ -527,8 +533,10 @@ module a26_ss_ctl (
 				sb_a <= w;
 				sb_d <= hdr_exp(4'(w), ~crc);
 				sb_we <= 1'b1;
-				if (w == WA'(SS_HDR_WORDS - 1))
-					ost <= O_FIN_OK;
+				if (w == WA'(SS_HDR_WORDS - 1)) begin
+					bi <= 6'd0;
+					ost <= O_REST;
+				end
 				else
 					w <= w + WA'(1);
 			end
@@ -564,6 +572,7 @@ module a26_ss_ctl (
 			O_VPAY2: if (dly == 3'd0) begin
 				v <= sb_q;
 				if ((in_cpad || in_gap) && sb_q != 32'd0) bad <= 1'b1;
+				if (in_cdata && sb_q[31:8] != 24'd0) bad <= 1'b1;
 				if (w_lastch && (sb_q & pad_mask) != 32'd0) bad <= 1'b1;
 				bq <= 2'd0;
 				ost <= O_VCRC;
@@ -598,6 +607,7 @@ module a26_ss_ctl (
 			O_AW2: if (dly == 3'd0) begin
 				v <= sb_q;
 				bi <= 6'd0;
+				if (in_cdata) keep <= sb_q[7:0];
 				if (in_chain)
 					ost <= O_ACH;
 				else if (in_riot || in_fa2) begin
@@ -660,13 +670,32 @@ module a26_ss_ctl (
 							t_wr <= 1'b0;
 					end
 				end else begin
-					if (w_last)
-						ost <= O_FIN_OK;
-					else begin
+					if (w_last) begin
+						bi <= 6'd0;
+						ost <= O_REST;
+					end else begin
 						w <= w + WA'(1);
 						ost <= O_AW;
 					end
 				end
+			end
+
+			// the SRAM's cartridge byte as it was at the freeze (the saved
+			// machine's, after a load): written into a byte of the cart RAM
+			// area no mapper uses (the last of the 128 KiB) and read back, 6
+			// clk_sys each, so the 6507 reads it on a cycle that issues no new
+			// access, as it would have without the save or load
+			O_REST: begin
+				bi <= bi + 6'd1;
+				case (bi)
+					6'd0: begin
+						t_own <= 1'b1; t_wr <= 1'b1; t_rd <= 1'b0;
+						t_addr <= 17'h1FFFF; t_wdata <= keep;
+					end
+					6'd6: begin t_wr <= 1'b0; t_rd <= 1'b1; end
+					6'd12: begin t_rd <= 1'b0; ost <= O_FIN_OK; end
+					default: ;
+				endcase
 			end
 
 			// ---------------- the end

@@ -97,6 +97,13 @@ speaking all that time) ends with err and leaves the machine untouched.
   SaveKey's and the FA2 flash's requests, DARIA's bus snoop, reset and
   pause, the region logic (`tia_pal_seen`, `region_pll`: no PLL retune), the
   TV Type toggle, the turbo counter, and the scaler slot (`video_pal_o`).
+- **The SRAM's cartridge byte.** `sram_ctrl`'s `c_rdata` is what the 6507
+  reads on a cartridge-RAM cycle that issues no new SRAM access (a repeated
+  address, the dummy read of an indexed store), and the controller's own
+  cart RAM copy overwrites it. ss_ctl keeps the byte from the end of the
+  freeze's settle, saves it in the blob, and at the end of a save or load
+  writes it into the last byte of the SRAM's 128 KiB cartridge area (no
+  mapper's RAM reaches it) and reads it back, so `c_rdata` holds it again.
 - **Block RAM read registers.** A block RAM's output register is not in the
   chain: it reloads on every clock from its address. After a load ss_ctl
   keeps the machine frozen 32 clocks more, with its ports released, so
@@ -157,8 +164,9 @@ Payload:
 | 448-2047 | 112-511 | 0 |
 | 2048-2175 | 512-543 | RIOT RAM, 128 bytes, four a word (the first in bits 31-24) |
 | 2176-2431 | 544-607 | FA2 work RAM, 256 bytes, as the RIOT RAM |
-| 2432-3455 | 608-863 | AtariVox register file, 256 words |
-| 3456-4095 | 864-1023 | 0 |
+| 2432-3459 | 608-864 | AtariVox register file, 256 words |
+| 3456-3459 | 864 | the SRAM controller's cartridge byte (`c_rdata`) at the freeze, bits 7-0 (the rest 0): what the 6507 reads on a cycle that issues no new SRAM access (section 2.2) |
+| 3460-4095 | 865-1023 | 0 |
 | 4096-36863 | 1024-9215 | cartridge RAM: the SRAM's cartridge area, bytes 0-32767, as the RIOT RAM |
 | 36864-131071 | | not stored: read as 0, and a load refuses a blob with anything else written there |
 

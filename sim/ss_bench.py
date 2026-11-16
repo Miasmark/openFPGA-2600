@@ -81,8 +81,11 @@ CASES["gun"] = dict(img=("py", "input_test.py"), ms=700, saves=2, kind="rt",
                     args=["+port1=4", "+joyscript=@gun"])
 CASES["driving"] = dict(img=("py", "input_test.py"), ms=700, saves=2, kind="rt",
                         args=["+port1=3", "+joyscript=@driving"])
-# the AtariVox: a phrase at 50 ms, another at 1 s; saves wait for silence
-CASES["vox"] = dict(img=("py", "vox_test.py"), ms=1500, saves=2, kind="rt", win=(60, 400), A=True,
+# the AtariVox: "Hello world" at 50 ms (it speaks until about 1.02 s; the
+# voice is quiet 0.25 s later), the saves asked for while it speaks (they
+# wait for the quiet), then the next phrase at 1.8 s, after the saves, which
+# a loaded engine must speak as the straight run's does
+CASES["vox"] = dict(img=("py", "vox_test.py"), ms=2600, saves=2, kind="rt", win=(60, 400), A=True,
                     args=["+sk_on", "+joyscript=@vox"])
 CASES["refuse_dpcp"] = dict(img=("py", "bupchip/daria/fe_dir/mkimg.py", "smoke_dpc"), ms=300, kind="refuse")
 CASES["refuse_ar"] = dict(img=("py", "ar_test.py", "full"), ms=300, kind="refuse")
@@ -107,7 +110,7 @@ SCRIPTS = {
                 "720 joy3=1002", "880 joy3=0"],
     "gun": ["0 types", "100 joy0=6", "300 joy0=200", "360 joy0=0", "400 joy0=9", "600 joy0=0"],
     "driving": ["0 types", "100 joy0=1", "350 joy0=0", "400 joy0=2", "650 joy0=0"],
-    "vox": ["50 joy0=200", "120 joy0=0", "900 joy0=80", "950 joy0=0", "1000 joy0=200", "1070 joy0=0"],
+    "vox": ["50 joy0=200", "120 joy0=0", "1800 joy0=80", "1850 joy0=0", "1900 joy0=200", "1970 joy0=0"],
     "mc": ["80 reset", "160 reset", "240 reset", "320 reset", "400 reset"],
     "game": ["100 joy0=100", "150 joy0=0", "200 joy0=10", "260 joy0=0", "300 joy0=1", "600 joy0=0", "620 joy0=12",
              "800 joy0=2", "1000 joy0=0", "1050 joy0=10", "1100 joy0=0"],
