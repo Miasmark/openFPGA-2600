@@ -318,10 +318,15 @@ speed factor x FAST/SLOW, from the same tables as the model.
   frame correlation 0.93-0.97.
 - **The RTL against the program** (`sim/atarivox/run.sh`): bytes sent over
   the serial line as a game sends them; every output sample equal, at the
-  same clock, to the emulator's. Juno First's title, the allophones, the
+  same clock, to the emulator's. A title-like phrase, the allophones, the
   effects, the speed and bend steps and a serial-control sequence (clear
   before each phrase, a phrase cut off, "Ready"): about 357,000 samples,
-  no difference, no tick missed.
+  no difference, no tick missed. The title-like phrase was Juno First's,
+  copied from the game; since 1.1.0 it is our own,
+  `sim/atarivox/make_phrase.py` (the same kinds of codes: volume, speed,
+  pitch and bend set and changed, a pitch staircase up and one down across
+  allophones, pauses 0 and 2; 75 bytes, 48,130 samples with `+ms=2000`, no
+  difference), and the copy is gone from the repository.
 - **On its own in Quartus** (5CEBA4F23C8): 420 ALMs, 17 M10K, 1 DSP, +55 ns
   of setup slack at clk_sys.
 - **In the whole core** (`tb_load +voxlog +voxpcm +sk_on`, DARIA in):
@@ -376,7 +381,9 @@ even on Loud (owner's hardware test), so each level moved up two steps.
   (`src/fpga/core/atarivox/vox_*rom.{hex,mif}`); rerun it after changing
   `voxprog.py` or `vox_rom.py`.
 - `sim/atarivox/run.sh BYTES` (hex bytes, `gap MS`): the unit test, RTL
-  against the emulator. `tb_load +voxpcm` writes the voice inside the whole
+  against the emulator. The byte files are in `sim/atarivox/`; the
+  title-like phrase comes from `python3 sim/atarivox/make_phrase.py >
+  phrase.txt` (run it with `+ms=2000`, to its end). `tb_load +voxpcm` writes the voice inside the whole
   core to `vox.pcm`.
 
 - `tools/atarivox/sjsynth.py OUT.wav CODES...` or `--log tb.log`: renders
