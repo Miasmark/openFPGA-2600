@@ -23,6 +23,8 @@
 
 module M6532
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
+	input logic ss_ram, input logic [6:0] ss_ra, input logic ss_rwe, input logic [7:0] ss_rd, output logic [7:0] ss_rq,
 	input        clk,       // PHI 2
 	input        ce,        // Clock enable
 	input        res_n,     // reset
@@ -44,6 +46,11 @@ module M6532
 	output [7:0] oe,        // Which of D7:D0 the chip is actually driving
 	output       PA_read    // A selected read of ORA is happening now
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c2;
+
 
 reg [7:0] out_a, out_b, data;
 reg [7:0] dir_a, dir_b;
@@ -84,7 +91,7 @@ wire [7:0] init_image [128] = '{
 // is a wrapper instance. Port A is the CPU side and port B the power up walk;
 // they never write together because the console drives ram_init from its
 // reset, which is the same signal that holds res_n low.
-wire       ram_cpu_wr = res_n && ce && (CS1 & ~CS2_n) && ~RS_n && ~RW_n;
+wire       ram_cpu_wr = res_n && ce && (CS1 & ~CS2_n) && ~RS_n && ~RW_n && !(ss_en || ss_frz);  // ss hold
 wire [7:0] ram_init_d = ram_init_7800 ? init_image[init_addr] : 8'h00;
 
 cache_ram_dp #(.ADDR_WIDTH(7), .DATA_WIDTH(8)) riot_ram
@@ -94,10 +101,10 @@ cache_ram_dp #(.ADDR_WIDTH(7), .DATA_WIDTH(8)) riot_ram
 	.wren_a_i  (ram_cpu_wr),
 	.wdata_a_i (d_in),
 	.q_a_o     (ram_q),
-	.addr_b_i  (init_addr),
-	.wren_b_i  (ram_init),
-	.wdata_b_i (ram_init_d),
-	.q_b_o     ()
+	.addr_b_i  (ss_ram ? ss_ra : init_addr),   // ss port
+	.wren_b_i  (ss_ram ? ss_rwe : (ram_init && !(ss_en || ss_frz))),
+	.wdata_b_i (ss_ram ? ss_rd : ram_init_d),
+	.q_b_o     (ss_rq)
 );
 
 // IRQ is open drain on the part: it pulls the line low and otherwise releases
@@ -142,6 +149,10 @@ assign PA_read = drive && RS_n && ~addr[2] && ~|addr[1:0];
 assign d_out = ram_read_r ? ram_q : d_out_reg;
 
 always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {ram_read_r, d_out_reg[7], d_out_reg[6], d_out_reg[5], d_out_reg[4], d_out_reg[3], d_out_reg[2], d_out_reg[1], d_out_reg[0]} <= {ss_c0, ram_read_r, d_out_reg[7], d_out_reg[6], d_out_reg[5], d_out_reg[4], d_out_reg[3], d_out_reg[2], d_out_reg[1], d_out_reg[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 	// A selected RAM read this cycle puts the wrapper's answer on the bus next
 	// cycle; capturing it as well keeps it there once the selection goes away.
 	ram_read_r <= res_n && (CS1 & ~CS2_n) && RW_n && ~RS_n;
@@ -174,8 +185,16 @@ always_ff @(posedge clk) begin
 		ram_read_r <= 1'b0;
 	end
 end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {ram_read_r, d_out_reg[7], d_out_reg[6], d_out_reg[5], d_out_reg[4], d_out_reg[3], d_out_reg[2], d_out_reg[1], d_out_reg[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 always_ff @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {init_addr[6], init_addr[5], init_addr[4], init_addr[3], init_addr[2], init_addr[1], init_addr[0], out_a[7], out_a[6], out_a[5], out_a[4], out_a[3], out_a[2], out_a[1], out_a[0], out_b[7], out_b[6], out_b[5], out_b[4], out_b[3], out_b[2], out_b[1], out_b[0], dir_a[7], dir_a[6], dir_a[5], dir_a[4], dir_a[3], dir_a[2], dir_a[1], dir_a[0], dir_b[7], dir_b[6], dir_b[5], dir_b[4], dir_b[3], dir_b[2], dir_b[1], dir_b[0], interrupt[7], interrupt[6], edge_detect, old_pa7, incr[1], incr[0], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], prescaler[9], prescaler[8], prescaler[7], prescaler[6], prescaler[5], prescaler[4], prescaler[3], prescaler[2], prescaler[1], prescaler[0], rollover} <= {ss_c1, init_addr[6], init_addr[5], init_addr[4], init_addr[3], init_addr[2], init_addr[1], init_addr[0], out_a[7], out_a[6], out_a[5], out_a[4], out_a[3], out_a[2], out_a[1], out_a[0], out_b[7], out_b[6], out_b[5], out_b[4], out_b[3], out_b[2], out_b[1], out_b[0], dir_a[7], dir_a[6], dir_a[5], dir_a[4], dir_a[3], dir_a[2], dir_a[1], dir_a[0], dir_b[7], dir_b[6], dir_b[5], dir_b[4], dir_b[3], dir_b[2], dir_b[1], dir_b[0], interrupt[7], interrupt[6], edge_detect, old_pa7, incr[1], incr[0], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], prescaler[9], prescaler[8], prescaler[7], prescaler[6], prescaler[5], prescaler[4], prescaler[3], prescaler[2], prescaler[1], prescaler[0], rollover} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 	// RES leaves the 128 bytes of RAM alone. This is the console's power up
 	// image instead, and the top level decides when a console applies it. It is
 	// written a byte a cycle for as long as ram_init is held, so ram_init has to
@@ -251,5 +270,9 @@ always_ff @(posedge clk) begin
 			interrupt[6] <= 1;
 	end
 end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c2 = {init_addr[6], init_addr[5], init_addr[4], init_addr[3], init_addr[2], init_addr[1], init_addr[0], out_a[7], out_a[6], out_a[5], out_a[4], out_a[3], out_a[2], out_a[1], out_a[0], out_b[7], out_b[6], out_b[5], out_b[4], out_b[3], out_b[2], out_b[1], out_b[0], dir_a[7], dir_a[6], dir_a[5], dir_a[4], dir_a[3], dir_a[2], dir_a[1], dir_a[0], dir_b[7], dir_b[6], dir_b[5], dir_b[4], dir_b[3], dir_b[2], dir_b[1], dir_b[0], interrupt[7], interrupt[6], edge_detect, old_pa7, incr[1], incr[0], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], prescaler[9], prescaler[8], prescaler[7], prescaler[6], prescaler[5], prescaler[4], prescaler[3], prescaler[2], prescaler[1], prescaler[0], rollover};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule

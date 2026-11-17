@@ -1,6 +1,7 @@
 
 module lightgun
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input        CLK,
 	input        RESET,
 
@@ -27,6 +28,11 @@ module lightgun
 	output logic SENSOR,
 	output logic TRIGGER
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 
 assign TARGET  = ~offscreen & draw;
 
@@ -40,8 +46,7 @@ wire [8:0] j_x = {~JOY_X[7], JOY_X[6:0]};
 wire [8:0] j_y = {~JOY_Y[7], JOY_Y[6:0]};
 
 reg offscreen = 0, draw = 0;
-always @(posedge CLK) begin
-	reg old_pix, old_hde, old_vde, old_ms;
+reg old_pix, old_hde, old_vde, old_ms;
 	reg [9:0] hcnt;
 	reg [8:0] vcnt;
 	reg [8:0] vtotal;
@@ -50,7 +55,22 @@ always @(posedge CLK) begin
 	reg [8:0] ym,yp;
 	reg [8:0] cross_sz;
 	reg sensor_pend;
-	reg [7:0] sensor_time;
+	reg [7:0] sensor_time;   // (moved out of the block: chained)
+always @(posedge CLK) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {TRIGGER, cross_sz[1], lg_x[8], lg_x[7], lg_x[6], lg_x[5], lg_x[4], lg_x[3], lg_x[2], lg_x[1], lg_x[0], lg_y[8], lg_y[7], lg_y[6], lg_y[5], lg_y[4], lg_y[3], lg_y[2], lg_y[1], lg_y[0], hde_d[15], hde_d[14], hde_d[13], hde_d[12], hde_d[11], hde_d[10], hde_d[9], hde_d[8], hde_d[7], hde_d[6], hde_d[5], hde_d[4], hde_d[3], hde_d[2], hde_d[1], hde_d[0], old_hde, hcnt[9], hcnt[8], hcnt[7], hcnt[6], hcnt[5], hcnt[4], hcnt[3], hcnt[2], hcnt[1], hcnt[0], vcnt[8], vcnt[7], vcnt[6], vcnt[5], vcnt[4], vcnt[3], vcnt[2], vcnt[1], vcnt[0], vtotal[8], vtotal[7], vtotal[6], vtotal[5], vtotal[4], vtotal[3], vtotal[2], vtotal[1], vtotal[0], old_vde, x[8], x[7], x[6], x[5], x[4], x[3], x[2], x[1], x[0], y[8], y[7], y[6], y[5], y[4], y[3], y[2], y[1], y[0], xm[9], xm[8], xm[7], xm[6], xm[5], xm[4], xm[3], xm[2], xm[1], xm[0], xp[9], xp[8], xp[7], xp[6], xp[5], xp[4], xp[3], xp[2], xp[1], xp[0], ym[8], ym[7], ym[6], ym[5], ym[4], ym[3], ym[2], ym[1], ym[0], yp[8], yp[7], yp[6], yp[5], yp[4], yp[3], yp[2], yp[1], yp[0], offscreen, sensor_time[7], sensor_time[6], sensor_time[5], sensor_time[4], sensor_time[3], sensor_time[2], sensor_time[1], sensor_time[0], SENSOR, sensor_pend, draw} <= {ss_c0, TRIGGER, cross_sz[1], lg_x[8], lg_x[7], lg_x[6], lg_x[5], lg_x[4], lg_x[3], lg_x[2], lg_x[1], lg_x[0], lg_y[8], lg_y[7], lg_y[6], lg_y[5], lg_y[4], lg_y[3], lg_y[2], lg_y[1], lg_y[0], hde_d[15], hde_d[14], hde_d[13], hde_d[12], hde_d[11], hde_d[10], hde_d[9], hde_d[8], hde_d[7], hde_d[6], hde_d[5], hde_d[4], hde_d[3], hde_d[2], hde_d[1], hde_d[0], old_hde, hcnt[9], hcnt[8], hcnt[7], hcnt[6], hcnt[5], hcnt[4], hcnt[3], hcnt[2], hcnt[1], hcnt[0], vcnt[8], vcnt[7], vcnt[6], vcnt[5], vcnt[4], vcnt[3], vcnt[2], vcnt[1], vcnt[0], vtotal[8], vtotal[7], vtotal[6], vtotal[5], vtotal[4], vtotal[3], vtotal[2], vtotal[1], vtotal[0], old_vde, x[8], x[7], x[6], x[5], x[4], x[3], x[2], x[1], x[0], y[8], y[7], y[6], y[5], y[4], y[3], y[2], y[1], y[0], xm[9], xm[8], xm[7], xm[6], xm[5], xm[4], xm[3], xm[2], xm[1], xm[0], xp[9], xp[8], xp[7], xp[6], xp[5], xp[4], xp[3], xp[2], xp[1], xp[0], ym[8], ym[7], ym[6], ym[5], ym[4], ym[3], ym[2], ym[1], ym[0], yp[8], yp[7], yp[6], yp[5], yp[4], yp[3], yp[2], yp[1], yp[0], offscreen, sensor_time[7], sensor_time[6], sensor_time[5], sensor_time[4], sensor_time[3], sensor_time[2], sensor_time[1], sensor_time[0], SENSOR, sensor_pend, draw} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
+	                                      
+                
+                
+                  
+                  
+                 
+                 
+                    
+                 
+                       
 
 	TRIGGER <= BTN_MODE ? MOUSE[0] : (JOY_TRIG);
 
@@ -126,5 +146,9 @@ always @(posedge CLK) begin
 	draw <= (((SIZE[1] || ($signed(hcnt) >= $signed(xm) && hcnt <= xp)) && y == vcnt) ||
 				((SIZE[1] || ($signed(vcnt) >= $signed(ym) && vcnt <= yp)) && x == hcnt));
 end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {TRIGGER, cross_sz[1], lg_x[8], lg_x[7], lg_x[6], lg_x[5], lg_x[4], lg_x[3], lg_x[2], lg_x[1], lg_x[0], lg_y[8], lg_y[7], lg_y[6], lg_y[5], lg_y[4], lg_y[3], lg_y[2], lg_y[1], lg_y[0], hde_d[15], hde_d[14], hde_d[13], hde_d[12], hde_d[11], hde_d[10], hde_d[9], hde_d[8], hde_d[7], hde_d[6], hde_d[5], hde_d[4], hde_d[3], hde_d[2], hde_d[1], hde_d[0], old_hde, hcnt[9], hcnt[8], hcnt[7], hcnt[6], hcnt[5], hcnt[4], hcnt[3], hcnt[2], hcnt[1], hcnt[0], vcnt[8], vcnt[7], vcnt[6], vcnt[5], vcnt[4], vcnt[3], vcnt[2], vcnt[1], vcnt[0], vtotal[8], vtotal[7], vtotal[6], vtotal[5], vtotal[4], vtotal[3], vtotal[2], vtotal[1], vtotal[0], old_vde, x[8], x[7], x[6], x[5], x[4], x[3], x[2], x[1], x[0], y[8], y[7], y[6], y[5], y[4], y[3], y[2], y[1], y[0], xm[9], xm[8], xm[7], xm[6], xm[5], xm[4], xm[3], xm[2], xm[1], xm[0], xp[9], xp[8], xp[7], xp[6], xp[5], xp[4], xp[3], xp[2], xp[1], xp[0], ym[8], ym[7], ym[6], ym[5], ym[4], ym[3], ym[2], ym[1], ym[0], yp[8], yp[7], yp[6], yp[5], yp[4], yp[3], yp[2], yp[1], yp[0], offscreen, sensor_time[7], sensor_time[6], sensor_time[5], sensor_time[4], sensor_time[3], sensor_time[2], sensor_time[1], sensor_time[0], SENSOR, sensor_pend, draw};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule

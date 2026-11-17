@@ -41,6 +41,7 @@ module mos6502_dp
 #(
 	parameter bit BCD_EN = 1'b1
 ) (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input  logic       clk_sys,
 	input  logic       phi1_en,
 	input  logic       phi2_en,
@@ -61,6 +62,11 @@ module mos6502_dp
 	                                 // is still last cycle's.
 	output logic [7:0] pcl, pch
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 
 	// ---- registers ---------------------------------------------------------
 	logic [7:0] s_in, s_out;         // S is two latches in series
@@ -199,6 +205,10 @@ module mos6502_dp
 
 	// ---- phase 1 loads -----------------------------------------------------
 	always_ff @(posedge clk_sys) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {x[7], x[6], x[5], x[4], x[3], x[2], x[1], x[0], y[7], y[6], y[5], y[4], y[3], y[2], y[1], y[0], a[7], a[6], a[5], a[4], a[3], a[2], a[1], a[0], s_in[7], s_in[6], s_in[5], s_in[4], s_in[3], s_in[2], s_in[1], s_in[0], ai[7], ai[6], ai[5], ai[4], ai[3], ai[2], ai[1], ai[0], bi[7], bi[6], bi[5], bi[4], bi[3], bi[2], bi[1], bi[0], pcls[7], pcls[6], pcls[5], pcls[4], pcls[3], pcls[2], pcls[1], pcls[0], pchs[7], pchs[6], pchs[5], pchs[4], pchs[3], pchs[2], pchs[1], pchs[0], abl[7], abl[6], abl[5], abl[4], abl[3], abl[2], abl[1], abl[0], abh[4], abh[3], abh[2], abh[1], abh[0], dor[7], dor[6], dor[5], dor[4], dor[3], dor[2], dor[1], dor[0], p_v, p_z, p_i, p_d, p_c, p_n, arr_lo_q, arr_hi_q, add[7], add[6], add[5], add[4], add[3], add[2], add[1], add[0], acr, avr, hc_held, dl[7], dl[6], dl[5], dl[4], dl[3], dl[2], dl[1], dl[0], pcl[7], pcl[6], pcl[5], pcl[4], pcl[3], pcl[2], pcl[1], pcl[0], pch[7], pch[6], pch[5], pch[4], pch[3], pch[2], pch[1], pch[0], s_out[7], s_out[6], s_out[5], s_out[4], s_out[3], s_out[2], s_out[1], s_out[0]} <= {ss_c0, x[7], x[6], x[5], x[4], x[3], x[2], x[1], x[0], y[7], y[6], y[5], y[4], y[3], y[2], y[1], y[0], a[7], a[6], a[5], a[4], a[3], a[2], a[1], a[0], s_in[7], s_in[6], s_in[5], s_in[4], s_in[3], s_in[2], s_in[1], s_in[0], ai[7], ai[6], ai[5], ai[4], ai[3], ai[2], ai[1], ai[0], bi[7], bi[6], bi[5], bi[4], bi[3], bi[2], bi[1], bi[0], pcls[7], pcls[6], pcls[5], pcls[4], pcls[3], pcls[2], pcls[1], pcls[0], pchs[7], pchs[6], pchs[5], pchs[4], pchs[3], pchs[2], pchs[1], pchs[0], abl[7], abl[6], abl[5], abl[4], abl[3], abl[2], abl[1], abl[0], abh[4], abh[3], abh[2], abh[1], abh[0], dor[7], dor[6], dor[5], dor[4], dor[3], dor[2], dor[1], dor[0], p_v, p_z, p_i, p_d, p_c, p_n, arr_lo_q, arr_hi_q, add[7], add[6], add[5], add[4], add[3], add[2], add[1], add[0], acr, avr, hc_held, dl[7], dl[6], dl[5], dl[4], dl[3], dl[2], dl[1], dl[0], pcl[7], pcl[6], pcl[5], pcl[4], pcl[3], pcl[2], pcl[1], pcl[0], pch[7], pch[6], pch[5], pch[4], pch[3], pch[2], pch[1], pch[0], s_out[7], s_out[6], s_out[5], s_out[4], s_out[3], s_out[2], s_out[1], s_out[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (phi1_en) begin
 			if (c.sb_x)  x <= sb;
 			if (c.sb_y)  y <= sb;
@@ -313,6 +323,10 @@ module mos6502_dp
 			s_out <= c.s_s ? s_out : s_in;
 		end
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {x[7], x[6], x[5], x[4], x[3], x[2], x[1], x[0], y[7], y[6], y[5], y[4], y[3], y[2], y[1], y[0], a[7], a[6], a[5], a[4], a[3], a[2], a[1], a[0], s_in[7], s_in[6], s_in[5], s_in[4], s_in[3], s_in[2], s_in[1], s_in[0], ai[7], ai[6], ai[5], ai[4], ai[3], ai[2], ai[1], ai[0], bi[7], bi[6], bi[5], bi[4], bi[3], bi[2], bi[1], bi[0], pcls[7], pcls[6], pcls[5], pcls[4], pcls[3], pcls[2], pcls[1], pcls[0], pchs[7], pchs[6], pchs[5], pchs[4], pchs[3], pchs[2], pchs[1], pchs[0], abl[7], abl[6], abl[5], abl[4], abl[3], abl[2], abl[1], abl[0], abh[4], abh[3], abh[2], abh[1], abh[0], dor[7], dor[6], dor[5], dor[4], dor[3], dor[2], dor[1], dor[0], p_v, p_z, p_i, p_d, p_c, p_n, arr_lo_q, arr_hi_q, add[7], add[6], add[5], add[4], add[3], add[2], add[1], add[0], acr, avr, hc_held, dl[7], dl[6], dl[5], dl[4], dl[3], dl[2], dl[1], dl[0], pcl[7], pcl[6], pcl[5], pcl[4], pcl[3], pcl[2], pcl[1], pcl[0], pch[7], pch[6], pch[5], pch[4], pch[3], pch[2], pch[1], pch[0], s_out[7], s_out[6], s_out[5], s_out[4], s_out[3], s_out[2], s_out[1], s_out[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign acr_now  = alu_acr;
 	assign s        = s_out;

@@ -19,11 +19,24 @@
 // - The 64-byte buffer; DOWN reads low ("buffer half full") from 32 bytes,
 //   and a game sends only while it is high.
 //
+// Save states (docs/SAVESTATE.md): every register but the FIFO's read
+// register is in the scan chain (ss_si in, ss_so out): {sync, cnt, bitn, sh,
+// got, got_byte}, {abort_set, ready_set, scp, esc}, {wp, rp, count}; 57
+// bits. A save waits for `idle` (no byte coming in, none held, the FIFO
+// empty), so the FIFO's contents and read register need not be saved. While
+// ss_en is high the registers shift; while ss_frz is high they hold, and
+// the FIFO takes no write.
+//
 // MIT licence, as the rest of the Pocket port's own code.
 
 module avox_rx #(
 	parameter int BIT_CLKS = 744
 ) (
+	input  logic       ss_en,           // save states: shift the chain
+	input  logic       ss_frz,          // hold every register
+	input  logic       ss_si,
+	output logic       ss_so,
+	output logic       idle,            // nothing received or held: a save may freeze
 	input  logic       clk,
 	input  logic       reset,
 	input  logic       line,            // port 2 UP as the console drives it (1 idle)
@@ -47,7 +60,11 @@ module avox_rx #(
 	logic [7:0]  got_byte = 8'd0;
 	/* verilator lint_on PROCASSINIT */
 
-	always_ff @(posedge clk) begin
+	wire [3:0] ss_c;
+	assign ss_c[0] = ss_si;
+	always_ff @(posedge clk) if (ss_en)
+		{sync, cnt, bitn, sh, got, got_byte} <= {ss_c[0], sync, cnt, bitn, sh, got, got_byte[7:1]};
+	else if (!ss_frz) begin
 		sync <= {sync[0], line};
 		got  <= 1'b0;
 		if (reset) begin
@@ -82,9 +99,12 @@ module avox_rx #(
 	/* verilator lint_off PROCASSINIT */
 	logic scp = 1'b0, esc = 1'b0;
 	/* verilator lint_on PROCASSINIT */
+	assign ss_c[1] = got_byte[0];
 	logic push;
 	always_comb push = got && !scp && !esc && (got_byte != 8'h5C);
-	always_ff @(posedge clk) begin
+	always_ff @(posedge clk) if (ss_en)
+		{abort_set, ready_set, scp, esc} <= {ss_c[1], abort_set, ready_set, scp};
+	else if (!ss_frz) begin
 		abort_set <= 1'b0;
 		ready_set <= 1'b0;
 		if (reset) begin
@@ -116,13 +136,16 @@ module avox_rx #(
 	logic [6:0] count = 7'd0;
 	/* verilator lint_on PROCASSINIT */
 	(* ramstyle = "M10K, no_rw_check" *) logic [7:0] mem [0:63];
-	always_ff @(posedge clk) begin
+	assign ss_c[2] = esc;
+	always_ff @(posedge clk) if (!(ss_en || ss_frz)) begin
 		if (push && count != 7'd64)
 			mem[wp] <= got_byte;
 		q <= mem[rp + (pop ? 6'd1 : 6'd0)];
 	end
 
-	always_ff @(posedge clk) begin
+	always_ff @(posedge clk) if (ss_en)
+		{wp, rp, count} <= {ss_c[2], wp, rp, count[6:1]};
+	else if (!ss_frz) begin
 		if (reset || abort_set) begin
 			wp    <= 6'd0;
 			rp    <= 6'd0;
@@ -135,6 +158,10 @@ module avox_rx #(
 			count <= count + 7'((push && count != 7'd64) ? 1 : 0) - 7'((pop && count != 7'd0) ? 1 : 0);
 		end
 	end
+
+	assign ss_c[3] = count[0];
+	assign ss_so = ss_c[3];
+	assign idle = (bitn == 4'd0) && !got && !esc && (count == 7'd0);
 
 	assign nonempty  = (count != 7'd0);
 	assign half_full = (count >= 7'd32);

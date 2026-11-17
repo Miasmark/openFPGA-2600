@@ -30,6 +30,7 @@ endmodule
 
 module mapper_F8
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -44,6 +45,11 @@ module mapper_F8
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -54,6 +60,10 @@ module mapper_F8
 	logic bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank} <= {ss_c0, bank} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			case (a_in)
 				13'h1FF8: bank <= 0;
@@ -64,6 +74,10 @@ module mapper_F8
 		if (reset)
 			bank <= 1;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {3'd0, bank, a_in[11:0]};
 
@@ -71,6 +85,7 @@ endmodule
 
 module mapper_F6
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -85,6 +100,11 @@ module mapper_F6
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -95,6 +115,10 @@ module mapper_F6
 	logic [1:0] bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[1], bank[0]} <= {ss_c0, bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			case (a_in)
 				13'h1FF6: bank <= 2'd0;
@@ -107,6 +131,10 @@ module mapper_F6
 		if (reset)
 			bank <= 0;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {2'd0, bank, a_in[11:0]};
 
@@ -114,6 +142,7 @@ endmodule
 
 module mapper_FE // SCABS
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -130,6 +159,11 @@ module mapper_FE // SCABS
 	// Special
 	input           ce
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -141,6 +175,10 @@ module mapper_FE // SCABS
 	logic latch_next;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {latch_next, bank} <= {ss_c0, latch_next, bank} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (ce) begin
 			if (a_in == 13'h1FE)
 				latch_next <= 1;
@@ -156,6 +194,10 @@ module mapper_FE // SCABS
 			latch_next <= 0;
 		end
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {latch_next, bank};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {3'd0, bank, a_in[11:0]};
 
@@ -163,6 +205,7 @@ endmodule
 
 module mapper_E0
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -177,6 +220,11 @@ module mapper_E0
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -188,6 +236,10 @@ module mapper_E0
 	logic [2:0] current_bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {banks[2][2], banks[2][1], banks[2][0], banks[1][2], banks[1][1], banks[1][0], banks[0][2], banks[0][1], banks[0][0]} <= {ss_c0, banks[2][2], banks[2][1], banks[2][0], banks[1][2], banks[1][1], banks[1][0], banks[0][2], banks[0][1], banks[0][0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			case (a_in[12:3])
 				{9'h1FE, 1'b0}: banks[0] <= a_in[2:0];
@@ -199,6 +251,10 @@ module mapper_E0
 		if (reset)
 			banks <= '{3'd0, 3'd0, 3'd0};
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {banks[2][2], banks[2][1], banks[2][0], banks[1][2], banks[1][1], banks[1][0], banks[0][2], banks[0][1], banks[0][0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	always_comb begin
 		case (a_in[11:10])
@@ -215,6 +271,7 @@ endmodule
 
 module mapper_3F
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -229,6 +286,11 @@ module mapper_3F
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -244,12 +306,20 @@ module mapper_3F
 	// dummy read of $0000 inside STA $00,X would switch banks mid-instruction,
 	// which is exactly what Miner 2049er's zero page clear does.
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[7], bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]} <= {ss_c0, bank[7], bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_in == 13'h3F)
 			bank <= d_in;
 
 		if (reset)
 			bank <= '0;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[7], bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {current_bank, a_in[10:0]};
 
@@ -257,6 +327,7 @@ endmodule
 
 module mapper_F4
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -271,6 +342,11 @@ module mapper_F4
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -281,6 +357,10 @@ module mapper_F4
 	logic [2:0] bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[2], bank[1], bank[0]} <= {ss_c0, bank[2], bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			case (a_in)
 				13'h1FF4: bank <= 3'd0;
@@ -297,6 +377,10 @@ module mapper_F4
 		if (reset)
 			bank <= 0;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[2], bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {1'd0, bank, a_in[11:0]};
 
@@ -304,6 +388,7 @@ endmodule
 
 module mapper_P2
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -320,6 +405,11 @@ module mapper_P2
 	// Special
 	input           ce
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1, ss_c2;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c2;
+
 	logic direct_en, rom_en, and_do_en, music_en;
 	logic bank;
 	logic [10:0] counters[8];
@@ -364,6 +454,10 @@ module mapper_P2
 	assign rom_a = rom_a_next;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {rom_a_next[13], rom_a_next[12], rom_a_next[11], rom_a_next[10], rom_a_next[9], rom_a_next[8], rom_a_next[7], rom_a_next[6], rom_a_next[5], rom_a_next[4], rom_a_next[3], rom_a_next[2], rom_a_next[1], rom_a_next[0], rand_val[7], rand_val[6], rand_val[5], rand_val[4], rand_val[3], rand_val[2], rand_val[1], rand_val[0], counters[7][10], counters[7][9], counters[7][8], counters[7][7], counters[7][6], counters[7][5], counters[7][4], counters[7][3], counters[7][2], counters[7][1], counters[7][0], counters[6][10], counters[6][9], counters[6][8], counters[6][7], counters[6][6], counters[6][5], counters[6][4], counters[6][3], counters[6][2], counters[6][1], counters[6][0], counters[5][10], counters[5][9], counters[5][8], counters[5][7], counters[5][6], counters[5][5], counters[5][4], counters[5][3], counters[5][2], counters[5][1], counters[5][0], counters[4][10], counters[4][9], counters[4][8], counters[4][7], counters[4][6], counters[4][5], counters[4][4], counters[4][3], counters[4][2], counters[4][1], counters[4][0], counters[3][10], counters[3][9], counters[3][8], counters[3][7], counters[3][6], counters[3][5], counters[3][4], counters[3][3], counters[3][2], counters[3][1], counters[3][0], counters[2][10], counters[2][9], counters[2][8], counters[2][7], counters[2][6], counters[2][5], counters[2][4], counters[2][3], counters[2][2], counters[2][1], counters[2][0], counters[1][10], counters[1][9], counters[1][8], counters[1][7], counters[1][6], counters[1][5], counters[1][4], counters[1][3], counters[1][2], counters[1][1], counters[1][0], counters[0][10], counters[0][9], counters[0][8], counters[0][7], counters[0][6], counters[0][5], counters[0][4], counters[0][3], counters[0][2], counters[0][1], counters[0][0], flags[7][7], flags[7][6], flags[7][5], flags[7][4], flags[7][3], flags[7][2], flags[7][1], flags[7][0], flags[6][7], flags[6][6], flags[6][5], flags[6][4], flags[6][3], flags[6][2], flags[6][1], flags[6][0], flags[5][7], flags[5][6], flags[5][5], flags[5][4], flags[5][3], flags[5][2], flags[5][1], flags[5][0], flags[4][7], flags[4][6], flags[4][5], flags[4][4], flags[4][3], flags[4][2], flags[4][1], flags[4][0], flags[3][7], flags[3][6], flags[3][5], flags[3][4], flags[3][3], flags[3][2], flags[3][1], flags[3][0], flags[2][7], flags[2][6], flags[2][5], flags[2][4], flags[2][3], flags[2][2], flags[2][1], flags[2][0], flags[1][7], flags[1][6], flags[1][5], flags[1][4], flags[1][3], flags[1][2], flags[1][1], flags[1][0], flags[0][7], flags[0][6], flags[0][5], flags[0][4], flags[0][3], flags[0][2], flags[0][1], flags[0][0], tops[7][7], tops[7][6], tops[7][5], tops[7][4], tops[7][3], tops[7][2], tops[7][1], tops[7][0], tops[6][7], tops[6][6], tops[6][5], tops[6][4], tops[6][3], tops[6][2], tops[6][1], tops[6][0], tops[5][7], tops[5][6], tops[5][5], tops[5][4], tops[5][3], tops[5][2], tops[5][1], tops[5][0], tops[4][7], tops[4][6], tops[4][5], tops[4][4], tops[4][3], tops[4][2], tops[4][1], tops[4][0], tops[3][7], tops[3][6], tops[3][5], tops[3][4], tops[3][3], tops[3][2], tops[3][1], tops[3][0], tops[2][7], tops[2][6], tops[2][5], tops[2][4], tops[2][3], tops[2][2], tops[2][1], tops[2][0], tops[1][7], tops[1][6], tops[1][5], tops[1][4], tops[1][3], tops[1][2], tops[1][1], tops[1][0], tops[0][7], tops[0][6], tops[0][5], tops[0][4], tops[0][3], tops[0][2], tops[0][1], tops[0][0], bottoms[7][7], bottoms[7][6], bottoms[7][5], bottoms[7][4], bottoms[7][3], bottoms[7][2], bottoms[7][1], bottoms[7][0], bottoms[6][7], bottoms[6][6], bottoms[6][5], bottoms[6][4], bottoms[6][3], bottoms[6][2], bottoms[6][1], bottoms[6][0], bottoms[5][7], bottoms[5][6], bottoms[5][5], bottoms[5][4], bottoms[5][3], bottoms[5][2], bottoms[5][1], bottoms[5][0], bottoms[4][7], bottoms[4][6], bottoms[4][5], bottoms[4][4], bottoms[4][3], bottoms[4][2], bottoms[4][1], bottoms[4][0], bottoms[3][7], bottoms[3][6], bottoms[3][5], bottoms[3][4], bottoms[3][3], bottoms[3][2], bottoms[3][1], bottoms[3][0], bottoms[2][7], bottoms[2][6], bottoms[2][5], bottoms[2][4], bottoms[2][3], bottoms[2][2], bottoms[2][1], bottoms[2][0], bottoms[1][7], bottoms[1][6], bottoms[1][5], bottoms[1][4], bottoms[1][3], bottoms[1][2], bottoms[1][1], bottoms[1][0], bottoms[0][7], bottoms[0][6], bottoms[0][5], bottoms[0][4], bottoms[0][3], bottoms[0][2], bottoms[0][1], bottoms[0][0], music_modes[2], music_modes[1], music_modes[0], bank, music_div[9], music_div[8], music_div[7], music_div[6], music_div[5], music_div[4], music_div[3], music_div[2], music_div[1], music_div[0], music_clock[15], music_clock[14], music_clock[13], music_clock[12], music_clock[11], music_clock[10], music_clock[9], music_clock[8], music_clock[7], music_clock[6], music_clock[5], music_clock[4], music_clock[3], music_clock[2], music_clock[1], music_clock[0]} <= {ss_c0, rom_a_next[13], rom_a_next[12], rom_a_next[11], rom_a_next[10], rom_a_next[9], rom_a_next[8], rom_a_next[7], rom_a_next[6], rom_a_next[5], rom_a_next[4], rom_a_next[3], rom_a_next[2], rom_a_next[1], rom_a_next[0], rand_val[7], rand_val[6], rand_val[5], rand_val[4], rand_val[3], rand_val[2], rand_val[1], rand_val[0], counters[7][10], counters[7][9], counters[7][8], counters[7][7], counters[7][6], counters[7][5], counters[7][4], counters[7][3], counters[7][2], counters[7][1], counters[7][0], counters[6][10], counters[6][9], counters[6][8], counters[6][7], counters[6][6], counters[6][5], counters[6][4], counters[6][3], counters[6][2], counters[6][1], counters[6][0], counters[5][10], counters[5][9], counters[5][8], counters[5][7], counters[5][6], counters[5][5], counters[5][4], counters[5][3], counters[5][2], counters[5][1], counters[5][0], counters[4][10], counters[4][9], counters[4][8], counters[4][7], counters[4][6], counters[4][5], counters[4][4], counters[4][3], counters[4][2], counters[4][1], counters[4][0], counters[3][10], counters[3][9], counters[3][8], counters[3][7], counters[3][6], counters[3][5], counters[3][4], counters[3][3], counters[3][2], counters[3][1], counters[3][0], counters[2][10], counters[2][9], counters[2][8], counters[2][7], counters[2][6], counters[2][5], counters[2][4], counters[2][3], counters[2][2], counters[2][1], counters[2][0], counters[1][10], counters[1][9], counters[1][8], counters[1][7], counters[1][6], counters[1][5], counters[1][4], counters[1][3], counters[1][2], counters[1][1], counters[1][0], counters[0][10], counters[0][9], counters[0][8], counters[0][7], counters[0][6], counters[0][5], counters[0][4], counters[0][3], counters[0][2], counters[0][1], counters[0][0], flags[7][7], flags[7][6], flags[7][5], flags[7][4], flags[7][3], flags[7][2], flags[7][1], flags[7][0], flags[6][7], flags[6][6], flags[6][5], flags[6][4], flags[6][3], flags[6][2], flags[6][1], flags[6][0], flags[5][7], flags[5][6], flags[5][5], flags[5][4], flags[5][3], flags[5][2], flags[5][1], flags[5][0], flags[4][7], flags[4][6], flags[4][5], flags[4][4], flags[4][3], flags[4][2], flags[4][1], flags[4][0], flags[3][7], flags[3][6], flags[3][5], flags[3][4], flags[3][3], flags[3][2], flags[3][1], flags[3][0], flags[2][7], flags[2][6], flags[2][5], flags[2][4], flags[2][3], flags[2][2], flags[2][1], flags[2][0], flags[1][7], flags[1][6], flags[1][5], flags[1][4], flags[1][3], flags[1][2], flags[1][1], flags[1][0], flags[0][7], flags[0][6], flags[0][5], flags[0][4], flags[0][3], flags[0][2], flags[0][1], flags[0][0], tops[7][7], tops[7][6], tops[7][5], tops[7][4], tops[7][3], tops[7][2], tops[7][1], tops[7][0], tops[6][7], tops[6][6], tops[6][5], tops[6][4], tops[6][3], tops[6][2], tops[6][1], tops[6][0], tops[5][7], tops[5][6], tops[5][5], tops[5][4], tops[5][3], tops[5][2], tops[5][1], tops[5][0], tops[4][7], tops[4][6], tops[4][5], tops[4][4], tops[4][3], tops[4][2], tops[4][1], tops[4][0], tops[3][7], tops[3][6], tops[3][5], tops[3][4], tops[3][3], tops[3][2], tops[3][1], tops[3][0], tops[2][7], tops[2][6], tops[2][5], tops[2][4], tops[2][3], tops[2][2], tops[2][1], tops[2][0], tops[1][7], tops[1][6], tops[1][5], tops[1][4], tops[1][3], tops[1][2], tops[1][1], tops[1][0], tops[0][7], tops[0][6], tops[0][5], tops[0][4], tops[0][3], tops[0][2], tops[0][1], tops[0][0], bottoms[7][7], bottoms[7][6], bottoms[7][5], bottoms[7][4], bottoms[7][3], bottoms[7][2], bottoms[7][1], bottoms[7][0], bottoms[6][7], bottoms[6][6], bottoms[6][5], bottoms[6][4], bottoms[6][3], bottoms[6][2], bottoms[6][1], bottoms[6][0], bottoms[5][7], bottoms[5][6], bottoms[5][5], bottoms[5][4], bottoms[5][3], bottoms[5][2], bottoms[5][1], bottoms[5][0], bottoms[4][7], bottoms[4][6], bottoms[4][5], bottoms[4][4], bottoms[4][3], bottoms[4][2], bottoms[4][1], bottoms[4][0], bottoms[3][7], bottoms[3][6], bottoms[3][5], bottoms[3][4], bottoms[3][3], bottoms[3][2], bottoms[3][1], bottoms[3][0], bottoms[2][7], bottoms[2][6], bottoms[2][5], bottoms[2][4], bottoms[2][3], bottoms[2][2], bottoms[2][1], bottoms[2][0], bottoms[1][7], bottoms[1][6], bottoms[1][5], bottoms[1][4], bottoms[1][3], bottoms[1][2], bottoms[1][1], bottoms[1][0], bottoms[0][7], bottoms[0][6], bottoms[0][5], bottoms[0][4], bottoms[0][3], bottoms[0][2], bottoms[0][1], bottoms[0][0], music_modes[2], music_modes[1], music_modes[0], bank, music_div[9], music_div[8], music_div[7], music_div[6], music_div[5], music_div[4], music_div[3], music_div[2], music_div[1], music_div[0], music_clock[15], music_clock[14], music_clock[13], music_clock[12], music_clock[11], music_clock[10], music_clock[9], music_clock[8], music_clock[7], music_clock[6], music_clock[5], music_clock[4], music_clock[3], music_clock[2], music_clock[1], music_clock[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			rom_a_next <= (is_dpc && (dpc_addr == 1 || dpc_addr == 2)) ? {8'b00000100, ~counters[index]} : {6'd0, bank, a_in[11:0]};
 			if (a_in[12]) begin
@@ -438,6 +532,10 @@ module mapper_P2
 			music_div <= '0;
 		end
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {rom_a_next[13], rom_a_next[12], rom_a_next[11], rom_a_next[10], rom_a_next[9], rom_a_next[8], rom_a_next[7], rom_a_next[6], rom_a_next[5], rom_a_next[4], rom_a_next[3], rom_a_next[2], rom_a_next[1], rom_a_next[0], rand_val[7], rand_val[6], rand_val[5], rand_val[4], rand_val[3], rand_val[2], rand_val[1], rand_val[0], counters[7][10], counters[7][9], counters[7][8], counters[7][7], counters[7][6], counters[7][5], counters[7][4], counters[7][3], counters[7][2], counters[7][1], counters[7][0], counters[6][10], counters[6][9], counters[6][8], counters[6][7], counters[6][6], counters[6][5], counters[6][4], counters[6][3], counters[6][2], counters[6][1], counters[6][0], counters[5][10], counters[5][9], counters[5][8], counters[5][7], counters[5][6], counters[5][5], counters[5][4], counters[5][3], counters[5][2], counters[5][1], counters[5][0], counters[4][10], counters[4][9], counters[4][8], counters[4][7], counters[4][6], counters[4][5], counters[4][4], counters[4][3], counters[4][2], counters[4][1], counters[4][0], counters[3][10], counters[3][9], counters[3][8], counters[3][7], counters[3][6], counters[3][5], counters[3][4], counters[3][3], counters[3][2], counters[3][1], counters[3][0], counters[2][10], counters[2][9], counters[2][8], counters[2][7], counters[2][6], counters[2][5], counters[2][4], counters[2][3], counters[2][2], counters[2][1], counters[2][0], counters[1][10], counters[1][9], counters[1][8], counters[1][7], counters[1][6], counters[1][5], counters[1][4], counters[1][3], counters[1][2], counters[1][1], counters[1][0], counters[0][10], counters[0][9], counters[0][8], counters[0][7], counters[0][6], counters[0][5], counters[0][4], counters[0][3], counters[0][2], counters[0][1], counters[0][0], flags[7][7], flags[7][6], flags[7][5], flags[7][4], flags[7][3], flags[7][2], flags[7][1], flags[7][0], flags[6][7], flags[6][6], flags[6][5], flags[6][4], flags[6][3], flags[6][2], flags[6][1], flags[6][0], flags[5][7], flags[5][6], flags[5][5], flags[5][4], flags[5][3], flags[5][2], flags[5][1], flags[5][0], flags[4][7], flags[4][6], flags[4][5], flags[4][4], flags[4][3], flags[4][2], flags[4][1], flags[4][0], flags[3][7], flags[3][6], flags[3][5], flags[3][4], flags[3][3], flags[3][2], flags[3][1], flags[3][0], flags[2][7], flags[2][6], flags[2][5], flags[2][4], flags[2][3], flags[2][2], flags[2][1], flags[2][0], flags[1][7], flags[1][6], flags[1][5], flags[1][4], flags[1][3], flags[1][2], flags[1][1], flags[1][0], flags[0][7], flags[0][6], flags[0][5], flags[0][4], flags[0][3], flags[0][2], flags[0][1], flags[0][0], tops[7][7], tops[7][6], tops[7][5], tops[7][4], tops[7][3], tops[7][2], tops[7][1], tops[7][0], tops[6][7], tops[6][6], tops[6][5], tops[6][4], tops[6][3], tops[6][2], tops[6][1], tops[6][0], tops[5][7], tops[5][6], tops[5][5], tops[5][4], tops[5][3], tops[5][2], tops[5][1], tops[5][0], tops[4][7], tops[4][6], tops[4][5], tops[4][4], tops[4][3], tops[4][2], tops[4][1], tops[4][0], tops[3][7], tops[3][6], tops[3][5], tops[3][4], tops[3][3], tops[3][2], tops[3][1], tops[3][0], tops[2][7], tops[2][6], tops[2][5], tops[2][4], tops[2][3], tops[2][2], tops[2][1], tops[2][0], tops[1][7], tops[1][6], tops[1][5], tops[1][4], tops[1][3], tops[1][2], tops[1][1], tops[1][0], tops[0][7], tops[0][6], tops[0][5], tops[0][4], tops[0][3], tops[0][2], tops[0][1], tops[0][0], bottoms[7][7], bottoms[7][6], bottoms[7][5], bottoms[7][4], bottoms[7][3], bottoms[7][2], bottoms[7][1], bottoms[7][0], bottoms[6][7], bottoms[6][6], bottoms[6][5], bottoms[6][4], bottoms[6][3], bottoms[6][2], bottoms[6][1], bottoms[6][0], bottoms[5][7], bottoms[5][6], bottoms[5][5], bottoms[5][4], bottoms[5][3], bottoms[5][2], bottoms[5][1], bottoms[5][0], bottoms[4][7], bottoms[4][6], bottoms[4][5], bottoms[4][4], bottoms[4][3], bottoms[4][2], bottoms[4][1], bottoms[4][0], bottoms[3][7], bottoms[3][6], bottoms[3][5], bottoms[3][4], bottoms[3][3], bottoms[3][2], bottoms[3][1], bottoms[3][0], bottoms[2][7], bottoms[2][6], bottoms[2][5], bottoms[2][4], bottoms[2][3], bottoms[2][2], bottoms[2][1], bottoms[2][0], bottoms[1][7], bottoms[1][6], bottoms[1][5], bottoms[1][4], bottoms[1][3], bottoms[1][2], bottoms[1][1], bottoms[1][0], bottoms[0][7], bottoms[0][6], bottoms[0][5], bottoms[0][4], bottoms[0][3], bottoms[0][2], bottoms[0][1], bottoms[0][0], music_modes[2], music_modes[1], music_modes[0], bank, music_div[9], music_div[8], music_div[7], music_div[6], music_div[5], music_div[4], music_div[3], music_div[2], music_div[1], music_div[0], music_clock[15], music_clock[14], music_clock[13], music_clock[12], music_clock[11], music_clock[10], music_clock[9], music_clock[8], music_clock[7], music_clock[6], music_clock[5], music_clock[4], music_clock[3], music_clock[2], music_clock[1], music_clock[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 
 	// The three music flags need music_clock % (tops[v] + 1). A runtime divider
@@ -473,6 +571,10 @@ module mapper_P2
 	endgenerate
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {mod_num[15], mod_num[14], mod_num[13], mod_num[12], mod_num[11], mod_num[10], mod_num[9], mod_num[8], mod_num[7], mod_num[6], mod_num[5], mod_num[4], mod_num[3], mod_num[2], mod_num[1], mod_num[0], mod_rem[2][7], mod_rem[2][6], mod_rem[2][5], mod_rem[2][4], mod_rem[2][3], mod_rem[2][2], mod_rem[2][1], mod_rem[2][0], mod_rem[1][7], mod_rem[1][6], mod_rem[1][5], mod_rem[1][4], mod_rem[1][3], mod_rem[1][2], mod_rem[1][1], mod_rem[1][0], mod_rem[0][7], mod_rem[0][6], mod_rem[0][5], mod_rem[0][4], mod_rem[0][3], mod_rem[0][2], mod_rem[0][1], mod_rem[0][0], mod_step[3], mod_step[2], mod_step[1], mod_step[0], mod_run, music_rem[2][7], music_rem[2][6], music_rem[2][5], music_rem[2][4], music_rem[2][3], music_rem[2][2], music_rem[2][1], music_rem[2][0], music_rem[1][7], music_rem[1][6], music_rem[1][5], music_rem[1][4], music_rem[1][3], music_rem[1][2], music_rem[1][1], music_rem[1][0], music_rem[0][7], music_rem[0][6], music_rem[0][5], music_rem[0][4], music_rem[0][3], music_rem[0][2], music_rem[0][1], music_rem[0][0]} <= {ss_c1, mod_num[15], mod_num[14], mod_num[13], mod_num[12], mod_num[11], mod_num[10], mod_num[9], mod_num[8], mod_num[7], mod_num[6], mod_num[5], mod_num[4], mod_num[3], mod_num[2], mod_num[1], mod_num[0], mod_rem[2][7], mod_rem[2][6], mod_rem[2][5], mod_rem[2][4], mod_rem[2][3], mod_rem[2][2], mod_rem[2][1], mod_rem[2][0], mod_rem[1][7], mod_rem[1][6], mod_rem[1][5], mod_rem[1][4], mod_rem[1][3], mod_rem[1][2], mod_rem[1][1], mod_rem[1][0], mod_rem[0][7], mod_rem[0][6], mod_rem[0][5], mod_rem[0][4], mod_rem[0][3], mod_rem[0][2], mod_rem[0][1], mod_rem[0][0], mod_step[3], mod_step[2], mod_step[1], mod_step[0], mod_run, music_rem[2][7], music_rem[2][6], music_rem[2][5], music_rem[2][4], music_rem[2][3], music_rem[2][2], music_rem[2][1], music_rem[2][0], music_rem[1][7], music_rem[1][6], music_rem[1][5], music_rem[1][4], music_rem[1][3], music_rem[1][2], music_rem[1][1], music_rem[1][0], music_rem[0][7], music_rem[0][6], music_rem[0][5], music_rem[0][4], music_rem[0][3], music_rem[0][2], music_rem[0][1], music_rem[0][0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (music_tick || tops_write) begin
 			mod_num  <= music_tick ? (music_clock + 1'd1) : music_clock;
 			mod_rem  <= '{3{8'd0}};
@@ -499,6 +601,10 @@ module mapper_P2
 			music_rem <= '{3{8'd0}};
 		end
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c2 = {mod_num[15], mod_num[14], mod_num[13], mod_num[12], mod_num[11], mod_num[10], mod_num[9], mod_num[8], mod_num[7], mod_num[6], mod_num[5], mod_num[4], mod_num[3], mod_num[2], mod_num[1], mod_num[0], mod_rem[2][7], mod_rem[2][6], mod_rem[2][5], mod_rem[2][4], mod_rem[2][3], mod_rem[2][2], mod_rem[2][1], mod_rem[2][0], mod_rem[1][7], mod_rem[1][6], mod_rem[1][5], mod_rem[1][4], mod_rem[1][3], mod_rem[1][2], mod_rem[1][1], mod_rem[1][0], mod_rem[0][7], mod_rem[0][6], mod_rem[0][5], mod_rem[0][4], mod_rem[0][3], mod_rem[0][2], mod_rem[0][1], mod_rem[0][0], mod_step[3], mod_step[2], mod_step[1], mod_step[0], mod_run, music_rem[2][7], music_rem[2][6], music_rem[2][5], music_rem[2][4], music_rem[2][3], music_rem[2][2], music_rem[2][1], music_rem[2][0], music_rem[1][7], music_rem[1][6], music_rem[1][5], music_rem[1][4], music_rem[1][3], music_rem[1][2], music_rem[1][1], music_rem[1][0], music_rem[0][7], music_rem[0][6], music_rem[0][5], music_rem[0][4], music_rem[0][3], music_rem[0][2], music_rem[0][1], music_rem[0][0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
@@ -523,6 +629,7 @@ endmodule
 // RAM already held.
 module mapper_CTY
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -540,6 +647,11 @@ module mapper_CTY
 	input           ce,        // 3.579 mhz
 	input   [7:0]   rom_do
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	// What the Harmony's flash costs: half a second to read, one to write.
 	localparam [21:0] READ_DELAY  = 22'd1789772;
 	localparam [21:0] WRITE_DELAY = 22'd3579545;
@@ -583,6 +695,10 @@ module mapper_CTY
 	assign rom_a = {4'd0, bank, a_in[11:0]};
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {busy_timer[21], busy_timer[20], busy_timer[19], busy_timer[18], busy_timer[17], busy_timer[16], busy_timer[15], busy_timer[14], busy_timer[13], busy_timer[12], busy_timer[11], busy_timer[10], busy_timer[9], busy_timer[8], busy_timer[7], busy_timer[6], busy_timer[5], busy_timer[4], busy_timer[3], busy_timer[2], busy_timer[1], busy_timer[0], bank[2], bank[1], bank[0], busy, error_code[7], error_code[6], error_code[5], error_code[4], error_code[3], error_code[2], error_code[1], error_code[0], operation[3], operation[2], operation[1], operation[0], random[31], random[30], random[29], random[28], random[27], random[26], random[25], random[24], random[23], random[22], random[21], random[20], random[19], random[18], random[17], random[16], random[15], random[14], random[13], random[12], random[11], random[10], random[9], random[8], random[7], random[6], random[5], random[4], random[3], random[2], random[1], random[0], tune_pos[15], tune_pos[14], tune_pos[13], tune_pos[12], tune_pos[11], tune_pos[10], tune_pos[9], tune_pos[8], tune_pos[7], tune_pos[6], tune_pos[5], tune_pos[4], tune_pos[3], tune_pos[2], tune_pos[1], tune_pos[0]} <= {ss_c0, busy_timer[21], busy_timer[20], busy_timer[19], busy_timer[18], busy_timer[17], busy_timer[16], busy_timer[15], busy_timer[14], busy_timer[13], busy_timer[12], busy_timer[11], busy_timer[10], busy_timer[9], busy_timer[8], busy_timer[7], busy_timer[6], busy_timer[5], busy_timer[4], busy_timer[3], busy_timer[2], busy_timer[1], busy_timer[0], bank[2], bank[1], bank[0], busy, error_code[7], error_code[6], error_code[5], error_code[4], error_code[3], error_code[2], error_code[1], error_code[0], operation[3], operation[2], operation[1], operation[0], random[31], random[30], random[29], random[28], random[27], random[26], random[25], random[24], random[23], random[22], random[21], random[20], random[19], random[18], random[17], random[16], random[15], random[14], random[13], random[12], random[11], random[10], random[9], random[8], random[7], random[6], random[5], random[4], random[3], random[2], random[1], random[0], tune_pos[15], tune_pos[14], tune_pos[13], tune_pos[12], tune_pos[11], tune_pos[10], tune_pos[9], tune_pos[8], tune_pos[7], tune_pos[6], tune_pos[5], tune_pos[4], tune_pos[3], tune_pos[2], tune_pos[1], tune_pos[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (ce && |busy_timer)
 			busy_timer <= busy_timer - 1'd1;
 
@@ -628,11 +744,16 @@ module mapper_CTY
 			busy_timer <= 22'd0;
 		end
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {busy_timer[21], busy_timer[20], busy_timer[19], busy_timer[18], busy_timer[17], busy_timer[16], busy_timer[15], busy_timer[14], busy_timer[13], busy_timer[12], busy_timer[11], busy_timer[10], busy_timer[9], busy_timer[8], busy_timer[7], busy_timer[6], busy_timer[5], busy_timer[4], busy_timer[3], busy_timer[2], busy_timer[1], busy_timer[0], bank[2], bank[1], bank[0], busy, error_code[7], error_code[6], error_code[5], error_code[4], error_code[3], error_code[2], error_code[1], error_code[0], operation[3], operation[2], operation[1], operation[0], random[31], random[30], random[29], random[28], random[27], random[26], random[25], random[24], random[23], random[22], random[21], random[20], random[19], random[18], random[17], random[16], random[15], random[14], random[13], random[12], random[11], random[10], random[9], random[8], random[7], random[6], random[5], random[4], random[3], random[2], random[1], random[0], tune_pos[15], tune_pos[14], tune_pos[13], tune_pos[12], tune_pos[11], tune_pos[10], tune_pos[9], tune_pos[8], tune_pos[7], tune_pos[6], tune_pos[5], tune_pos[4], tune_pos[3], tune_pos[2], tune_pos[1], tune_pos[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
 module mapper_FA
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -647,6 +768,11 @@ module mapper_FA
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -657,6 +783,10 @@ module mapper_FA
 	logic [1:0] bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[1], bank[0]} <= {ss_c0, bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			case (a_in)
 				13'h1FF8: bank <= 2'd0;
@@ -668,6 +798,10 @@ module mapper_FA
 		if (reset)
 			bank <= 0;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {2'd0, bank, a_in[11:0]};
 
@@ -728,6 +862,7 @@ endmodule
 
 module mapper_UA
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -744,6 +879,11 @@ module mapper_UA
 	// special
 	input           swapped // Swapped flag for the UASW mapper (Mickey)
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -754,6 +894,10 @@ module mapper_UA
 	logic bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank} <= {ss_c0, bank} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			case (a_in & 13'h126F)
 				13'h0220: bank <= swapped;
@@ -764,6 +908,10 @@ module mapper_UA
 		if (reset)
 			bank <= 0;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {3'd0, bank, a_in[11:0]};
 
@@ -771,6 +919,7 @@ endmodule
 
 module mapper_E7
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -785,6 +934,11 @@ module mapper_E7
 	output  [17:0]  ram_a,
 	output  logic [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	logic [2:0] bank;
 	logic [1:0] ram_bank;
 
@@ -806,6 +960,10 @@ module mapper_E7
 	end
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[2], bank[1], bank[0], ram_bank[1], ram_bank[0]} <= {ss_c0, bank[2], bank[1], bank[0], ram_bank[1], ram_bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			if (a_in[12:4] == 9'h1FE) begin
 				if (~a_in[3])
@@ -819,11 +977,16 @@ module mapper_E7
 			ram_bank <= 0;
 		end
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[2], bank[1], bank[0], ram_bank[1], ram_bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 endmodule
 
 module mapper_F0
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -838,6 +1001,11 @@ module mapper_F0
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -848,6 +1016,10 @@ module mapper_F0
 	logic [3:0] bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[3], bank[2], bank[1], bank[0]} <= {ss_c0, bank[3], bank[2], bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			if (a_in == 13'h1FF0)
 				bank <= bank + 1'd1;
@@ -856,12 +1028,17 @@ module mapper_F0
 			bank <= 0;
 		end
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[3], bank[2], bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 	assign rom_a = {bank, a_in[11:0]};
 
 endmodule
 
 module mapper_32
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -878,6 +1055,11 @@ module mapper_32
 	// Special
 	input           cold_reset
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -889,12 +1071,20 @@ module mapper_32
 	logic old_reset;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {old_reset, bank[4], bank[3], bank[2], bank[1], bank[0]} <= {ss_c0, old_reset, bank[4], bank[3], bank[2], bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		old_reset <= reset;
 		if (~old_reset && reset)
 			bank <= bank + 1'd1;
 		if (cold_reset)
 			bank <= 0;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {old_reset, bank[4], bank[3], bank[2], bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 	assign rom_a = {bank, a_in[10:0]};
 
 endmodule
@@ -1318,6 +1508,7 @@ endmodule
 
 module mapper_WD
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -1334,6 +1525,11 @@ module mapper_WD
 	// special
 	input           swapped // 8195-byte dumps have 1K banks 2 and 3 swapped
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	logic [2:0] bank_config;
 	logic [3:0] pending_switch;
 	logic [2:0] banks[4];
@@ -1365,6 +1561,10 @@ module mapper_WD
 	// Bankswitching is delayed by at least three cpu clocks, and is triggered by
 	// address 0x30 through 0x3F. The bank is the bottom three bits.
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {pending_switch[3], pending_switch[2], pending_switch[1], pending_switch[0], banks[3][2], banks[3][1], banks[3][0], banks[2][2], banks[2][1], banks[2][0], banks[1][2], banks[1][1], banks[1][0], banks[0][2], banks[0][1], banks[0][0], bank_config[2], bank_config[1], bank_config[0]} <= {ss_c0, pending_switch[3], pending_switch[2], pending_switch[1], pending_switch[0], banks[3][2], banks[3][1], banks[3][0], banks[2][2], banks[2][1], banks[2][0], banks[1][2], banks[1][1], banks[1][0], banks[0][2], banks[0][1], banks[0][0], bank_config[2], bank_config[1], bank_config[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			pending_switch <= {pending_switch[2:0], 1'b0};
 			if (pending_switch[3]) begin
@@ -1382,10 +1582,15 @@ module mapper_WD
 			banks <= bank_lut[0];
 		end
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {pending_switch[3], pending_switch[2], pending_switch[1], pending_switch[0], banks[3][2], banks[3][1], banks[3][0], banks[2][2], banks[2][1], banks[2][0], banks[1][2], banks[1][1], banks[1][0], banks[0][2], banks[0][1], banks[0][0], bank_config[2], bank_config[1], bank_config[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 endmodule
 
 module mapper_3E
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -1402,6 +1607,11 @@ module mapper_3E
 	// special
 	input   [18:0]  rom_size
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -1417,6 +1627,10 @@ module mapper_3E
 	wire [7:0] current_bank = ~a_in[11] ? bank : highest_bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[7], bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0], ram_en, ram_bank[4], ram_bank[3], ram_bank[2], ram_bank[1], ram_bank[0]} <= {ss_c0, bank[7], bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0], ram_en, ram_bank[4], ram_bank[3], ram_bank[2], ram_bank[1], ram_bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		case (a_in)
 			13'h003F: begin
 				bank <= d_in[7:0];
@@ -1434,6 +1648,10 @@ module mapper_3E
 			ram_en <= 0;
 		end
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[7], bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0], ram_en, ram_bank[4], ram_bank[3], ram_bank[2], ram_bank[1], ram_bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {current_bank, a_in[10:0]};
 
@@ -1441,6 +1659,7 @@ endmodule
 
 module mapper_SB
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -1455,6 +1674,11 @@ module mapper_SB
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -1465,6 +1689,10 @@ module mapper_SB
 	logic [6:0] bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]} <= {ss_c0, bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			if (a_in[12:11] == 2'b01)
 				bank <= a_in[6:0];
@@ -1473,6 +1701,10 @@ module mapper_SB
 		if (reset)
 			bank <= 3'd0;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {bank, a_in[11:0]};
 
@@ -1480,6 +1712,7 @@ endmodule
 
 module mapper_EF
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -1494,6 +1727,11 @@ module mapper_EF
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -1504,6 +1742,10 @@ module mapper_EF
 	logic [3:0] bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[3], bank[2], bank[1], bank[0]} <= {ss_c0, bank[3], bank[2], bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			if (a_in[12:4] == 9'h1FE)
 				bank <= a_in[3:0];
@@ -1512,6 +1754,10 @@ module mapper_EF
 		if (reset)
 			bank <= 0;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[3], bank[2], bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {bank, a_in[11:0]};
 
@@ -1519,6 +1765,7 @@ endmodule
 
 module mapper_JANE
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -1533,6 +1780,11 @@ module mapper_JANE
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -1543,6 +1795,10 @@ module mapper_JANE
 	logic [1:0] bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[1], bank[0]} <= {ss_c0, bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			case (a_in)
 				13'h1FF0: bank <= 2'd0;
@@ -1555,6 +1811,10 @@ module mapper_JANE
 		if (reset)
 			bank <= 2'd1;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {2'd0, bank, a_in[11:0]};
 
@@ -1586,6 +1846,7 @@ endmodule
 // A12, A11 and A6 are decoded, so every mirror of those addresses works too.
 module mapper_0840
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -1600,6 +1861,11 @@ module mapper_0840
 	output  [17:0]  ram_a,
 	output  [18:0]  rom_a
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? 8'hFF : 8'h00;
@@ -1610,11 +1876,19 @@ module mapper_0840
 	logic bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank} <= {ss_c0, bank} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change && a_in[12:11] == 2'b01)
 			bank <= a_in[6];
 		if (reset)
 			bank <= 0;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {6'd0, bank, a_in[11:0]};
 
@@ -1627,6 +1901,7 @@ endmodule
 // that writes the same value to both registers still lands on that bank.
 module mapper_FC
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -1643,6 +1918,11 @@ module mapper_FC
 	// special
 	input   [31:0]  rom_size
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? 8'hFF : 8'h00;
@@ -1660,6 +1940,10 @@ module mapper_FC
 	// The data bus settles late in the cycle, so the registers follow it for
 	// as long as the address sits on the hotspot and keep the final value.
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {lo[1], lo[0], hi[5], hi[4], hi[3], hi[2], hi[1], hi[0], bank[2], bank[1], bank[0]} <= {ss_c0, lo[1], lo[0], hi[5], hi[4], hi[3], hi[2], hi[1], hi[0], bank[2], bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_in == 13'h1FF8)
 			lo <= d_in[1:0];
 		if (a_in == 13'h1FF9)
@@ -1672,6 +1956,10 @@ module mapper_FC
 			hi <= 0;
 		end
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {lo[1], lo[0], hi[5], hi[4], hi[3], hi[2], hi[1], hi[0], bank[2], bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {4'd0, bank, a_in[11:0]};
 
@@ -1681,6 +1969,7 @@ endmodule
 // $F80-$FBF). Same board family as EF; the image size says which one.
 module mapper_DF
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -1697,6 +1986,11 @@ module mapper_DF
 	// special
 	input           big  // 256K image: BF rather than DF
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? (~ram_rw && ram_sel ? 8'h00 : 8'hFF) : 8'h00;
@@ -1707,6 +2001,10 @@ module mapper_DF
 	logic [5:0] bank;
 
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]} <= {ss_c0, bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		if (a_change) begin
 			if (big && a_in[12:6] == 7'h7E)
 				bank <= a_in[5:0];
@@ -1716,6 +2014,10 @@ module mapper_DF
 		if (reset)
 			bank <= big ? 6'd1 : 6'd15;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	assign rom_a = {1'b0, bank, a_in[11:0]};
 
@@ -1727,6 +2029,7 @@ endmodule
 // games, 2 is 8K games that bankswitch like F8.
 module mapper_MC #(parameter SLICE = 0)
 (
+	input logic ss_en, input logic ss_frz, input logic ss_si, output logic ss_so,
 	input           clk,
 	input           reset,
 	input           a_change,
@@ -1744,6 +2047,11 @@ module mapper_MC #(parameter SLICE = 0)
 	input           load_start,
 	input   [31:0]  rom_size
 );
+	// save states: scan chain (tools/savestate/scan_insert.py)
+	wire ss_c0, ss_c1;
+	assign ss_c0 = ss_si;
+	assign ss_so = ss_c1;
+
 	assign flags_out = 16'd0;
 	assign d_out = 8'd0;
 	assign oe = a_in[12] ? 8'hFF : 8'h00;
@@ -1760,6 +2068,10 @@ module mapper_MC #(parameter SLICE = 0)
 	// The load itself holds reset high; the first falling edge after the load
 	// arms the counter so only later resets count.
 	always @(posedge clk) begin
+		/* verilator lint_off WIDTHTRUNC */
+		if (ss_en) {reset_d, game[7], game[6], game[5], game[4], game[3], game[2], game[1], game[0], armed, bank} <= {ss_c0, reset_d, game[7], game[6], game[5], game[4], game[3], game[2], game[1], game[0], armed, bank} >> 1;
+		/* verilator lint_on WIDTHTRUNC */
+		else if (!ss_frz) begin
 		reset_d <= reset;
 		if (load_start) begin
 			game <= 0;
@@ -1781,6 +2093,10 @@ module mapper_MC #(parameter SLICE = 0)
 		if (reset)
 			bank <= 1;
 	end
+	end
+	/* verilator lint_off WIDTHTRUNC */
+	assign ss_c1 = {reset_d, game[7], game[6], game[5], game[4], game[3], game[2], game[1], game[0], armed, bank};   // the LSB
+	/* verilator lint_on WIDTHTRUNC */
 
 	generate
 		if (SLICE == 0) begin : slice_2k
