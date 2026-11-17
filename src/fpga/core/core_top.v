@@ -349,6 +349,7 @@ synch_3 s01(pll_core_locked, pll_core_locked_s, clk_74a);
 //   0x10000000  settings (interact.json)
 //   0x30000000  SaveKey EEPROM RAM (save slot 2, 32 KiB)
 //   0x40000000  FA2 cartridge flash (save slot 3, 256 bytes)
+//   0x50000000  save-state blob (128 KiB, docs/SAVESTATE.md)
 //   0xF8000000  APF command interface
 // The 7800 core's 7800 BIOS (0x02000000), HSC firmware (0x04000000,
 // 0x08000000), BupChip firmware (0x0A000000) and HSC save (0x20000000)
@@ -367,6 +368,7 @@ localparam [15:0] SLOT_ARFW = 16'h0107;
     reg             set_rdiff_b   = 1'b1;
     reg     [1:0]   set_region    = 2'd0;
     reg     [1:0]   set_palette   = 2'd0;
+    reg             set_composite = 1'b0;   // composite video (Palette's Composite choices)
     reg             set_stereo    = 1'b0;
     reg             set_blend     = 1'b0;
     reg             set_savekey   = 1'b0;   // SaveKey: 0 off, 1 on (no Auto: no header)
@@ -379,6 +381,7 @@ localparam [15:0] SLOT_ARFW = 16'h0107;
     reg     [2:0]   set_port2     = 3'd0;
     reg     [1:0]   set_turbo     = 2'd0;   // X / Y turbo: off, fast, medium, slow
     reg     [1:0]   set_atarivox  = 2'd2;   // AtariVox voice: off, quiet, normal, loud
+    reg             set_nopause   = 1'b0;   // save states: bit 1 at 0x260, not in the menu (Pause in Menu always on)
     reg     [7:0]   menu_reset_cnt = 8'd0;
 
 always @(posedge clk_74a) begin
@@ -388,11 +391,13 @@ always @(posedge clk_74a) begin
     if (bridge_wr && bridge_addr[31:24] == 8'h10) begin
         case (bridge_addr[11:0])
             12'h200: menu_reset_cnt <= 8'hFF;
-            12'h260: set_swap      <= bridge_wr_data[0];
+            // Swap Controllers (bit 0); bit 1, no menu pause, is not in the menu
+            // (Pause in Menu always on: docs/SAVESTATE.md 1), the check item never sets it
+            12'h260: {set_nopause, set_swap} <= bridge_wr_data[1:0];
             12'h264: set_ldiff_b   <= bridge_wr_data[0];
             12'h268: set_rdiff_b   <= bridge_wr_data[0];
             12'h26C: set_region    <= bridge_wr_data[1:0];
-            12'h270: set_palette   <= bridge_wr_data[1:0];
+            12'h270: {set_composite, set_palette} <= bridge_wr_data[2:0];   // Palette: bit 2 Composite
             12'h280: set_stereo    <= bridge_wr_data[0];
             12'h288: set_blend     <= bridge_wr_data[0];
             12'h290: set_savekey   <= bridge_wr_data[0];
@@ -430,6 +435,10 @@ wire sk_wr  = bridge_wr && sk_sel;
 wire fa2_sel = bridge_addr[31:24] == 8'h40;
 wire fa2_wr  = bridge_wr && fa2_sel;
 
+// The save-state blob (docs/SAVESTATE.md): 128 KiB at 0x50000000, the same
+// scheme (ss_ctl's staging RAM and read latch, in atari2600_pocket.sv).
+    wire    [31:0]  ss_rd_latched;
+
 // for bridge write data, we just broadcast it to all bus devices
 // for bridge read data, we have to mux it
 always @(*) begin
@@ -442,6 +451,9 @@ always @(*) begin
     end
     32'h40xxxxxx: begin
         bridge_rd_data <= fa2_rd_latched;
+    end
+    32'h50xxxxxx: begin
+        bridge_rd_data <= ss_rd_latched;
     end
     32'hF8xxxxxx: begin
         bridge_rd_data <= cmd_bridge_rd_data;
@@ -484,22 +496,24 @@ end
     wire     [31:0] rtc_time_bcd;
     wire            rtc_valid;
 
-    wire            savestate_supported = 1'b0;
-    wire    [31:0]  savestate_addr = 32'd0;
-    wire    [31:0]  savestate_size = 32'd0;
-    wire    [31:0]  savestate_maxloadsize = 32'd0;
+    // Save states (docs/SAVESTATE.md): the blob, 128 KiB at 0x50000000,
+    // served by the wrapper's ss_ctl
+    wire            savestate_supported = 1'b1;
+    wire    [31:0]  savestate_addr = 32'h50000000;
+    wire    [31:0]  savestate_size = 32'd131072;
+    wire    [31:0]  savestate_maxloadsize = 32'd131072;
 
     wire            savestate_start;
-    wire            savestate_start_ack = 1'b0;
-    wire            savestate_start_busy = 1'b0;
-    wire            savestate_start_ok = 1'b0;
-    wire            savestate_start_err = 1'b0;
+    wire            savestate_start_ack;
+    wire            savestate_start_busy;
+    wire            savestate_start_ok;
+    wire            savestate_start_err;
 
     wire            savestate_load;
-    wire            savestate_load_ack = 1'b0;
-    wire            savestate_load_busy = 1'b0;
-    wire            savestate_load_ok = 1'b0;
-    wire            savestate_load_err = 1'b0;
+    wire            savestate_load_ack;
+    wire            savestate_load_busy;
+    wire            savestate_load_ok;
+    wire            savestate_load_err;
 
     wire            osnotify_inmenu;
 
@@ -718,18 +732,18 @@ end
 
 // Settings into clk_sys. They change rarely and only ever from the menu;
 // a two stage synchroniser per bit is enough.
-    reg     [33:0]  set_s1, set_s2;
-    wire            s_bw, s_decomb, s_swap, s_ldiff_b, s_rdiff_b, s_stereo, s_blend, s_savekey;
+    reg     [34:0]  set_s1, set_s2;
+    wire            s_composite, s_bw, s_decomb, s_swap, s_ldiff_b, s_rdiff_b, s_stereo, s_blend, s_savekey;
     wire    [4:0]   s_bs, s_bs_more;
     wire    [2:0]   s_port1, s_port2;
     wire    [1:0]   s_atarivox, s_turbo, s_stmix, s_region, s_palette;
 always @(posedge clk_sys) begin
-    set_s1 <= {set_bw, set_bs_more, set_bs, set_atarivox, set_turbo, set_port2, set_port1,
+    set_s1 <= {set_composite, set_bw, set_bs_more, set_bs, set_atarivox, set_turbo, set_port2, set_port1,
                set_decomb, set_stmix, set_swap, set_ldiff_b, set_rdiff_b, set_region, set_palette,
                set_stereo, set_blend, set_savekey};
     set_s2 <= set_s1;
 end
-assign {s_bw, s_bs_more, s_bs, s_atarivox, s_turbo, s_port2, s_port1,
+assign {s_composite, s_bw, s_bs_more, s_bs, s_atarivox, s_turbo, s_port2, s_port1,
         s_decomb, s_stmix, s_swap, s_ldiff_b, s_rdiff_b, s_region, s_palette,
         s_stereo, s_blend, s_savekey} = set_s2;
 
@@ -855,6 +869,7 @@ atari2600_pocket atari (
     .savekey_setting( {1'b0, s_savekey} ),
     .atarivox_setting( s_atarivox ),
     .decomb         ( s_decomb ),
+    .composite      ( s_composite ),
     .bs_override    ( bs_override ),
     .port1_input    ( s_port1 ),
     .port2_input    ( s_port2 ),
@@ -898,6 +913,23 @@ atari2600_pocket atari (
     .fa2_bridge_rd  ( bridge_rd && fa2_sel ),
     .fa2_bridge_din ( bridge_wr_data ),
     .fa2_bridge_dout( fa2_rd_latched ),
+    .ss_bridge_addr ( bridge_addr ),
+    .ss_bridge_rd   ( bridge_rd ),
+    .ss_bridge_wr   ( bridge_wr ),
+    .ss_bridge_wr_data ( bridge_wr_data ),
+    .ss_bridge_rd_data ( ss_rd_latched ),
+    .savestate_start      ( savestate_start ),
+    .savestate_start_ack  ( savestate_start_ack ),
+    .savestate_start_busy ( savestate_start_busy ),
+    .savestate_start_ok   ( savestate_start_ok ),
+    .savestate_start_err  ( savestate_start_err ),
+    .savestate_load       ( savestate_load ),
+    .savestate_load_ack   ( savestate_load_ack ),
+    .savestate_load_busy  ( savestate_load_busy ),
+    .savestate_load_ok    ( savestate_load_ok ),
+    .savestate_load_err   ( savestate_load_err ),
+    .osnotify_inmenu      ( osnotify_inmenu ),
+    .pause_in_menu        ( ~set_nopause ),
 
     .SDRAM_A        ( dram_a ),
     .SDRAM_BA       ( dram_ba ),

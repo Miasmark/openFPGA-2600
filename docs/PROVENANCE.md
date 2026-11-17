@@ -93,6 +93,14 @@ findings: none of them is a name from the private list.
   `tools/fix_hsc_save.py` (a 7800 high score cart tool) removed, and the
   CI's game-data check (`sim/check/game_data.py`) added.
 
+- **`sim/atarivox/juno.txt` removed (1.1.0).** The library content scan
+  (the Intellivision core's `hygiene.sh --data` over the owner's ROM
+  library) found that its 75 bytes, the AtariVox unit test's title phrase,
+  were copied from Juno First's ROM. It came with the import (blob
+  `69aed6f`, below). `sim/atarivox/make_phrase.py` now writes a phrase of
+  our own choosing that exercises the same kinds of codes, and the
+  documents name it instead. The history is kept as it is.
+
 The files removed by these commits stay in the history, from the import on.
 
 ## Imported files

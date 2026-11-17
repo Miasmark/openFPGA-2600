@@ -12,9 +12,28 @@
 // Registers r0-r63 and data words 64-255 share two block RAM copies (one per
 // read port; both written). r0 is never written, so reads 0.
 //
+// Save states (docs/SAVESTATE.md): every register is in the scan chain
+// (ss_si in, ss_so out), 168 bits: {st, pc, sample_strobe, res, maddr,
+// b_hold, npc, f_tick, f_abort, f_ready, lfsr, sample} and the four block
+// RAMs' read addresses of the last clock the engine ran (a_irom, a_drom,
+// a_rfa, a_rfb). While frozen (ss_en or ss_frz high) each RAM reads at that
+// address, so its output register holds what it held when the engine
+// stopped, also after a load; the register file takes no write but the
+// state port's (ss_ram: the controller's address, data and write, both
+// copies alike; ss_rq is copy A's word).
+//
 // MIT licence, as the rest of the Pocket port's own code.
 
 module avox_engine (
+	input  logic        ss_en,             // save states: shift the chain
+	input  logic        ss_frz,            // hold every register
+	input  logic        ss_si,
+	output logic        ss_so,
+	input  logic        ss_ram,            // the register file's state port (while frozen)
+	input  logic  [7:0] ss_ra,
+	input  logic        ss_rwe,
+	input  logic [31:0] ss_rd,
+	output logic [31:0] ss_rq,
 	input  logic        clk,
 	input  logic        reset,
 
@@ -41,7 +60,12 @@ module avox_engine (
 	/* verilator lint_off PROCASSINIT */  // power-up values (DEVELOPING.md, "Power-up values")
 	logic [1:0] st = 2'd0;
 	logic [9:0] pc = 10'd0;
+	// the RAMs' read addresses of the last clock the engine ran
+	logic  [9:0] a_irom = 10'd0;
+	logic [11:0] a_drom = 12'd0;
+	logic  [7:0] a_rfa = 8'd0, a_rfb = 8'd0;
 	/* verilator lint_on PROCASSINIT */
+	wire         ss_hold = ss_en || ss_frz;
 
 	// ---------------------------------------------------------------- ROMs
 	/* verilator lint_off UNUSEDSIGNAL */
@@ -54,7 +78,7 @@ module avox_engine (
 		.SIM_INIT_FILE ("rtl/vox_irom.hex")
 	) irom (
 		.clk_i   (clk),
-		.addr_i  (pc),
+		.addr_i  (ss_hold ? a_irom : pc),
 		.wren_i  (1'b0),
 		.wdata_i (40'd0),
 		.q_o     (ir)
@@ -81,7 +105,7 @@ module avox_engine (
 		.SIM_INIT_FILE ("rtl/vox_drom.hex")
 	) drom (
 		.clk_i   (clk),
-		.addr_i  (drom_addr),
+		.addr_i  (ss_hold ? a_drom : drom_addr),
 		.wren_i  (1'b0),
 		.wdata_i (20'd0),
 		.q_o     (drom_q)
@@ -97,10 +121,15 @@ module avox_engine (
 	wire  [7:0] rfb_addr = (st == 2'd3) ? wr_addr : {2'b00, f_b};
 	wire        rf_we    = (st == 2'd3) && wr_en;
 
+	wire  [7:0] rfa_a  = ss_ram ? ss_ra : ss_hold ? a_rfa : rfa_addr;
+	wire  [7:0] rfb_a  = ss_ram ? ss_ra : ss_hold ? a_rfb : rfb_addr;
+	wire        rf_w   = ss_ram ? ss_rwe : (rf_we && !ss_hold);
+	wire [31:0] rf_d   = ss_ram ? ss_rd : wr_data;
 	cache_ram #(.ADDR_WIDTH(8), .DATA_WIDTH(32)) rf_a (
-		.clk_i(clk), .addr_i(rfa_addr), .wren_i(rf_we), .wdata_i(wr_data), .q_o(ra));
+		.clk_i(clk), .addr_i(rfa_a), .wren_i(rf_w), .wdata_i(rf_d), .q_o(ra));
 	cache_ram #(.ADDR_WIDTH(8), .DATA_WIDTH(32)) rf_b (
-		.clk_i(clk), .addr_i(rfb_addr), .wren_i(rf_we), .wdata_i(wr_data), .q_o(rb));
+		.clk_i(clk), .addr_i(rfb_a), .wren_i(rf_w), .wdata_i(rf_d), .q_o(rb));
+	assign ss_rq = ra;
 
 	// ---------------------------------------------------------------- ALU (cycle 2)
 	/* verilator lint_off UNUSEDSIGNAL */
@@ -187,7 +216,16 @@ module avox_engine (
 		endcase
 	end
 
-	always_ff @(posedge clk) begin
+	always_ff @(posedge clk) if (ss_en)
+		{st, pc, sample_strobe, res, maddr, b_hold, npc, f_tick, f_abort, f_ready, lfsr, sample,
+		 a_irom, a_drom, a_rfa, a_rfb} <=
+			{ss_si, st, pc, sample_strobe, res, maddr, b_hold, npc, f_tick, f_abort, f_ready, lfsr, sample,
+			 a_irom, a_drom, a_rfa, a_rfb[7:1]};
+	else if (!ss_frz) begin
+		a_irom <= pc;
+		a_drom <= drom_addr;
+		a_rfa  <= rfa_addr;
+		a_rfb  <= rfb_addr;
 		sample_strobe <= 1'b0;
 		if (reset) begin
 			st      <= 2'd0;
@@ -220,5 +258,7 @@ module avox_engine (
 			f_ready <= (f_ready & ~rd_st) | ready_set;
 		end
 	end
+
+	assign ss_so = a_rfb[0];
 
 endmodule

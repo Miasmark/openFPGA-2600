@@ -27,6 +27,8 @@
 #                  status overlay checks (sim/tb_frames.sv's header). The
 #                  build writes WORK/obj_frames.mode ("FRAMES_DEBUG=0|1 md5
 #                  <the binary's>"), which sim/run_frames.sh checks
+#   SS_BENCH=1     build without the 6507's unique-case checks (the save-state
+#                  benches: they fire while the scan chain shifts)
 #   ONLY=daria     build tb_load alone and run only the DARIA section (below),
 #                  e.g. the BUP_DEBUG overlay check at another divider or on
 #                  a scratch tree (sim/bupchip/dstat/run_ovl.sh); its log is
@@ -85,7 +87,7 @@ SRCS=(
 	$(ls "$RTL"/6502/*.sv | grep -v pkg)
 	"$RTL/Maria/maria.sv"
 	"$RTL/cache_ram.v" "$RTL/bram.v"
-	"$RTL/composite_out.sv" "$RTL/cart_ram_tdp.sv" "$RTL/cdf_fastjump_table.sv"
+	"$RTL/composite_out.sv" "$RTL/composite_decoder.sv" "$RTL/cart_ram_tdp.sv" "$RTL/cdf_fastjump_table.sv"
 	"$RTL"/arm_mapper_{memory,controller,subsystem,tables,ram_init,writeback,audio}.sv
 	"$RTL"/mapper_{dpcplus,cdf,bus,fa2}.sv "$RTL/fa2_nvram_bridge.sv"
 	"$RTL/TIA.sv"
@@ -94,7 +96,8 @@ SRCS=(
 	"$RTL/top.sv"
 	"$RTL/EEPROM_24LC256.sv" "$FPGA/core/atari2600_pocket.sv"
 	"$FPGA/core/atarivox/avox_rx.sv" "$FPGA/core/atarivox/avox_engine.sv" "$FPGA/core/atarivox/atarivox.sv"
-	"$FPGA/core/virtual_axis.sv" "$FPGA/core/virtual_axis5.sv" "$FPGA/core/stick_dirs.sv" "$FPGA/core/sram_ctrl.sv" "$PATCHED/paddles.sv" "$RTL/lightgun.sv"
+	"$FPGA/core/virtual_axis.sv" "$FPGA/core/virtual_axis5.sv" "$FPGA/core/stick_dirs.sv" "$FPGA/core/sram_ctrl.sv" "$PATCHED/paddles.sv" "$FPGA/core/paddle_timer4.sv" "$RTL/lightgun.sv"
+	"$FPGA/core/a26_ss_pkg.sv" "$FPGA/core/a26_ss_ctl.sv" "$FPGA/core/ss_raster.sv"
 	"$FPGA/pocket_utils/data_loader.sv"
 	"$FPGA/core/audio_filter.sv"
 	"$RTL/bupchip_peripheral.sv" "$FPGA/pocket_utils/psram.sv"
@@ -162,6 +165,10 @@ exec 3>&1
 sim() { local rc=0; "$@" || rc=$?; [ "$rc" = 0 ] || echo "SIMULATOR EXIT $rc: $*" >&3; return 0; }
 
 VL_OPT=(-O2)
+# Save states (docs/SAVESTATE.md 6): while the scan chain shifts, the 6507's
+# control word holds arbitrary patterns, and its `unique case` checks fire;
+# the save-state benches build with SS_BENCH=1, without them.
+[ "${SS_BENCH:-0}" = 1 ] && VL_OPT=(-O3 --x-assign fast --x-initial fast --no-assert-case)
 build() {   # build <top> <objdir> [more bench sources]
 	local top="$1" obj="$2"; shift 2
 	"${VERILATOR:-verilator}" --binary --timing -j "${VL_JOBS:-4}" "${VL_OPT[@]}" -Wno-fatal -Wno-lint -Wno-style -Wno-MULTIDRIVEN \
@@ -471,3 +478,6 @@ sim ./obj_va/vtb | grep AXIS
 
 echo "-- the five virtual axes as one engine (virtual_axis5.sv, tb_vaxis5):"
 WORK="$WORK/vaxis5" bash "$HERE/run_vaxis5.sh" | grep -E "^VAXIS5 (seed|planted|pass|FAIL|build)|^MISMATCH" || true
+
+echo "-- the four paddle timers with one engine (paddle_timer4.sv, tb_paddles4):"
+WORK="$WORK/paddles4" bash "$HERE/run_paddles4.sh" | grep -E "^PADDLES4 (seed|planted|pass|FAIL|build)|^MISMATCH" || true

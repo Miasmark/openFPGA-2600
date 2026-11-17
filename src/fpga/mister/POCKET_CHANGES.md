@@ -304,10 +304,31 @@ In `rtl/banks2600.sv` (`mapper_AR`), with a `tape_rewind` port through
 `../../../docs/SUPERCHARGER_FASTLOAD.md` has the design. Without the macro
 the files are unchanged from upstream.
 
+### Save states: the scan chain (generated)
+
+`TIA.sv`, `RIOT/M6532.sv`, `Maria/maria.sv`, `6502/mos6502_ctl.sv`,
+`6502/mos6502_dp.sv`, `6502/mos6502.sv`, `6502/sally.sv`, `top.sv`,
+`cart2600.sv`, `banks2600.sv`, `mapper_fa2.sv`, `lightgun.sv`,
+`EEPROM_24LC256.sv` and `video_mux.sv` are generated from their pristine
+copies by `../../../tools/savestate/apply.sh` (`scan_insert.py`): no line of
+them is edited by hand. Each module that holds state gets the ports `ss_en`,
+`ss_frz`, `ss_si`, `ss_so`; each clocked block shifts its chained flip-flops
+while `ss_en` is high and holds while `ss_frz` is; the hold rule's gates
+(the cartridge's bus enables and reset in `top.sv`, the RIOT RAM's write
+ports) and the state ports of the RIOT RAM (port B, which only the power-up
+walk used) and the FA2 work RAM are text replacements listed in
+`scan_insert.py`. Unused (`ss_en`, `ss_frz` low) the files behave as the
+pristine ones, clock for clock: `sim/run_sim.sh`'s fingerprints are the
+same. `../../../docs/SAVESTATE.md` 5.1 has the procedure for changing one of
+these files; openFPGA-7800 shares them and can take the same generated
+edits.
+
 ## Updating
 
 Copy a newer upstream `rtl/` over this one and re-apply the changes to all
-thirteen modified files:
+thirteen modified files (then the save states' chain: run
+`tools/savestate/apply.sh` with `BASE` at the commit that holds the updated
+pristine files, as `docs/SAVESTATE.md` 5.1 describes):
 
 - the `ifdef` blocks in `top.sv`, `cart.sv`, `cart2600.sv`, `banks2600.sv`
   and `EEPROM_24LC256.sv`;

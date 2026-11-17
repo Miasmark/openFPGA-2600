@@ -234,7 +234,8 @@ fi
 # input_test.py's image reads the ports every frame as paddle, driving and
 # light-gun games do and stores what it saw; +joyscript presses the
 # controllers and prints it (INPUT lines: tb_load's show, the wrapper's port
-# types, each port's driving gray codes). Six runs cover every menu value on
+# types, each port's driving gray codes; +padshadow: MiSTer's four
+# paddle_timer beside paddle_timer4.sv, compared on every clock). Six runs cover every menu value on
 # port 1 and the four of port 2: Joystick (0, and 1), Paddles (2), Driving
 # (3), Light Gun (4), Dual Stick (5), Booster Grip (6). tb_load's joy bits:
 # 0 right, 1 left, 2 down, 3 up, 9 A (fire 1), 10 B, 11 X, 12 Y.
@@ -257,7 +258,7 @@ printf '%s\n' "0 types" "300 show" "300 joy0=400" "420 show" "420 joy0=0" "540 s
 	"660 joy0=200" "720 show" "720 joy0=0" "840 show" > bg.txt
 inrun() {   # inrun TITLE CASE PORT1 PORT2 MS SCRIPT
 	echo "  $1:"
-	sim "$WORK/obj_load/vtb" +image=in.a26 +port1=$3 +port2=$4 +wav=$5 +joyscript=$6 $(fp "in_$2") | grep -aE "^INPUT" | sed 's/^/    /'
+	sim "$WORK/obj_load/vtb" +image=in.a26 +port1=$3 +port2=$4 +wav=$5 +joyscript=$6 +padshadow $(fp "in_$2") | grep -aE "^INPUT" | sed 's/^/    /'
 }
 inrun "Port 1 Paddles (2), Port 2 Driving (3)" paddles_driving 2 3 1160 pd.txt
 inrun "Port 1 Driving (3), Port 2 Paddles (2)" driving_paddles 3 2 1160 dp.txt

@@ -97,6 +97,8 @@ module tb_load;
 	initial void'($value$plusargs("bs=%d", bs_ovr));
 	logic blend_on = 1'b0;                                // +blend: 2600 Flicker Blend
 	initial blend_on = $test$plusargs("blend");
+	logic composite_on = 1'b0;                            // +composite: the decoded picture
+	initial composite_on = $test$plusargs("composite");
 	// The console switches as the menu sets them (openFPGA-2600's Left and
 	// Right Difficulty and TV Type items): B, B and Colour unless +ldiffa,
 	// +rdiffa (A) or +bw (B&W) say otherwise from the start; +joyscript's
@@ -174,6 +176,13 @@ module tb_load;
 		.cram_we_n(cram0_we_n), .cram_ub_n(cram0_ub_n), .cram_lb_n(cram0_lb_n));
 `endif
 
+	// save states (+ss_*: the save-state host, below): the APF bridge at
+	// 0x50000000 and the template's save-state signals, on clk_74a
+	logic [31:0] ss_baddr = 32'd0, ss_bwdata = 32'd0;
+	logic        ss_brd = 1'b0, ss_bwr = 1'b0, ss_start = 1'b0, ss_load = 1'b0, ss_inmenu = 1'b0, ss_pause_en = 1'b1;
+	wire  [31:0] ss_brdata;
+	wire         ss_s_ack, ss_s_busy, ss_s_ok, ss_s_err, ss_l_ack, ss_l_busy, ss_l_ok, ss_l_err;
+
 	atari2600_pocket dut (
 `ifdef POCKET_BUPCHIP
 		.clk_arm(clk_arm), .ioctl_wr_any(ioctl_wr_r), .ioctl_hi(ioctl_hi_r),
@@ -190,7 +199,7 @@ module tb_load;
 		.region_setting(region_tb), .palette_temp(2'd0),
 		.stereo_tia(1'b0), .swap_joysticks(1'b0), .diff_left_b(ldiff_b),
 		.diff_right_b(rdiff_b), .bw_setting(bw_set), .flicker_blend(blend_on), .pause_core(1'b0),
-		.decomb(1'b0), .bs_override(bs_ovr),
+		.decomb(1'b0), .composite(composite_on), .bs_override(bs_ovr),
 		.joy0(joy0), .joy1(joy1), .joy2(joy2), .joy3(joy3),
 		.analog0(ana0), .analog1(16'h8080), .analog2(16'h8080), .analog3(16'h8080),
 		.port1_input(port1_in), .port2_input(port2_in),
@@ -203,6 +212,13 @@ module tb_load;
 		.sk_bridge_din(sk_din), .sk_bridge_dout(sk_dout),
 		.fa2_bridge_addr(fa2_addr), .fa2_bridge_wr(fa2_wr), .fa2_bridge_rd(fa2_rd), .fa2_bridge_din(fa2_din),
 		.fa2_bridge_dout(fa2_dout),
+		.ss_bridge_addr(ss_baddr), .ss_bridge_rd(ss_brd), .ss_bridge_wr(ss_bwr), .ss_bridge_wr_data(ss_bwdata),
+		.ss_bridge_rd_data(ss_brdata),
+		.savestate_start(ss_start), .savestate_start_ack(ss_s_ack), .savestate_start_busy(ss_s_busy),
+		.savestate_start_ok(ss_s_ok), .savestate_start_err(ss_s_err),
+		.savestate_load(ss_load), .savestate_load_ack(ss_l_ack), .savestate_load_busy(ss_l_busy),
+		.savestate_load_ok(ss_l_ok), .savestate_load_err(ss_l_err),
+		.osnotify_inmenu(ss_inmenu), .pause_in_menu(ss_pause_en),
 		.SDRAM_A(), .SDRAM_BA(), .SDRAM_DQ(SDRAM_DQ), .SDRAM_DQML(), .SDRAM_DQMH(),
 		.SDRAM_nWE(), .SDRAM_nRAS(), .SDRAM_nCAS(), .SDRAM_CLK(), .SDRAM_CKE(),
 		.SRAM_A(SRAM_A), .SRAM_DQ(SRAM_DQ), .SRAM_OE_N(SRAM_OE_N), .SRAM_WE_N(SRAM_WE_N),
@@ -850,6 +866,19 @@ module tb_load;
 		if (!dut.reset && ce_pix && !HBlank && !VBlank) rf_pic = fnv(fnv(fnv(rf_pic, R), G), B);
 	end
 
+	// +composite: how many clk_sys the decoded picture's HBlank trails the RGB
+	// one (atari2600_pocket.sv's COMP_GUN_DELAY), once, after 600 visible lines
+	longint cg_cyc = 0, cg_rgb = 0; int cg_lines = 0; bit cg_done = 0, cg_rhb = 1, cg_chb = 1;
+	always @(posedge clk_sys) if (composite_on && !cg_done) begin
+		cg_cyc++;
+		cg_rhb <= dut.rgb_hb; cg_chb <= dut.comp_hbo;
+		if (cg_rhb && !dut.rgb_hb && !dut.rgb_vb) begin cg_rgb = cg_cyc; cg_lines++; end
+		if (cg_chb && !dut.comp_hbo && cg_lines > 600 && cg_rgb != 0) begin
+			$display("COMPOSITE HBlank trails RGB by %0d clk_sys", cg_cyc - cg_rgb);
+			cg_done = 1;
+		end
+	end
+
 	// ---------------- frame capture (+dump=N: write N frames as PPM) --------
 	int dump_frames = 0, dumped = 0, fx = 0, fy = 0, line_px = 0, dump_at = 0, fire_at = 0, fire_at2 = 0, reset_at = 0;
 	logic capture = 0, old_vs2 = 0, old_hb2 = 1;
@@ -995,7 +1024,9 @@ module tb_load;
 	function automatic string boot_src(logic [1:0] from_bios);
 		return from_bios == 2'b11 ? "the BIOS ROM" : from_bios == 2'b00 ? "the cartridge slot" : "both";
 	endfunction
-	always @(posedge clk_sys) begin
+	// (not while the machine is held for a save state: the chain's shift
+	// moves effective_reset's register)
+	always @(posedge clk_sys) if (!dut.ss_hold) begin
 		boot_rst_d <= dut.main.effective_reset;
 		if (boot_on && (dut.main.effective_reset || $time - boot_t0 >= 50000000)) begin
 			$display("BOOT %0d after %0d ms: %0d CPU reads from the BIOS ROM, tia_en %0d",
@@ -1248,10 +1279,365 @@ module tb_load;
 		forever begin
 			repeat (longint'(14318) * 100) @(posedge clk_sys);
 			$display("PAD %5d ms: knob %3d  lowest %0d highest %0d difference %0d read_count %0d charged %b  reads/100ms %0d  cart var %0d",
-				$time / 1000000, dut.vx_pos[0], dut.paddle[0].pt.lowest, dut.paddle[0].pt.highest,
-				dut.paddle[0].pt.difference, dut.paddle[0].pt.read_count, dut.pad_wire[0], pad_reads, pad_val);
+				$time / 1000000, dut.vx_pos[0], dut.pads.pd[0].lowest, dut.pads.pd[0].highest,
+				dut.pads.pd[0].difference, dut.pads.pd[0].read_count, dut.pad_wire[0], pad_reads, pad_val);
 			pad_reads = 0;
 		end
+	end
+
+	// ---------------- paddle shadow (+padshadow) ----------------
+	// MiSTer's four paddle_timer (mister/rtl/paddles.sv), fed as the wrapper
+	// fed them before paddle_timer4.sv, beside the core: their `charged`
+	// outputs (INPT0-3) and the engine's must agree on every clock. The
+	// result is an INPUT line at the end (extra_tests.sh's inputs runs).
+	wire [3:0] shadow_charged;
+	genvar psi;
+	generate
+		for (psi = 0; psi < 4; psi = psi + 1) begin : padshadow
+			paddle_timer pt (
+				.clk        (clk_sys),
+				.ce         (dut.pads.ce),
+				.reset      (dut.reset || ~dut.paddle_en[psi]),
+				.kohms      ({2'b00, ~dut.vx_pos[psi]}),
+				.clear      (~dut.iout[1]),
+				.read       (dut.i_read[psi]),
+				.charged    (shadow_charged[psi]),
+				.difference ()
+			);
+		end
+	endgenerate
+	bit pad_shadow = 1'b0;
+	longint ps_clocks = 0, ps_mism = 0, ps_rises = 0;
+	logic [3:0] ps_d = 4'd0;
+	initial pad_shadow = $test$plusargs("padshadow");
+	always @(posedge clk_sys) if (pad_shadow) begin
+		ps_clocks <= ps_clocks + 1;
+		ps_d <= shadow_charged;
+		ps_rises <= ps_rises + $countones(shadow_charged & ~ps_d);
+		if (shadow_charged != dut.pad_wire) begin
+			ps_mism <= ps_mism + 1;
+			if (ps_mism < 5)
+				$display("INPUT paddle shadow MISMATCH at %0t: paddle_timer %b, paddle_timer4 %b", $time, shadow_charged, dut.pad_wire);
+		end
+	end
+	final if (pad_shadow)
+		$display("INPUT paddle shadow: clocks %0d, INPT0-3 rises %0d, mismatches %0d", ps_clocks, ps_rises, ps_mism);
+
+	// ---------------- save states (+ss_*) ----------------
+	// The Pocket's side of save states (docs/SAVESTATE.md 6): ss_ctl's
+	// commands as core_bridge_cmd gives them (start / load held until ack;
+	// busy, then ok or err), the blob over the bridge at 0x50000000, one
+	// access every 88 clk_74a (a read's word taken 84 clk_74a after its
+	// bridge_rd), and the menu. Times are ms after reset_in falls.
+	//   +ss_save=MS[,MS..]     save; the blob into ss_save_<n>.bin, and
+	//                          ss_save_<n>.txt: "frame F" (the machine frame
+	//                          it was frozen in, +ssfp's numbering)
+	//   +ss_load=FILE +ss_load_at=MS [+ss_load_frame=F]
+	//                          write FILE to the blob and load it; from the
+	//                          load's ok on, +ssfp numbers frames from F
+	//   +ss_load_reset=MS      ... with reset_in held from MS until the load
+	//                          answers (wake: the load is checked in reset and
+	//                          applied at the reset's exit)
+	//   +ss_menu=MS:LEN[,..]   the menu open LEN ms; +ss_nopause: Pause in
+	//                          Menu off
+	//   +ss_reset=MS           a 64 clk_sys reset (the Pocket's menu Reset)
+	//   +ssfp=FILE             the machine's frames, counted on the clocks it
+	//                          is not held (dut.ss_hold low): frame, clocks,
+	//                          RIOT RAM, picture (main's RGB), sound (main's
+	//                          and the AtariVox's mix),
+	//                          CPU bus hashes; one line per machine VSync rise
+	//   +ss_anywhere           freeze at the first CPU cycle after the request,
+	//                          not at a frame boundary (a bench's wider net:
+	//                          the machine saved mid-frame, mid-line)
+	//   +ss_measure            fill the chain with 0, shift a 1 through it and
+	//                          print each segment's length (destroys the
+	//                          state), then finish
+	// Each operation prints an "SS" line.
+	longint ss_sysclk = 0, ss_mclk = 0, ss_t0 = 0;
+	string  ss_prefix = "";                         // +ss_prefix=P: the saves' files are Pss_save_<n>.*
+	// machine time since reset_in fell, as the joyscript counts it (js_t):
+	// clk_sys while the machine is not held; ss_frz_mt where a freeze landed
+	longint ss_mt = 0, ss_frz_mt = 0;
+	bit ss_frz_seen = 0;
+	longint js_t = 0, js_jump = -1;                 // the joyscript's machine time (clk_sys)
+	initial begin
+		wait (reset_in == 1'b0);
+		forever begin
+			@(posedge clk_sys);
+			if (!dut.ss_hold) ss_mt++;
+			if (dut.ss_frz && !ss_frz_seen) ss_frz_mt = ss_mt;
+			ss_frz_seen = dut.ss_frz;
+		end
+	end
+	int     ss_frame = 0;
+	// where each freeze lands (machine frame and clock)
+	int     ss_frz_frame = 0;
+	longint ss_frz_mclk = 0;
+	bit     ss_renumber = 0;
+	logic   ss_frz_q = 1'b0;
+	task automatic ss_bridge_write(input logic [31:0] a, input logic [31:0] d);
+		@(posedge clk_74a);
+		ss_baddr <= a; ss_bwdata <= d; ss_bwr <= 1'b1;
+		@(posedge clk_74a);
+		ss_bwr <= 1'b0;
+		repeat (86) @(posedge clk_74a);
+	endtask
+	task automatic ss_bridge_read(input logic [31:0] a, output logic [31:0] d);
+		@(posedge clk_74a);
+		ss_baddr <= a; ss_brd <= 1'b1;
+		@(posedge clk_74a);
+		ss_brd <= 1'b0;
+		repeat (84) @(posedge clk_74a);
+		d = ss_brdata;
+		repeat (2) @(posedge clk_74a);
+	endtask
+	// one command: start (save) or load; returns 2 ok, 3 err
+	task automatic ss_command(input bit is_load, output int rc, output longint clocks);
+		automatic longint t0 = 0;
+		t0 = ss_sysclk;
+		@(posedge clk_74a);
+		if (is_load) ss_load <= 1'b1; else ss_start <= 1'b1;
+		while (!(is_load ? ss_l_ack : ss_s_ack)) @(posedge clk_74a);
+		@(posedge clk_74a);
+		if (is_load) ss_load <= 1'b0; else ss_start <= 1'b0;
+		// busy, then ok or err with busy low
+		while ((is_load ? ss_l_busy : ss_s_busy) || !((is_load ? ss_l_ok : ss_s_ok) || (is_load ? ss_l_err : ss_s_err)))
+			@(posedge clk_74a);
+		rc = (is_load ? ss_l_ok : ss_s_ok) ? 2 : 3;
+		clocks = ss_sysclk - t0;
+	endtask
+	always @(posedge clk_sys) begin
+		ss_sysclk <= ss_sysclk + 1;
+		if (!dut.ss_hold) ss_mclk <= ss_mclk + 1;
+	end
+	function automatic void ss_ms_list(input string arg, ref int ms[$]);
+		int v = 0;
+		bit any = 0;
+		for (int i = 0; i <= arg.len(); i++) begin
+			if (i == arg.len() || arg[i] == ",") begin
+				if (any) ms.push_back(v);
+				v = 0; any = 0;
+			end else if (arg[i] >= "0" && arg[i] <= "9") begin
+				v = v * 10 + (arg[i] - "0"); any = 1;
+			end
+		end
+	endfunction
+	task automatic ss_wait_ms(input int ms);
+		while (($time - ss_t0) < longint'(ms) * 64'd1_000_000) @(posedge clk_sys);
+	endtask
+	initial begin
+		automatic string arg, path;
+		automatic int ms[$], rc, fd, at_ms, nsave = 0, f0, rst_ms, rst_at;
+		automatic longint mt0;
+		automatic longint clocks;
+		automatic logic [31:0] w;
+		automatic logic [7:0] blob[];
+		if ($test$plusargs("ss_nopause")) ss_pause_en = 1'b0;
+		void'($value$plusargs("ss_prefix=%s", ss_prefix));
+		wait (reset_in == 1'b0);
+		ss_t0 = $time;
+		// +ss_reset=MS: a short reset (64 clk_sys, as the Pocket's menu Reset:
+		// core_top.v's 255 clk_74a) MS after the start, on the wall clock
+		if ($value$plusargs("ss_reset=%d", rst_at)) fork
+			begin
+				ss_wait_ms(rst_at);
+				reset_in = 1'b1;
+				$display("SS reset at %0d ms (machine clock %0d, held %0d)", rst_at, ss_mclk, dut.ss_hold);
+				repeat (64) @(posedge clk_sys);
+				reset_in = 1'b0;
+			end
+		join_none
+		if ($value$plusargs("ss_menu=%s", arg)) fork
+			begin
+				automatic int a = 0, b = 0, i = 0;
+				// MS:LEN pairs
+				while (i < arg.len()) begin
+					a = 0; b = 0;
+					while (i < arg.len() && arg[i] != ":") begin a = a * 10 + (arg[i] - "0"); i++; end
+					i++;
+					while (i < arg.len() && arg[i] != ",") begin b = b * 10 + (arg[i] - "0"); i++; end
+					i++;
+					ss_wait_ms(a);
+					ss_inmenu = 1'b1;
+					$display("SS menu open at %0d ms (machine clock %0d, frame %0d)", a, ss_mclk, ss_frame);
+					ss_wait_ms(a + b);
+					ss_inmenu = 1'b0;
+					$display("SS menu closed at %0d ms (machine clock %0d)", a + b, ss_mclk);
+				end
+			end
+		join_none
+		if ($value$plusargs("ss_save=%s", arg)) begin
+			ss_ms_list(arg, ms);
+			foreach (ms[k]) begin
+				ss_wait_ms(ms[k]);
+				nsave++;
+				ss_command(1'b0, rc, clocks);
+				$display("SS save %0d at %0d ms: %s, %0d clk_sys, frozen in machine frame %0d at machine clock %0d",
+					nsave, ms[k], rc == 2 ? "ok" : "err", clocks, ss_frz_frame, ss_frz_mclk);
+				if (rc == 2) begin
+					blob = new[131072];
+					for (int i = 0; i < 32768; i++) begin
+						ss_bridge_read(32'h5000_0000 + 4 * i, w);
+						{blob[4*i], blob[4*i+1], blob[4*i+2], blob[4*i+3]} = w;
+					end
+					path = $sformatf("%0sss_save_%0d.bin", ss_prefix, nsave);
+					fd = $fopen(path, "wb");
+					foreach (blob[i]) $fwrite(fd, "%c", blob[i]);
+					$fclose(fd);
+					fd = $fopen($sformatf("%0sss_save_%0d.txt", ss_prefix, nsave), "w");
+					$fwrite(fd, "frame %0d mclk %0d\n", ss_frz_frame, ss_frz_mt);
+					$fclose(fd);
+					$display("SS save %0d: %s written", nsave, path);
+				end
+			end
+		end
+		if ($value$plusargs("ss_load=%s", path)) begin
+			at_ms = 0;
+			void'($value$plusargs("ss_load_at=%d", at_ms));
+			f0 = -1;
+			void'($value$plusargs("ss_load_frame=%d", f0));
+			rst_ms = -1;
+			void'($value$plusargs("ss_load_reset=%d", rst_ms));
+			mt0 = -1;
+			void'($value$plusargs("ss_load_mclk=%d", mt0));
+			fd = $fopen(path, "rb");
+			if (fd == 0) $fatal(1, "cannot open %s", path);
+			blob = new[131072];
+			foreach (blob[i]) begin
+				automatic int c = $fgetc(fd);
+				blob[i] = (c < 0) ? 8'd0 : 8'(c);
+			end
+			$fclose(fd);
+			ss_wait_ms(at_ms);
+			for (int i = 0; i < 32768; i++)
+				ss_bridge_write(32'h5000_0000 + 4 * i, {blob[4*i], blob[4*i+1], blob[4*i+2], blob[4*i+3]});
+			if (rst_ms >= 0) begin
+				ss_wait_ms(rst_ms);
+				reset_in = 1'b1;
+				repeat (14318) @(posedge clk_sys);
+			end
+			ss_command(1'b1, rc, clocks);
+			if (rst_ms >= 0) begin
+				$display("SS load in reset: %s", rc == 2 ? "ok" : "err");
+				reset_in = 1'b0;
+				wait (dut.ss_ctl.ld_applied || !dut.ss_ctl.pend);
+				$display("SS load %s %s after the reset's exit", path, dut.ss_ctl.ld_applied ? "applied" : "not applied");
+			end else
+				$display("SS load %s at %0d ms: %s, %0d clk_sys", path, at_ms, rc == 2 ? "ok" : "err", clocks);
+			if (rc == 2 && f0 >= 0) begin
+				ss_frame = f0;
+				ss_renumber = 1;
+			end
+			// the machine time of the saved run, for the joyscript's inputs
+			if (rc == 2 && mt0 >= 0) begin
+				ss_mt = mt0;
+				js_jump = mt0;
+			end
+		end
+	end
+	always @(posedge clk_sys) begin
+		ss_frz_q <= dut.ss_frz;
+		if (dut.ss_frz && !ss_frz_q) begin
+			ss_frz_frame <= ss_frame;
+			ss_frz_mclk <= ss_mclk;
+		end
+	end
+
+	// the machine's frames (+ssfp)
+	int          ssfp_fd = 0;
+	longint      ssfp_t0 = 0;
+	logic        ssfp_vs = 1'b0;
+	logic [63:0] ssfp_video = FNV_OFFSET, ssfp_audio = FNV_OFFSET, ssfp_cpu = FNV_OFFSET;
+	logic [31:0] ssfp_last = 32'd0;
+	initial begin
+		automatic string p2;
+		if ($value$plusargs("ssfp=%s", p2)) begin
+			ssfp_fd = $fopen(p2, "w");
+			if (ssfp_fd == 0) $fatal(1, "cannot open %s", p2);
+			$fwrite(ssfp_fd, "frame,mclk,riot,video,audio,cpu\n");
+		end
+	end
+	always @(posedge clk_sys) if (ssfp_fd != 0) begin
+		if (ss_renumber) begin            // a load restored the machine at a frame boundary
+			ss_renumber = 0;
+			ssfp_video = FNV_OFFSET; ssfp_audio = FNV_OFFSET; ssfp_cpu = FNV_OFFSET;
+			ssfp_t0 = ss_mclk;
+		end
+		if (!dut.ss_hold) begin
+			ssfp_vs <= dut.rgb_vs;
+			if (dut.rgb_vs && !ssfp_vs) begin
+				automatic logic [63:0] h = FNV_OFFSET;
+				for (int i = 0; i < 128; i++) h = fnv(h, dut.main.riot_inst.riot_ram.mem_q[i]);
+				if (ss_frame > 0)
+					$fwrite(ssfp_fd, "%0d,%0d,%016x,%016x,%016x,%016x\n", ss_frame, ss_mclk - ssfp_t0, h,
+						ssfp_video, ssfp_audio, ssfp_cpu);
+				ssfp_video = FNV_OFFSET; ssfp_audio = FNV_OFFSET; ssfp_cpu = FNV_OFFSET;
+				ss_frame = ss_frame + 1;
+				ssfp_t0 = ss_mclk;
+			end
+			if (dut.rgb_ce && !dut.rgb_hb && !dut.rgb_vb) ssfp_video = fnv(fnv(fnv(ssfp_video, dut.rgb_r), dut.rgb_g), dut.rgb_b);
+			// the sound with the AtariVox's voice mixed in (the wrapper's, before its hold)
+			if ({dut.audio_live_l, dut.audio_live_r} != ssfp_last) begin
+				ssfp_last = {dut.audio_live_l, dut.audio_live_r};
+				for (int i = 0; i < 4; i++) ssfp_audio = fnv(ssfp_audio, ssfp_last[i*8 +: 8]);
+			end
+			if (`FP_CPU.core_phi2_en)
+				ssfp_cpu = fnv(fnv(fnv(fnv(ssfp_cpu, `FP_CPU.addr_out[7:0]), `FP_CPU.addr_out[15:8]),
+					{7'd0, `FP_CPU.rw_n}), `FP_CPU.rw_n ? `FP_CPU.data_in : `FP_CPU.data_out);
+		end
+	end
+	final if (ssfp_fd != 0) $fclose(ssfp_fd);
+
+	initial if ($test$plusargs("ss_anywhere")) force dut.ss_ctl.nov = 3'd4;
+	// +ss_trace: the freeze's conditions as they change
+	bit ss_trace = 0;
+	logic [3:0] ss_tr_q = 4'hF;
+	initial ss_trace = $test$plusargs("ss_trace");
+`ifdef POCKET_ATARIVOX
+	initial if ($test$plusargs("ss_trace")) forever begin
+		repeat (14318 * 50) @(posedge clk_sys);
+		$display("SS trace %0.3f ms: AtariVox sample %0d, rx idle %0d", ($time - ss_t0) / 1.0e6,
+			dut.vox_sample, dut.atarivox.rx_idle);
+	end
+`endif
+	always @(posedge clk_sys) if (ss_trace && {dut.sk_idle, dut.fa2_quiet_cnt[3], dut.vox_quiet, dut.ss_frz} != ss_tr_q) begin
+		ss_tr_q <= {dut.sk_idle, dut.fa2_quiet_cnt[3], dut.vox_quiet, dut.ss_frz};
+		$display("SS trace %0.3f ms: SaveKey idle %0d, FA2 quiet %0d, AtariVox quiet %0d, frozen %0d",
+			($time - ss_t0) / 1.0e6, dut.sk_idle, dut.fa2_quiet_cnt[3], dut.vox_quiet, dut.ss_frz);
+	end
+
+	// +ss_measure: each segment's length
+	initial if ($test$plusargs("ss_measure")) begin
+		automatic int pos[7], n = 0;
+		automatic bit seen[7];
+		wait (reset_in == 1'b0);
+		repeat (14318 * 50) @(posedge clk_sys);
+		@(negedge clk_sys);
+		force dut.ss_frz = 1'b1;
+		force dut.ss_en = 1'b1;
+		force dut.ss_si = 1'b0;
+		repeat (16384) @(posedge clk_sys);
+		@(negedge clk_sys);
+		force dut.ss_si = 1'b1;
+		@(negedge clk_sys);
+		force dut.ss_si = 1'b0;
+		foreach (seen[i]) seen[i] = 0;
+		for (n = 1; n <= 16384 && !seen[6]; n++) begin
+			@(posedge clk_sys);
+			@(negedge clk_sys);
+			// the 1 went in on the clock before n = 1: it is out of a segment of
+			// L bits after L clocks
+			if (!seen[0] && dut.ss_c_main) begin seen[0] = 1; pos[0] = n + 1; end
+			if (!seen[1] && dut.ss_c_pd)   begin seen[1] = 1; pos[1] = n + 1; end
+			if (!seen[2] && dut.ss_c_va)   begin seen[2] = 1; pos[2] = n + 1; end
+			if (!seen[3] && dut.ss_c_lg)   begin seen[3] = 1; pos[3] = n + 1; end
+			if (!seen[4] && dut.ss_c_sk)   begin seen[4] = 1; pos[4] = n + 1; end
+			if (!seen[5] && dut.ss_c_vx)   begin seen[5] = 1; pos[5] = n + 1; end
+			if (!seen[6] && dut.ss_c_end)  begin seen[6] = 1; pos[6] = n + 1; end
+		end
+		$display("SSCHAIN bits %0d: main %0d, paddles %0d, axes %0d, light gun %0d, SaveKey %0d, AtariVox %0d, tick %0d",
+			pos[6], pos[0], pos[1] - pos[0], pos[2] - pos[1], pos[3] - pos[2], pos[4] - pos[3], pos[5] - pos[4], pos[6] - pos[5]);
+		$finish;
 	end
 
 	// The cart's tone is counted on the console's own mix, before the
@@ -1293,9 +1679,40 @@ module tb_load;
 	//                      1:0; "-" for none)
 	// and print each switch change as "SWITCH at N ms: ...".
 	longint t_run = 0;
+	// a state word of the script (the controllers, the stick, the switch
+	// items), applied; quiet: a save-state load's replay (no SWITCH line)
+	function automatic bit js_state(input string word, input int ms, input bit quiet);
+		automatic string key, val;
+		automatic int eq = -1;
+		for (int i = 0; i < word.len(); i++) if (word[i] == "=") begin eq = i; break; end
+		key = eq < 0 ? word : word.substr(0, eq - 1);
+		val = eq < 0 ? "" : word.substr(eq + 1, word.len() - 1);
+		if (key == "joy0") joy0 = 16'(val.atohex());
+		else if (key == "joy1") joy1 = 16'(val.atohex());
+		else if (key == "joy2") joy2 = 16'(val.atohex());
+		else if (key == "joy3") joy3 = 16'(val.atohex());
+		else if (key == "ana0") ana0 = 16'(val.atohex());
+		else if (key == "ldiff" || key == "rdiff" || key == "bw") begin
+			if (key == "ldiff") ldiff_b = (val == "B");
+			if (key == "rdiff") rdiff_b = (val == "B");
+			if (key == "bw") bw_set = (val == "1");
+			if (!quiet)
+				$display("SWITCH at %0d ms: %0s (left %0s, right %0s, TV type item %0s)", ms, word,
+					ldiff_b ? "B" : "A", rdiff_b ? "B" : "A", bw_set ? "B&W" : "Colour");
+		end
+		else if (eq < 0 && word != "end" && word != "dump" && word != "show" && word != "drive" && word != "types" && word != "reset")
+			joy0 = 16'(word.atohex());
+		else return 0;
+		return 1;
+	endfunction
 	initial begin
-		automatic string jpath, line, word, key, val;
-		automatic int jf, ms, at = 0, eq;
+		automatic string jpath, line, word;
+		automatic int jf, ms, at = 0;
+		automatic int js_ms[$];
+		automatic string js_word[$];
+		automatic logic [15:0] j0, j1, j2, j3, a0;
+		automatic logic l0, r0, b0;
+		automatic bit js_done = 1'b0;
 		wait (reset_in == 1'b0);
 		t_run = $time;
 		if ($value$plusargs("joyscript=%s", jpath)) begin
@@ -1304,12 +1721,47 @@ module tb_load;
 			capture = 1;                     // fb always holds the last whole frame
 			while ($fgets(line, jf) > 0) begin
 				if ($sscanf(line, "%d %s", ms, word) != 2 || word.substr(0, 0) == "#") continue;
-				for (; at < ms; at++) repeat (14318) @(posedge clk_sys);
-				eq = -1;
-				for (int i = 0; i < word.len(); i++) if (word[i] == "=") begin eq = i; break; end
-				key = eq < 0 ? word : word.substr(0, eq - 1);
-				val = eq < 0 ? "" : word.substr(eq + 1, word.len() - 1);
-				if (word == "dump") dump_frames = dumped + 1;
+				js_ms.push_back(ms);
+				js_word.push_back(word);
+			end
+			$fclose(jf);
+			// a last word never reached (the run ends first), so the script
+			// waits on to the end and a load after its last word still
+			// replays it (and fires its words after the saved time again)
+			js_ms.push_back(32'h3FFF_FFFF);
+			js_word.push_back("end");
+			// the inputs before the script, for a load's replay
+			j0 = joy0; j1 = joy1; j2 = joy2; j3 = joy3; a0 = ana0; l0 = ldiff_b; r0 = rdiff_b; b0 = bw_set;
+			for (int e = 0; e < js_ms.size(); e++) begin
+				ms = js_ms[e];
+				word = js_word[e];
+				// machine time: clk_sys while the machine is not held for a
+				// save state (dut.ss_hold), and a load moves it to the saved
+				// machine's (js_jump): the inputs are then those the script
+				// gives at that time (its state words replayed from the start),
+				// and it goes on from the first word after it; without save
+				// states, every clk_sys
+				while (js_t < longint'(ms) * 14318) begin
+					@(posedge clk_sys);
+					if (!dut.ss_hold) js_t++;
+					if (js_jump >= 0) begin
+						js_t = js_jump;
+						js_jump = -1;
+						joy0 = j0; joy1 = j1; joy2 = j2; joy3 = j3; ana0 = a0; ldiff_b = l0; rdiff_b = r0; bw_set = b0;
+						e = 0;
+						while (e < js_ms.size() && longint'(js_ms[e]) * 14318 <= js_t) begin
+							void'(js_state(js_word[e], js_ms[e], 1'b1));
+							e++;
+						end
+						if (e >= js_ms.size()) begin js_done = 1'b1; break; end
+						ms = js_ms[e];
+						word = js_word[e];
+					end
+				end
+				if (js_done) break;                       // the script ended in a replay
+				at = ms;
+				if (word == "end") ;
+				else if (word == "dump") dump_frames = dumped + 1;
 				else if (word == "show") show($sformatf("at %0d ms", ms));
 				else if (word == "drive") begin
 					$display("INPUT driving gray codes at %0d ms: port 1 %0s, port 2 %0s", ms,
@@ -1324,23 +1776,10 @@ module tb_load;
 					repeat (14318 * 10) @(posedge clk_sys);
 					reset_in = 1'b0;
 					at += 10;
+					js_t += 14318 * 10;
 				end
-				else if (key == "joy0") joy0 = 16'(val.atohex());
-				else if (key == "joy1") joy1 = 16'(val.atohex());
-				else if (key == "joy2") joy2 = 16'(val.atohex());
-				else if (key == "joy3") joy3 = 16'(val.atohex());
-				else if (key == "ana0") ana0 = 16'(val.atohex());
-				else if (key == "ldiff" || key == "rdiff" || key == "bw") begin
-					if (key == "ldiff") ldiff_b = (val == "B");
-					if (key == "rdiff") rdiff_b = (val == "B");
-					if (key == "bw") bw_set = (val == "1");
-					$display("SWITCH at %0d ms: %0s (left %0s, right %0s, TV type item %0s)", ms, word,
-						ldiff_b ? "B" : "A", rdiff_b ? "B" : "A", bw_set ? "B&W" : "Colour");
-				end
-				else if (eq < 0) joy0 = 16'(word.atohex());
-				else begin $display("joyscript: unknown word %s", word); $fatal(1, "joyscript"); end
+				else if (!js_state(word, ms, 1'b0)) begin $display("joyscript: unknown word %s", word); $fatal(1, "joyscript"); end
 			end
-			$fclose(jf);
 		end
 	end
 

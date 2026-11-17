@@ -1,0 +1,181 @@
+# chain map (tools/savestate/scan_insert.py): module, item, clock, names in
+# source order [preprocessor conditions]; keep list 1845 registers
+lfsr_6	block@123	clk	lfsr_next[5], lfsr_next[4], lfsr_next[3], lfsr_next[2], lfsr_next[1], lfsr_next[0], lfsr_latch1[5], lfsr_latch1[4], lfsr_latch1[3], lfsr_latch1[2], lfsr_latch1[1], lfsr_latch1[0]
+lfsr_6_instant	hold only (1 blocks)
+sr_latch	block@181	clk	sr_val
+f_cell	block@215	clk	slave, master
+f_counter_ll	inst	f_cell f_left
+f_counter_ll	inst	f_cell f_right
+f_counter_ll	inst	sr_latch q_1l
+d_cell	block@296	clk	out_next, out_latch
+inverter_reg	block@324	clk	inv_latch
+f_counter	block@380	clk	old_tick, old_reset, f_count[1], f_count[0], f1_qn_reg
+cpuclk	inst	sr_latch q_1l
+cpuclk	inst	sr_latch q_2l
+cpuclk	inst	sr_latch q_3l
+cpuclk	inst	sr_latch q_4l
+clockgen	inst	f_counter hclk_counter
+clockgen	block@543	clk	oclk_tog, oclk_clock, pclk_div[2], pclk_div[1], pclk_div[0], pclk_clock
+horiz_gen	inst	lfsr_6 timing_lfsr
+horiz_gen	inst	sr_latch sec_l
+horiz_gen	inst	inverter_reg rsynd_ir
+horiz_gen	inst	inverter_reg shb_ir
+horiz_gen	inst	d_cell aud1_d
+horiz_gen	inst	d_cell aud2_d
+horiz_gen	inst	d_cell rhs_db
+horiz_gen	inst	d_cell hsync_dl
+horiz_gen	inst	d_cell hblank_dl
+horiz_gen	inst	d_cell hgap_dl
+horiz_gen	inst	d_cell cb_dl
+horiz_gen	inst	d_cell cnt_d
+hmove_gen	inst	sr_latch hmove_l
+hmove_gen	inst	inverter_reg s0_ir
+hmove_gen	inst	inverter_reg sec_ir
+hmove_gen	inst	inverter_reg sec1_ir
+hmove_gen	block@788	clk	hmove_cnt[3], hmove_cnt[2], hmove_cnt[1], hmove_cnt[0], p0ec[1], p0ec[0], p1ec[1], p1ec[0], m0ec[1], m0ec[0], m1ec[1], m1ec[0], blec[1], blec[0]
+playfield	inst	f_cell pf_out
+playfield	inst	sr_latch dir_l
+playfield	inst	inverter_reg pf1_ir
+playfield	inst	inverter_reg pf2_ir
+playfield	block@894	clk	pf_latch1[4], pf_latch1[3], pf_latch1[2], pf_latch1[1], pf_latch1[0], pf_latch2[4], pf_latch2[3], pf_latch2[2], pf_latch2[1], pf_latch2[0]
+object_tick	block@923	clk	old_motck, old_ec
+ball	inst	object_tick bl_tick
+ball	inst	f_counter_ll object_counter
+ball	inst	lfsr_6 object_lfsr
+ball	inst	f_cell ball_out
+ball	inst	d_cell obj_1
+ball	inst	d_cell obj_2
+missile	inst	object_tick m_tick
+missile	inst	f_counter_ll object_counter
+missile	inst	lfsr_6 object_lfsr
+missile	inst	f_cell mis_out
+missile	inst	d_cell obj_1
+missile	inst	d_cell obj_2
+missile	inst	d_cell obj_3
+player	inst	object_tick p_tick
+player	inst	f_counter_ll object_counter
+player	inst	lfsr_6 object_lfsr
+player	inst	f_cell pl_out
+player	inst	d_cell obj_reset
+player	inst	d_cell obj_start
+player	inst	d_cell obj_fstob
+player	inst	f_cell f_ena
+player	inst	f_cell f_go
+player	inst	f_cell f_psc1
+player	inst	f_cell f_psc2
+player	inst	f_cell f_psc3
+priority_encoder	inst	sr_latch center_delayed
+audio_channel	inst	inverter_reg freq_div01
+audio_channel	inst	inverter_reg freq_div02
+audio_channel	inst	inverter_reg noise0_latch
+audio_channel	inst	inverter_reg nor2_l
+audio_channel	inst	f_cell pulse_3
+audio_channel	inst	f_cell pulse_2
+audio_channel	inst	f_cell pulse_1
+audio_channel	inst	f_cell pulse_0
+audio_channel	block@1529	clk	freq_next[4], freq_next[3], freq_next[2], freq_next[1], freq_next[0], freq_latch[4], freq_latch[3], freq_latch[2], freq_latch[1], freq_latch[0], noise_next[4], noise_next[3], noise_next[2], noise_next[1], noise_next[0], noise_latch[4], noise_latch[3], noise_latch[2], noise_latch[1], noise_latch[0]
+video_stabilize	block@1619	clk	old_hblank, old_vsync, total_lines[8], total_lines[7], total_lines[6], total_lines[5], total_lines[4], total_lines[3], total_lines[2], total_lines[1], total_lines[0], vsync_override, vsync_emulate, v_count[8], v_count[7], v_count[6], v_count[5], v_count[4], v_count[3], v_count[2], v_count[1], v_count[0], vblank_en, vsync_en, vsync_set, vsync_count[7], vsync_count[6], vsync_count[5], vsync_count[4], vsync_count[3], vsync_count[2], vsync_count[1], vsync_count[0], vsync_line[8], vsync_line[7], vsync_line[6], vsync_line[5], vsync_line[4], vsync_line[3], vsync_line[2], vsync_line[1], vsync_line[0], region_frames[5], region_frames[4], region_frames[3], region_frames[2], region_frames[1], region_frames[0], pal_sum[11], pal_sum[10], pal_sum[9], pal_sum[8], pal_sum[7], pal_sum[6], pal_sum[5], pal_sum[4], pal_sum[3], pal_sum[2], pal_sum[1], pal_sum[0], ntsc_sum[11], ntsc_sum[10], ntsc_sum[9], ntsc_sum[8], ntsc_sum[7], ntsc_sum[6], ntsc_sum[5], ntsc_sum[4], ntsc_sum[3], ntsc_sum[2], ntsc_sum[1], ntsc_sum[0], pal_mode, region_done	not chained: dot_count
+TIA	inst	f_cell hgap1_out
+TIA	inst	f_cell hgap_out
+TIA	inst	f_cell hblank_out
+TIA	inst	f_cell blank_out
+TIA	inst	video_stabilize stab
+TIA	block@1879	clk	hblank_d	not chained: old_hblank,old_vsync,column,row
+TIA	block@1896	clk	phi2_delay, i_out[1], wreg[63][7], wreg[63][6], wreg[63][5], wreg[63][4], wreg[63][3], wreg[63][2], wreg[63][1], wreg[63][0], wreg[62][7], wreg[62][6], wreg[62][5], wreg[62][4], wreg[62][3], wreg[62][2], wreg[62][1], wreg[62][0], wreg[61][1], wreg[41][1], wreg[40][1], wreg[39][0], wreg[38][0], wreg[37][0], wreg[36][7], wreg[36][6], wreg[36][5], wreg[36][4], wreg[35][7], wreg[35][6], wreg[35][5], wreg[35][4], wreg[34][7], wreg[34][6], wreg[34][5], wreg[34][4], wreg[33][7], wreg[33][6], wreg[33][5], wreg[33][4], wreg[32][7], wreg[32][6], wreg[32][5], wreg[32][4], wreg[31][1], wreg[30][1], wreg[29][1], wreg[28][7], wreg[28][6], wreg[28][5], wreg[28][4], wreg[28][3], wreg[28][2], wreg[28][1], wreg[28][0], wreg[27][7], wreg[27][6], wreg[27][5], wreg[27][4], wreg[27][3], wreg[27][2], wreg[27][1], wreg[27][0], wreg[26][3], wreg[26][2], wreg[26][1], wreg[26][0], wreg[25][3], wreg[25][2], wreg[25][1], wreg[25][0], wreg[24][4], wreg[24][3], wreg[24][2], wreg[24][1], wreg[24][0], wreg[23][4], wreg[23][3], wreg[23][2], wreg[23][1], wreg[23][0], wreg[22][3], wreg[22][2], wreg[22][1], wreg[22][0], wreg[21][3], wreg[21][2], wreg[21][1], wreg[21][0], wreg[15][7], wreg[15][6], wreg[15][5], wreg[15][4], wreg[15][3], wreg[15][2], wreg[15][1], wreg[15][0], wreg[14][7], wreg[14][6], wreg[14][5], wreg[14][4], wreg[14][3], wreg[14][2], wreg[14][1], wreg[14][0], wreg[13][7], wreg[13][6], wreg[13][5], wreg[13][4], wreg[12][3], wreg[11][3], wreg[10][5], wreg[10][4], wreg[10][2], wreg[10][1], wreg[10][0], wreg[9][7], wreg[9][6], wreg[9][5], wreg[9][4], wreg[9][3], wreg[9][2], wreg[9][1], wreg[8][7], wreg[8][6], wreg[8][5], wreg[8][4], wreg[8][3], wreg[8][2], wreg[8][1], wreg[7][7], wreg[7][6], wreg[7][5], wreg[7][4], wreg[7][3], wreg[7][2], wreg[7][1], wreg[6][7], wreg[6][6], wreg[6][5], wreg[6][4], wreg[6][3], wreg[6][2], wreg[6][1], wreg[5][5], wreg[5][4], wreg[5][2], wreg[5][1], wreg[5][0], wreg[4][5], wreg[4][4], wreg[4][2], wreg[4][1], wreg[4][0], wreg[1][7], wreg[1][6], wreg[1][1], wreg[0][1], hmclr, cxclr
+TIA	inst	clockgen clockgen
+TIA	inst	horiz_gen h_gen
+TIA	inst	playfield playfield
+TIA	inst	hmove_gen hmv
+TIA	inst	player pl1
+TIA	inst	player pl2
+TIA	inst	missile mis0
+TIA	inst	missile mis1
+TIA	inst	ball bal
+TIA	inst	priority_encoder prior
+TIA	inst	audio_channel audio0
+TIA	inst	audio_channel audio1
+TIA	block@2179	clk	col[3], col[2], col[1], col[0], lum[2], lum[1], lum[0]
+TIA	inst	sr_latch in_sr
+TIA	block@2208	clk	rreg[13][7], rreg[12][7], rreg[11][7], rreg[10][7], rreg[9][7], rreg[8][7], rreg[7][7], rreg[7][6], rreg[6][7], rreg[5][7], rreg[5][6], rreg[4][7], rreg[4][6], rreg[3][7], rreg[3][6], rreg[2][7], rreg[2][6], rreg[1][7], rreg[1][6], rreg[0][7], rreg[0][6]
+M6532	block@144	clk	ram_read_r, d_out_reg[7], d_out_reg[6], d_out_reg[5], d_out_reg[4], d_out_reg[3], d_out_reg[2], d_out_reg[1], d_out_reg[0]
+M6532	block@178	clk	init_addr[6], init_addr[5], init_addr[4], init_addr[3], init_addr[2], init_addr[1], init_addr[0], out_a[7], out_a[6], out_a[5], out_a[4], out_a[3], out_a[2], out_a[1], out_a[0], out_b[7], out_b[6], out_b[5], out_b[4], out_b[3], out_b[2], out_b[1], out_b[0], dir_a[7], dir_a[6], dir_a[5], dir_a[4], dir_a[3], dir_a[2], dir_a[1], dir_a[0], dir_b[7], dir_b[6], dir_b[5], dir_b[4], dir_b[3], dir_b[2], dir_b[1], dir_b[0], interrupt[7], interrupt[6], edge_detect, old_pa7, incr[1], incr[0], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], prescaler[9], prescaler[8], prescaler[7], prescaler[6], prescaler[5], prescaler[4], prescaler[3], prescaler[2], prescaler[1], prescaler[0], rollover	not chained: irq_en
+maria	block@85	clk_sys	mclk1, mclk0, pclk0, pclk1, men_count[2], men_count[1], men_count[0], tia_enable_count[2], tia_enable_count[1], tia_enable_count[0], slow_clk_latch, clk_toggle, clock_div[1], clock_div[0], pclk_toggle	not chained: ready_int,old_men,pclk
+mos6502_ctl	block@878	clk_sys	rdy_q
+mos6502_ctl	block@1287	clk_sys	res_c2, res_g, res_p, sync_short, brk_done_q, tg_c2[3], tg_c2[2], tg_c2[0], sync_c2, end_x_q	not chained: irq_p,nmi_p,nmi_l,nmig_c2,vec_n_c2,ext_t5_r,ext_t6_r
+mos6502_ctl	block@1382	clk_sys	wr_q, sync_q, t[3], t[2], t[1], t[0], c_reg.zero_v, c_reg.zero_adl1, c_reg.zero_adl0, c_reg.zero_adh17, c_reg.zero_adh0, c_reg.zero_add, c_reg.y_sb, c_reg.x_sb, c_reg.wr, c_reg.sums, c_reg.srs, c_reg.sb_y, c_reg.sb_x, c_reg.sb_s, c_reg.sb_db, c_reg.sb_adh, c_reg.sb_add, c_reg.sb_ac, c_reg.s_sb, c_reg.s_inc, c_reg.s_dec, c_reg.s_adl, c_reg.pcl_db, c_reg.pcl_adl, c_reg.pch_db, c_reg.pch_adh, c_reg.p_db, c_reg.ors, c_reg.one_i, c_reg.ndb_add, c_reg.ir5_i, c_reg.ir5_d, c_reg.ir5_c, c_reg.ipc, c_reg.eors, c_reg.dsa, c_reg.dl_db, c_reg.dl_adl, c_reg.dl_adh, c_reg.dbz_z, c_reg.db_p, c_reg.db_add, c_reg.db7_n, c_reg.db7_c, c_reg.db6_v, c_reg.db0_c, c_reg.daa, c_reg.b_out, c_reg.avr_v, c_reg.arr_flags, c_reg.arr_daa, c_reg.arr_d, c_reg.ands, c_reg.alucin, c_reg.adl_pcl, c_reg.adl_add, c_reg.adl_abl, c_reg.adh_pch, c_reg.adh_abh, c_reg.add_sb7, c_reg.add_sb06, c_reg.add_adl, c_reg.acr_c, c_reg.ac_sb, c_reg.ac_db, br_back_q, ir[7], ir[6], ir[5], ir[4], ir[3], ir[2], ir[1], ir[0], pgx, idx_cross_q	not chained: so_last,so_edge_q,int_g,int_armed
+mos6502_dp	block@201	clk_sys	x[7], x[6], x[5], x[4], x[3], x[2], x[1], x[0], y[7], y[6], y[5], y[4], y[3], y[2], y[1], y[0], a[7], a[6], a[5], a[4], a[3], a[2], a[1], a[0], s_in[7], s_in[6], s_in[5], s_in[4], s_in[3], s_in[2], s_in[1], s_in[0], ai[7], ai[6], ai[5], ai[4], ai[3], ai[2], ai[1], ai[0], bi[7], bi[6], bi[5], bi[4], bi[3], bi[2], bi[1], bi[0], pcls[7], pcls[6], pcls[5], pcls[4], pcls[3], pcls[2], pcls[1], pcls[0], pchs[7], pchs[6], pchs[5], pchs[4], pchs[3], pchs[2], pchs[1], pchs[0], abl[7], abl[6], abl[5], abl[4], abl[3], abl[2], abl[1], abl[0], abh[4], abh[3], abh[2], abh[1], abh[0], dor[7], dor[6], dor[5], dor[4], dor[3], dor[2], dor[1], dor[0], p_v, p_z, p_i, p_d, p_c, p_n, arr_lo_q, arr_hi_q, add[7], add[6], add[5], add[4], add[3], add[2], add[1], add[0], acr, avr, hc_held, dl[7], dl[6], dl[5], dl[4], dl[3], dl[2], dl[1], dl[0], pcl[7], pcl[6], pcl[5], pcl[4], pcl[3], pcl[2], pcl[1], pcl[0], pch[7], pch[6], pch[5], pch[4], pch[3], pch[2], pch[1], pch[0], s_out[7], s_out[6], s_out[5], s_out[4], s_out[3], s_out[2], s_out[1], s_out[0]
+mos6502	inst	mos6502_ctl ctl
+mos6502	inst	mos6502_dp dp
+mos6502	block@112	clk_sys	phase2
+mos6502	block@130	clk_sys	wr_pin	not chained: sync_pin
+sally	inst	mos6502 core
+Atari7800	block@232	clk_sys	reset_hold	not chained: reset_phase_wait
+Atari7800	block@256	clk_sys	tia_RDY_seen_high
+Atari7800	block@287	clk_sys	stall_cycle_taken
+Atari7800	block@314	clk_sys	open_bus[7], open_bus[6], open_bus[5], open_bus[4], open_bus[3], open_bus[2], open_bus[1], open_bus[0]	not chained: pause_clock,last_address
+Atari7800	inst	cpu_phase_controller phase_controller
+Atari7800	inst	maria maria_inst
+Atari7800	inst	TIA tia_inst
+Atari7800	inst	video_mux mux
+Atari7800	inst	M6532 riot_inst
+Atari7800	inst	M6502C cpu_inst
+Atari7800	block@622	clk_sys	tia_en
+Atari7800	inst	cart2600 cart2600
+cpu_phase_controller	block@1056	clk_sys	last_phase2, phase_valid, active_tia, state, target_tia
+M6502C	block@1131	clk_sys	in_phase2
+M6502C	inst	sally cpu
+cart2600	block@276	clk	access_taken
+cart2600	block@283	clk	old_ain[12], old_ain[11], old_ain[10], old_ain[9], old_ain[8], old_ain[7], old_ain[6], old_ain[5], old_ain[4], old_ain[3], old_ain[2], old_ain[1], old_ain[0]
+cart2600	inst	mapper_CTY mapper_CTY
+cart2600	inst	mapper_F8 mapper_F8
+cart2600	inst	mapper_F6 mapper_F6
+cart2600	inst	mapper_FE mapper_FE
+cart2600	inst	mapper_E0 mapper_E0
+cart2600	inst	mapper_3F mapper_3F
+cart2600	inst	mapper_F4 mapper_F4
+cart2600	inst	mapper_P2 mapper_P2
+cart2600	inst	mapper_FA mapper_FA
+cart2600	inst	mapper_fa2 mapper_FA2
+cart2600	inst	mapper_UA mapper_UA
+cart2600	inst	mapper_E7 mapper_E7
+cart2600	inst	mapper_F0 mapper_F0
+cart2600	inst	mapper_32 mapper_32
+cart2600	inst	mapper_WD mapper_WD
+cart2600	inst	mapper_3E mapper_3E
+cart2600	inst	mapper_SB mapper_SB
+cart2600	inst	mapper_EF mapper_EF
+cart2600	inst	mapper_0840 mapper_0840
+cart2600	inst	mapper_FC mapper_FC
+cart2600	inst	mapper_DF mapper_DF
+cart2600	inst	mapper_MC mapper_MC_MC2K
+cart2600	inst	mapper_MC mapper_MC_MC4K
+cart2600	inst	mapper_MC mapper_MC_MC8K
+cart2600	inst	mapper_JANE mapper_JANE
+mapper_F8	block@56	clk	bank
+mapper_F6	block@97	clk	bank[1], bank[0]
+mapper_FE	block@143	clk	latch_next, bank
+mapper_E0	block@190	clk	banks[2][2], banks[2][1], banks[2][0], banks[1][2], banks[1][1], banks[1][0], banks[0][2], banks[0][1], banks[0][0]
+mapper_3F	block@246	clk	bank[7], bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]
+mapper_F4	block@283	clk	bank[2], bank[1], bank[0]
+mapper_P2	block@366	clk	rom_a_next[13], rom_a_next[12], rom_a_next[11], rom_a_next[10], rom_a_next[9], rom_a_next[8], rom_a_next[7], rom_a_next[6], rom_a_next[5], rom_a_next[4], rom_a_next[3], rom_a_next[2], rom_a_next[1], rom_a_next[0], rand_val[7], rand_val[6], rand_val[5], rand_val[4], rand_val[3], rand_val[2], rand_val[1], rand_val[0], counters[7][10], counters[7][9], counters[7][8], counters[7][7], counters[7][6], counters[7][5], counters[7][4], counters[7][3], counters[7][2], counters[7][1], counters[7][0], counters[6][10], counters[6][9], counters[6][8], counters[6][7], counters[6][6], counters[6][5], counters[6][4], counters[6][3], counters[6][2], counters[6][1], counters[6][0], counters[5][10], counters[5][9], counters[5][8], counters[5][7], counters[5][6], counters[5][5], counters[5][4], counters[5][3], counters[5][2], counters[5][1], counters[5][0], counters[4][10], counters[4][9], counters[4][8], counters[4][7], counters[4][6], counters[4][5], counters[4][4], counters[4][3], counters[4][2], counters[4][1], counters[4][0], counters[3][10], counters[3][9], counters[3][8], counters[3][7], counters[3][6], counters[3][5], counters[3][4], counters[3][3], counters[3][2], counters[3][1], counters[3][0], counters[2][10], counters[2][9], counters[2][8], counters[2][7], counters[2][6], counters[2][5], counters[2][4], counters[2][3], counters[2][2], counters[2][1], counters[2][0], counters[1][10], counters[1][9], counters[1][8], counters[1][7], counters[1][6], counters[1][5], counters[1][4], counters[1][3], counters[1][2], counters[1][1], counters[1][0], counters[0][10], counters[0][9], counters[0][8], counters[0][7], counters[0][6], counters[0][5], counters[0][4], counters[0][3], counters[0][2], counters[0][1], counters[0][0], flags[7][7], flags[7][6], flags[7][5], flags[7][4], flags[7][3], flags[7][2], flags[7][1], flags[7][0], flags[6][7], flags[6][6], flags[6][5], flags[6][4], flags[6][3], flags[6][2], flags[6][1], flags[6][0], flags[5][7], flags[5][6], flags[5][5], flags[5][4], flags[5][3], flags[5][2], flags[5][1], flags[5][0], flags[4][7], flags[4][6], flags[4][5], flags[4][4], flags[4][3], flags[4][2], flags[4][1], flags[4][0], flags[3][7], flags[3][6], flags[3][5], flags[3][4], flags[3][3], flags[3][2], flags[3][1], flags[3][0], flags[2][7], flags[2][6], flags[2][5], flags[2][4], flags[2][3], flags[2][2], flags[2][1], flags[2][0], flags[1][7], flags[1][6], flags[1][5], flags[1][4], flags[1][3], flags[1][2], flags[1][1], flags[1][0], flags[0][7], flags[0][6], flags[0][5], flags[0][4], flags[0][3], flags[0][2], flags[0][1], flags[0][0], tops[7][7], tops[7][6], tops[7][5], tops[7][4], tops[7][3], tops[7][2], tops[7][1], tops[7][0], tops[6][7], tops[6][6], tops[6][5], tops[6][4], tops[6][3], tops[6][2], tops[6][1], tops[6][0], tops[5][7], tops[5][6], tops[5][5], tops[5][4], tops[5][3], tops[5][2], tops[5][1], tops[5][0], tops[4][7], tops[4][6], tops[4][5], tops[4][4], tops[4][3], tops[4][2], tops[4][1], tops[4][0], tops[3][7], tops[3][6], tops[3][5], tops[3][4], tops[3][3], tops[3][2], tops[3][1], tops[3][0], tops[2][7], tops[2][6], tops[2][5], tops[2][4], tops[2][3], tops[2][2], tops[2][1], tops[2][0], tops[1][7], tops[1][6], tops[1][5], tops[1][4], tops[1][3], tops[1][2], tops[1][1], tops[1][0], tops[0][7], tops[0][6], tops[0][5], tops[0][4], tops[0][3], tops[0][2], tops[0][1], tops[0][0], bottoms[7][7], bottoms[7][6], bottoms[7][5], bottoms[7][4], bottoms[7][3], bottoms[7][2], bottoms[7][1], bottoms[7][0], bottoms[6][7], bottoms[6][6], bottoms[6][5], bottoms[6][4], bottoms[6][3], bottoms[6][2], bottoms[6][1], bottoms[6][0], bottoms[5][7], bottoms[5][6], bottoms[5][5], bottoms[5][4], bottoms[5][3], bottoms[5][2], bottoms[5][1], bottoms[5][0], bottoms[4][7], bottoms[4][6], bottoms[4][5], bottoms[4][4], bottoms[4][3], bottoms[4][2], bottoms[4][1], bottoms[4][0], bottoms[3][7], bottoms[3][6], bottoms[3][5], bottoms[3][4], bottoms[3][3], bottoms[3][2], bottoms[3][1], bottoms[3][0], bottoms[2][7], bottoms[2][6], bottoms[2][5], bottoms[2][4], bottoms[2][3], bottoms[2][2], bottoms[2][1], bottoms[2][0], bottoms[1][7], bottoms[1][6], bottoms[1][5], bottoms[1][4], bottoms[1][3], bottoms[1][2], bottoms[1][1], bottoms[1][0], bottoms[0][7], bottoms[0][6], bottoms[0][5], bottoms[0][4], bottoms[0][3], bottoms[0][2], bottoms[0][1], bottoms[0][0], music_modes[2], music_modes[1], music_modes[0], bank, music_div[9], music_div[8], music_div[7], music_div[6], music_div[5], music_div[4], music_div[3], music_div[2], music_div[1], music_div[0], music_clock[15], music_clock[14], music_clock[13], music_clock[12], music_clock[11], music_clock[10], music_clock[9], music_clock[8], music_clock[7], music_clock[6], music_clock[5], music_clock[4], music_clock[3], music_clock[2], music_clock[1], music_clock[0]
+mapper_P2	block@475	clk	mod_num[15], mod_num[14], mod_num[13], mod_num[12], mod_num[11], mod_num[10], mod_num[9], mod_num[8], mod_num[7], mod_num[6], mod_num[5], mod_num[4], mod_num[3], mod_num[2], mod_num[1], mod_num[0], mod_rem[2][7], mod_rem[2][6], mod_rem[2][5], mod_rem[2][4], mod_rem[2][3], mod_rem[2][2], mod_rem[2][1], mod_rem[2][0], mod_rem[1][7], mod_rem[1][6], mod_rem[1][5], mod_rem[1][4], mod_rem[1][3], mod_rem[1][2], mod_rem[1][1], mod_rem[1][0], mod_rem[0][7], mod_rem[0][6], mod_rem[0][5], mod_rem[0][4], mod_rem[0][3], mod_rem[0][2], mod_rem[0][1], mod_rem[0][0], mod_step[3], mod_step[2], mod_step[1], mod_step[0], mod_run, music_rem[2][7], music_rem[2][6], music_rem[2][5], music_rem[2][4], music_rem[2][3], music_rem[2][2], music_rem[2][1], music_rem[2][0], music_rem[1][7], music_rem[1][6], music_rem[1][5], music_rem[1][4], music_rem[1][3], music_rem[1][2], music_rem[1][1], music_rem[1][0], music_rem[0][7], music_rem[0][6], music_rem[0][5], music_rem[0][4], music_rem[0][3], music_rem[0][2], music_rem[0][1], music_rem[0][0]
+mapper_CTY	block@585	clk	busy_timer[21], busy_timer[20], busy_timer[19], busy_timer[18], busy_timer[17], busy_timer[16], busy_timer[15], busy_timer[14], busy_timer[13], busy_timer[12], busy_timer[11], busy_timer[10], busy_timer[9], busy_timer[8], busy_timer[7], busy_timer[6], busy_timer[5], busy_timer[4], busy_timer[3], busy_timer[2], busy_timer[1], busy_timer[0], bank[2], bank[1], bank[0], busy, error_code[7], error_code[6], error_code[5], error_code[4], error_code[3], error_code[2], error_code[1], error_code[0], operation[3], operation[2], operation[1], operation[0], random[31], random[30], random[29], random[28], random[27], random[26], random[25], random[24], random[23], random[22], random[21], random[20], random[19], random[18], random[17], random[16], random[15], random[14], random[13], random[12], random[11], random[10], random[9], random[8], random[7], random[6], random[5], random[4], random[3], random[2], random[1], random[0], tune_pos[15], tune_pos[14], tune_pos[13], tune_pos[12], tune_pos[11], tune_pos[10], tune_pos[9], tune_pos[8], tune_pos[7], tune_pos[6], tune_pos[5], tune_pos[4], tune_pos[3], tune_pos[2], tune_pos[1], tune_pos[0]
+mapper_FA	block@659	clk	bank[1], bank[0]
+mapper_UA	block@756	clk	bank
+mapper_E7	block@808	clk	bank[2], bank[1], bank[0], ram_bank[1], ram_bank[0]
+mapper_F0	block@850	clk	bank[3], bank[2], bank[1], bank[0]
+mapper_32	block@891	clk	old_reset, bank[4], bank[3], bank[2], bank[1], bank[0]
+mapper_WD	block@1367	clk	pending_switch[3], pending_switch[2], pending_switch[1], pending_switch[0], banks[3][2], banks[3][1], banks[3][0], banks[2][2], banks[2][1], banks[2][0], banks[1][2], banks[1][1], banks[1][0], banks[0][2], banks[0][1], banks[0][0], bank_config[2], bank_config[1], bank_config[0]
+mapper_3E	block@1419	clk	bank[7], bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0], ram_en, ram_bank[4], ram_bank[3], ram_bank[2], ram_bank[1], ram_bank[0]
+mapper_SB	block@1467	clk	bank[6], bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]
+mapper_EF	block@1506	clk	bank[3], bank[2], bank[1], bank[0]
+mapper_JANE	block@1545	clk	bank[1], bank[0]
+mapper_0840	block@1612	clk	bank
+mapper_FC	block@1662	clk	lo[1], lo[0], hi[5], hi[4], hi[3], hi[2], hi[1], hi[0], bank[2], bank[1], bank[0]
+mapper_DF	block@1709	clk	bank[5], bank[4], bank[3], bank[2], bank[1], bank[0]
+mapper_MC	block@1762	clk	reset_d, game[7], game[6], game[5], game[4], game[3], game[2], game[1], game[0], armed, bank
+mapper_fa2	block@129	clk	timer[18], timer[17], timer[16], timer[15], timer[14], timer[13], timer[12], timer[11], timer[10], timer[9], timer[8], timer[7], timer[6], timer[5], timer[4], timer[3], timer[2], timer[1], timer[0], ready_response, command_pending, operation_active, copy_addr[7], copy_addr[6], copy_addr[5], copy_addr[4], copy_addr[3], copy_addr[2], copy_addr[1], copy_addr[0], copy_state, bank[2], bank[1], bank[0]	not chained: nvram_dirty
+lightgun	block@43	CLK	TRIGGER, cross_sz[1], lg_x[8], lg_x[7], lg_x[6], lg_x[5], lg_x[4], lg_x[3], lg_x[2], lg_x[1], lg_x[0], lg_y[8], lg_y[7], lg_y[6], lg_y[5], lg_y[4], lg_y[3], lg_y[2], lg_y[1], lg_y[0], hde_d[15], hde_d[14], hde_d[13], hde_d[12], hde_d[11], hde_d[10], hde_d[9], hde_d[8], hde_d[7], hde_d[6], hde_d[5], hde_d[4], hde_d[3], hde_d[2], hde_d[1], hde_d[0], old_hde, hcnt[9], hcnt[8], hcnt[7], hcnt[6], hcnt[5], hcnt[4], hcnt[3], hcnt[2], hcnt[1], hcnt[0], vcnt[8], vcnt[7], vcnt[6], vcnt[5], vcnt[4], vcnt[3], vcnt[2], vcnt[1], vcnt[0], vtotal[8], vtotal[7], vtotal[6], vtotal[5], vtotal[4], vtotal[3], vtotal[2], vtotal[1], vtotal[0], old_vde, x[8], x[7], x[6], x[5], x[4], x[3], x[2], x[1], x[0], y[8], y[7], y[6], y[5], y[4], y[3], y[2], y[1], y[0], xm[9], xm[8], xm[7], xm[6], xm[5], xm[4], xm[3], xm[2], xm[1], xm[0], xp[9], xp[8], xp[7], xp[6], xp[5], xp[4], xp[3], xp[2], xp[1], xp[0], ym[8], ym[7], ym[6], ym[5], ym[4], ym[3], ym[2], ym[1], ym[0], yp[8], yp[7], yp[6], yp[5], yp[4], yp[3], yp[2], yp[1], yp[0], offscreen, sensor_time[7], sensor_time[6], sensor_time[5], sensor_time[4], sensor_time[3], sensor_time[2], sensor_time[1], sensor_time[0], SENSOR, sensor_pend, draw	not chained: old_ms
+EEPROM_24LC0X	block@53	clk	state, command[9], command[8], command[7], command[6], command[5], command[4], command[3], command[2], command[1], command[0], last_SCL, last_SDA, SDA_out, ram_read, address[14], address[13], address[12], address[11], address[10], address[9], address[8], address[7], address[6], address[5], address[4], address[3], address[2], address[1], address[0], ram_write, read_ack_phase, data[8], data[7], data[6], data[5], data[4], data[3], data[2], data[1], data[0], a_bytes_left[7], a_bytes_left[6], a_bytes_left[5], a_bytes_left[4], a_bytes_left[3], a_bytes_left[2], a_bytes_left[1], a_bytes_left[0], address_buffer[13], address_buffer[12], address_buffer[11], address_buffer[10], address_buffer[9], address_buffer[8], address_buffer[7], address_buffer[6], address_buffer[5], address_buffer[4], address_buffer[3], address_buffer[2], address_buffer[1], address_buffer[0]
+video_mux	block@165	clk_sys	pal_buff[15], pal_buff[14], pal_buff[13], pal_buff[12], pal_buff[11], pal_buff[10], pal_buff[9], pal_buff[8], pal_buff[7], pal_buff[6], pal_buff[5], pal_buff[4], pal_buff[3], pal_buff[2], pal_buff[1], frame_ptr[15], frame_ptr[14], frame_ptr[13], frame_ptr[12], frame_ptr[11], frame_ptr[10], frame_ptr[9], frame_ptr[8], frame_ptr[7], frame_ptr[6], frame_ptr[5], frame_ptr[4], frame_ptr[3], frame_ptr[2], frame_ptr[1], frame_ptr[0], old_color[23], old_color[22], old_color[21], old_color[20], old_color[19], old_color[18], old_color[17], old_color[15], old_color[14], old_color[13], old_color[12], old_color[11], old_color[10], old_color[9], old_color[7], old_color[6], old_color[5], old_color[4], old_color[3], old_color[2], old_color[1], old_vblank, pix_ce_delayed, pix_ce, red[7], red[6], red[5], red[4], red[3], red[2], red[1], red[0], green[7], green[6], green[5], green[4], green[3], green[2], green[1], green[0], blue[7], blue[6], blue[5], blue[4], blue[3], blue[2], blue[1], blue[0], vsync, vblank, hsync, hblank	not chained: pal_count,pal_mux_addr,last_color
+# stateful modules: Atari7800 EEPROM_24LC0X M6502C M6532 TIA audio_channel ball cart2600 clockgen cpu_phase_controller cpuclk d_cell f_cell f_counter f_counter_ll hmove_gen horiz_gen inverter_reg lfsr_6 lightgun mapper_0840 mapper_32 mapper_3E mapper_3F mapper_CTY mapper_DF mapper_E0 mapper_E7 mapper_EF mapper_F0 mapper_F4 mapper_F6 mapper_F8 mapper_FA mapper_FC mapper_FE mapper_JANE mapper_MC mapper_P2 mapper_SB mapper_UA mapper_WD mapper_fa2 maria missile mos6502 mos6502_ctl mos6502_dp object_tick player playfield priority_encoder sally sr_latch video_mux video_stabilize

@@ -427,12 +427,19 @@ def input_events(body):
         m = re.fullmatch(r"INPUT port types: (.*)", x)
         if m:
             types = m.group(1)
+        m = re.fullmatch(r"INPUT paddle shadow: clocks (\d+), INPT0-3 rises (\d+), mismatches (\d+)", x)
+        if m:
+            shows["shadow"] = [int(v) for v in m.groups()]
     return types, shows, drives
 
 
 def input_rules(title, s, d):
     """(what, ok) pairs for one run: s the shows by ms, d the drive lines."""
     out = []
+    # tb_load's +padshadow: MiSTer's four paddle_timer beside paddle_timer4.sv
+    sh = s.get("shadow")
+    out.append(("paddle_timer4 equals four paddle_timer on every clock (+padshadow)",
+                sh is not None and sh[0] > 0 and sh[2] == 0 and (sh[1] > 0 or "Paddles" not in title)))
     try:
         if title.startswith("Port 1 Paddles"):
             r = s[300]["p"][0]

@@ -32,6 +32,9 @@ expected lines and fails on:
     the bad game screen's scheme, 32) leaving the file as it was;
   - tb_vaxis5 (sim/run_vaxis5.sh) other than its four seeds of 10^7 clocks
     with 0 mismatches each, the planted fault caught and "VAXIS5 pass";
+  - tb_paddles4 (sim/run_paddles4.sh) other than its four seeds of 2 x 10^7
+    clocks (two with the clock enable dropping) with 0 mismatches each,
+    both planted faults caught and "PADDLES4 pass";
   - tb_region (sim/run_region.sh) other than its lines for the DARIA and
     the plain build (every trial with the retunes wanted, no retune back to
     back, and in the DARIA build daria_rgn exact: scenarios A, B and C for
@@ -132,6 +135,14 @@ VAXIS5 = [r"VAXIS5 seed %d cycles 10000000 ticks [1-9]\d* resets [1-9]\d* \(on a
           r"1-4 clocks after one [1-9]\d*\) mismatches 0" % k for k in (1, 2, 3, 4)] + [
     r"VAXIS5 planted fault \(axis 4 reads axis 3's slow\), seed 1: caught, [1-9]\d* mismatches",
     r"VAXIS5 pass",
+]
+# tb_paddles4 through sim/run_paddles4.sh's defaults: seeds 1 and 2, and 3
+# and 4 with the clock enable dropping, 2 x 10^7 clocks each
+PADDLES4 = [r"PADDLES4 seed %d ce %d clocks 20000000 mismatches 0" % (k, k > 2) for k in (1, 2, 3, 4)] + [
+    r"PADDLES4 planted fault \(the chain shifted one bit short\), seed 2: caught, [1-9]\d* mismatches",
+    r"PADDLES4 planted fault \(the engine reads paddle 0's cleared\), seed 1: caught, [1-9]\d* mismatches",
+    r"PADDLES4 planted fault \(a pending width dropped in a dump\), seed 1: caught, [1-9]\d* mismatches",
+    r"PADDLES4 pass",
 ]
 # tb_region through sim/run_region.sh: the region logic of both builds in
 # RTL-1's and RTL-2's load sequences, and its planted variants. The plain
@@ -401,6 +412,12 @@ def check(log, build, only=None):
         need(b, p, "tb_vaxis5")
     if b and any(x.startswith("MISMATCH") for x in b):
         bad.append("tb_vaxis5: MISMATCH lines")
+    # the four paddle timers with one engine
+    h, b = L.section("-- the four paddle timers")
+    for p in PADDLES4:
+        need(b, p, "tb_paddles4")
+    if b and any(x.startswith("MISMATCH") for x in b):
+        bad.append("tb_paddles4: MISMATCH lines")
     return bad, notes, build
 
 

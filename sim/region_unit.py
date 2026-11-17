@@ -15,6 +15,8 @@ cart_is_7800, tia_mode, tia_en, daria_reset, daria_arm) are ports, which
 tb_region.sv models. openFPGA-2600's wrapper ties the block's A78 input,
 rgn_a78, to 0 (no A78 reaches its region logic); here it is the
 cart_is_7800 port, as in the 7800 core, so the A78 scenarios still run.
+The save states' hold (ss_hold, which keeps region_pll while the machine is
+frozen) is 0.
 
 VARIANT plants one change (each replacement must match exactly once):
   rtl2    RTL-2 undone: the withdrawal takes daria_rgn's old value
@@ -53,6 +55,7 @@ module region_unit (
 	output wire  [3:0] rt_cnt_o
 );
 wire rgn_a78 = cart_is_7800;
+wire ss_hold = 1'b0;   // save states: the machine never held here (docs/SAVESTATE.md 2.2)
 reg old_cart_download = 1'b0;
 reg [1:0] pll_busy_s = 2'b00;
 always @(posedge clk_sys) begin
